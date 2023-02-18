@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1"
+        />
+        <style>
+            body.dragging * {
+                cursor: grabbing !important;
+            }
+            .gitbook-splashscreen {
+                position: fixed;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                left: 0;
+                display: flex;
+                width: 100%;
+                height: 100%;
+            }
+            .slate-spacer {
+                height: 0;
+                color: transparent;
+                outline: none;
+                position: absolute;
+            }
+            @keyframes LoadingIndicator {
+                from {
+                    transform: rotate(0deg);
+                }
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+            [data-loading-indicator='true'] {
+                animation: LoadingIndicator 0.6s linear infinite;
+            }
+        </style>
+        <title>8.4 Copy On Write Fork - MIT6.S081</title>
+<meta name="twitter:site" content="MIT6.S081" id="__meta-twitter:site" />
+<link rel="preload" as="font" type="font/woff2" href="https://app.gitbook.com/public/fonts/Roboto/Roboto-Bold.woff2?v=3.19" crossorigin="anonymous">
+<link rel="preload" as="font" type="font/woff2" href="https://app.gitbook.com/public/fonts/Roboto/Roboto-BoldItalic.woff2?v=3.19" crossorigin="anonymous">
+<link rel="preload" as="font" type="font/woff2" href="https://app.gitbook.com/public/fonts/Roboto/Roboto-Black.woff2?v=3.19" crossorigin="anonymous">
+<link rel="preload" as="font" type="font/woff2" href="https://app.gitbook.com/public/fonts/Roboto/Roboto-BlackItalic.woff2?v=3.19" crossorigin="anonymous">
+<link rel="preload" as="font" type="font/woff2" href="https://app.gitbook.com/public/fonts/Roboto/Roboto-Medium.woff2?v=3.19" crossorigin="anonymous">
+<link rel="preload" as="font" type="font/woff2" href="https://app.gitbook.com/public/fonts/Roboto/Roboto-MediumItalic.woff2?v=3.19" crossorigin="anonymous">
+<link rel="preload" as="font" type="font/woff2" href="https://app.gitbook.com/public/fonts/Roboto/Roboto-Regular.woff2?v=3.19" crossorigin="anonymous">
+<link rel="preload" as="font" type="font/woff2" href="https://app.gitbook.com/public/fonts/Roboto/Roboto-Italic.woff2?v=3.19" crossorigin="anonymous">
+        <style id="__font-Roboto-gitbook-content-font">
+            @font-face {
+            font-family: 'gitbook-content-font';
+            font-style:  normal;
+            font-weight: 700;
+            font-display: swap;
+            src: local("Roboto Bold"), local("Roboto-Bold"), url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Bold.woff2?v=3.19") format("woff2"),
+                    url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Bold.woff?v=3.19") format("woff");
+        }
+@font-face {
+            font-family: 'gitbook-content-font';
+            font-style:  italic;
+            font-weight: 700;
+            font-display: swap;
+            src: local("Roboto BoldItalic"), local("Roboto-BoldItalic"), url("https://app.gitbook.com/public/fonts/Roboto/Roboto-BoldItalic.woff2?v=3.19") format("woff2"),
+                    url("https://app.gitbook.com/public/fonts/Roboto/Roboto-BoldItalic.woff?v=3.19") format("woff");
+        }
+@font-face {
+            font-family: 'gitbook-content-font';
+            font-style:  normal;
+            font-weight: 800;
+            font-display: swap;
+            src: local("Roboto Black"), local("Roboto-Black"), url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Black.woff2?v=3.19") format("woff2"),
+                    url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Black.woff?v=3.19") format("woff");
+        }
+@font-face {
+            font-family: 'gitbook-content-font';
+            font-style:  italic;
+            font-weight: 800;
+            font-display: swap;
+            src: local("Roboto BlackItalic"), local("Roboto-BlackItalic"), url("https://app.gitbook.com/public/fonts/Roboto/Roboto-BlackItalic.woff2?v=3.19") format("woff2"),
+                    url("https://app.gitbook.com/public/fonts/Roboto/Roboto-BlackItalic.woff?v=3.19") format("woff");
+        }
+@font-face {
+            font-family: 'gitbook-content-font';
+            font-style:  normal;
+            font-weight: 500;
+            font-display: swap;
+            src: local("Roboto Medium"), local("Roboto-Medium"), url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Medium.woff2?v=3.19") format("woff2"),
+                    url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Medium.woff?v=3.19") format("woff");
+        }
+@font-face {
+            font-family: 'gitbook-content-font';
+            font-style:  italic;
+            font-weight: 500;
+            font-display: swap;
+            src: local("Roboto MediumItalic"), local("Roboto-MediumItalic"), url("https://app.gitbook.com/public/fonts/Roboto/Roboto-MediumItalic.woff2?v=3.19") format("woff2"),
+                    url("https://app.gitbook.com/public/fonts/Roboto/Roboto-MediumItalic.woff?v=3.19") format("woff");
+        }
+@font-face {
+            font-family: 'gitbook-content-font';
+            font-style:  normal;
+            font-weight: 400;
+            font-display: swap;
+            src: local("Roboto Regular"), local("Roboto-Regular"), url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Regular.woff2?v=3.19") format("woff2"),
+                    url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Regular.woff?v=3.19") format("woff");
+        }
+@font-face {
+            font-family: 'gitbook-content-font';
+            font-style:  italic;
+            font-weight: 400;
+            font-display: swap;
+            src: local("Roboto Italic"), local("Roboto-Italic"), url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Italic.woff2?v=3.19") format("woff2"),
+                    url("https://app.gitbook.com/public/fonts/Roboto/Roboto-Italic.woff?v=3.19") format("woff");
+        }
+        </style>
+<meta name="description" content="" id="__meta-description" />
+<meta name="og:description" content="" id="__meta-og:description" />
+<meta name="og:image" content="https://app.gitbook.com/share/space/thumbnail/-MHZoT2b_bcLghjAOPsJ/page/-MMjViRs2-CXbUvFNOMC.png?color=%23A44EED&logo=&theme=none" id="__meta-og:image" />
+<meta name="twitter:card" content="summary_large_image" id="__meta-twitter:card" />
+<meta name="og:title" content="8.4 Copy On Write Fork" id="__meta-og:title" />
+<meta name="robots" content="index" id="__meta-robots" />
+<link rel="icon" href="https://app.gitbook.com/public/images/icon-512.png"  id="__link-icon" />
+<link rel="preload" as="image" href="https://906337931-files.gitbook.io/~/files/v0/b/gitbook-legacy-files/o/assets%2F-MHZoT2b_bcLghjAOPsJ%2F-MMidiGrWWP5Do6c9hwf%2F-MMjs294uvJMihNXEnSm%2Fimage.png?alt=media&token=bf43b7d6-b65a-4a61-9f98-2a3fde9fb4c1" />
+<link rel="preload" as="image" href="https://906337931-files.gitbook.io/~/files/v0/b/gitbook-legacy-files/o/assets%2F-MHZoT2b_bcLghjAOPsJ%2F-MMidiGrWWP5Do6c9hwf%2F-MMjtSVtD4aJB6PMR83g%2Fimage.png?alt=media&token=05cb5346-42d3-4d27-b64d-7acb8ba455dd" />
+
+                
+                <script type="module" defer src="https://app.gitbook.com/public/app/public-WRKNRXNI.min.js?v=10.9.262-436ae9093c05e28ab7ebb323584bf39c60221dc6-4202023843"></script>
+                <link as="style" rel="preload" href="https://app.gitbook.com/public/app/public-AQGENNDA.css?v=10.9.262-436ae9093c05e28ab7ebb323584bf39c60221dc6-4202023843">
+                <link rel="stylesheet" href="https://app.gitbook.com/public/app/public-AQGENNDA.css?v=10.9.262-436ae9093c05e28ab7ebb323584bf39c60221dc6-4202023843">
+                <style id="react-native-stylesheet">[stylesheet-group="0"]{}
+body{margin:0;}
+button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0;}
+html{-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:rgba(0,0,0,0);}
+input::-webkit-search-cancel-button,input::-webkit-search-decoration,input::-webkit-search-results-button,input::-webkit-search-results-decoration{display:none;}
+[stylesheet-group="1"]{}
+.css-11aywtz{-moz-appearance:textfield;-webkit-appearance:none;background-color:rgba(0,0,0,0.00);border-bottom-left-radius:0px;border-bottom-right-radius:0px;border-top-left-radius:0px;border-top-right-radius:0px;border:0 solid black;box-sizing:border-box;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:0px;padding:0px;resize:none;}
+.css-175oi2r{align-items:stretch;background-color:rgba(0,0,0,0.00);border:0 solid black;box-sizing:border-box;display:flex;flex-basis:auto;flex-direction:column;flex-shrink:0;list-style:none;margin:0px;min-height:0px;min-width:0px;padding:0px;position:relative;text-decoration:none;z-index:0;}
+.css-1qaijid{background-color:rgba(0,0,0,0.00);border:0 solid black;box-sizing:border-box;color:inherit;display:inline;font:inherit;list-style:none;margin:0px;padding:0px;text-align:inherit;text-decoration:none;white-space:inherit;word-wrap:break-word;}
+.css-1rynq56{background-color:rgba(0,0,0,0.00);border:0 solid black;box-sizing:border-box;color:rgba(0,0,0,1.00);display:inline;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;list-style:none;margin:0px;padding:0px;text-align:inherit;text-decoration:none;white-space:pre-wrap;word-wrap:break-word;}
+.css-9pa8cd{bottom:0px;height:100%;left:0px;opacity:0;position:absolute;right:0px;top:0px;width:100%;z-index:-1;}
+[stylesheet-group="2"]{}
+.r-1064s9p{margin:4px;}
+.r-11mg6pl{border-bottom-color:rgba(255,255,255,1.00);border-left-color:rgba(255,255,255,1.00);border-right-color:rgba(255,255,255,1.00);border-top-color:rgba(255,255,255,1.00);}
+.r-13awgt0{flex:1;}
+.r-13fxbef{border-bottom-color:rgba(211,61,61,1.00);border-left-color:rgba(211,61,61,1.00);border-right-color:rgba(211,61,61,1.00);border-top-color:rgba(211,61,61,1.00);}
+.r-1471scf{display:inline;}
+.r-156hn8l{border-bottom-color:rgba(211,220,228,1.00);border-left-color:rgba(211,220,228,1.00);border-right-color:rgba(211,220,228,1.00);border-top-color:rgba(211,220,228,1.00);}
+.r-17gur6a{border-bottom-left-radius:0px;border-bottom-right-radius:0px;border-top-left-radius:0px;border-top-right-radius:0px;}
+.r-18c69zk{border-bottom-left-radius:100px;border-bottom-right-radius:100px;border-top-left-radius:100px;border-top-right-radius:100px;}
+.r-190qawg{border-bottom-color:rgba(227,232,237,1.00);border-left-color:rgba(227,232,237,1.00);border-right-color:rgba(227,232,237,1.00);border-top-color:rgba(227,232,237,1.00);}
+.r-19dn8jc{border-bottom-color:rgba(104,60,17,1.00);border-left-color:rgba(104,60,17,1.00);border-right-color:rgba(104,60,17,1.00);border-top-color:rgba(104,60,17,1.00);}
+.r-19nkufj{border-bottom-color:rgba(40,49,67,1.00);border-left-color:rgba(40,49,67,1.00);border-right-color:rgba(40,49,67,1.00);border-top-color:rgba(40,49,67,1.00);}
+.r-1awa8pu{border-bottom-color:rgba(101,119,134,1.00);border-left-color:rgba(101,119,134,1.00);border-right-color:rgba(101,119,134,1.00);border-top-color:rgba(101,119,134,1.00);}
+.r-1c57tb8{border-bottom-left-radius:34px;border-bottom-right-radius:34px;border-top-left-radius:34px;border-top-right-radius:34px;}
+.r-1d4xg89{border-bottom-color:rgba(170,184,194,1.00);border-left-color:rgba(170,184,194,1.00);border-right-color:rgba(170,184,194,1.00);border-top-color:rgba(170,184,194,1.00);}
+.r-1dqxon3{overflow-x:auto;overflow-y:auto;}
+.r-1edjr5w{padding:80px;}
+.r-1f0042m{border-bottom-left-radius:5px;border-bottom-right-radius:5px;border-top-left-radius:5px;border-top-right-radius:5px;}
+.r-1fdo3w0{margin:16px;}
+.r-1fuqb1j{border-bottom-left-radius:24px;border-bottom-right-radius:24px;border-top-left-radius:24px;border-top-right-radius:24px;}
+.r-1j16mh1{border-bottom-left-radius:100%;border-bottom-right-radius:100%;border-top-left-radius:100%;border-top-right-radius:100%;}
+.r-1jkafct{border-bottom-left-radius:2px;border-bottom-right-radius:2px;border-top-left-radius:2px;border-top-right-radius:2px;}
+.r-1jyn79y{border-bottom-color:rgba(0,150,136,1.00);border-left-color:rgba(0,150,136,1.00);border-right-color:rgba(0,150,136,1.00);border-top-color:rgba(0,150,136,1.00);}
+.r-1ntk80j{border-bottom-color:rgba(164,78,237,1.00);border-left-color:rgba(164,78,237,1.00);border-right-color:rgba(164,78,237,1.00);border-top-color:rgba(164,78,237,1.00);}
+.r-1p0fg95{border-bottom-color:rgba(245,247,249,1.00);border-left-color:rgba(245,247,249,1.00);border-right-color:rgba(245,247,249,1.00);border-top-color:rgba(245,247,249,1.00);}
+.r-1phboty{border-bottom-style:solid;border-left-style:solid;border-right-style:solid;border-top-style:solid;}
+.r-1rwzld0{border-bottom-color:rgba(11,79,47,1.00);border-left-color:rgba(11,79,47,1.00);border-right-color:rgba(11,79,47,1.00);border-top-color:rgba(11,79,47,1.00);}
+.r-1tw7wh{border-bottom-left-radius:50px;border-bottom-right-radius:50px;border-top-left-radius:50px;border-top-right-radius:50px;}
+.r-1udh08x{overflow-x:hidden;overflow-y:hidden;}
+.r-1w1o3af{border-bottom-color:rgba(251,232,240,1.00);border-left-color:rgba(251,232,240,1.00);border-right-color:rgba(251,232,240,1.00);border-top-color:rgba(251,232,240,1.00);}
+.r-1wgstfn{border-bottom-style:none;border-left-style:none;border-right-style:none;border-top-style:none;}
+.r-1x6f3t4{border-bottom-color:rgba(236,243,255,1.00);border-left-color:rgba(236,243,255,1.00);border-right-color:rgba(236,243,255,1.00);border-top-color:rgba(236,243,255,1.00);}
+.r-1xc7w19{border-bottom-color:rgba(0,0,0,1.00);border-left-color:rgba(0,0,0,1.00);border-right-color:rgba(0,0,0,1.00);border-top-color:rgba(0,0,0,1.00);}
+.r-1xfd6ze{border-bottom-left-radius:8px;border-bottom-right-radius:8px;border-top-left-radius:8px;border-top-right-radius:8px;}
+.r-1xutcf9{padding:40px;}
+.r-1yadl64{border-bottom-width:0px;border-left-width:0px;border-right-width:0px;border-top-width:0px;}
+.r-42olwf{border-bottom-color:rgba(0,0,0,0.00);border-left-color:rgba(0,0,0,0.00);border-right-color:rgba(0,0,0,0.00);border-top-color:rgba(0,0,0,0.00);}
+.r-4a18lf{border-bottom-color:rgba(255,0,0,1.00);border-left-color:rgba(255,0,0,1.00);border-right-color:rgba(255,0,0,1.00);border-top-color:rgba(255,0,0,1.00);}
+.r-4qtqp9{display:inline-block;}
+.r-60ke3l{border-bottom-color:rgba(0,128,0,1.00);border-left-color:rgba(0,128,0,1.00);border-right-color:rgba(0,128,0,1.00);border-top-color:rgba(0,128,0,1.00);}
+.r-6578ry{margin:40px;}
+.r-6koalj{display:flex;}
+.r-6ncur5{border-bottom-left-radius:18px;border-bottom-right-radius:18px;border-top-left-radius:18px;border-top-right-radius:18px;}
+.r-6t2glc{border-bottom-left-radius:40px;border-bottom-right-radius:40px;border-top-left-radius:40px;border-top-right-radius:40px;}
+.r-9x6qib{border-bottom-color:rgba(204,214,221,1.00);border-left-color:rgba(204,214,221,1.00);border-right-color:rgba(204,214,221,1.00);border-top-color:rgba(204,214,221,1.00);}
+.r-ancj0c{border-bottom-color:rgba(218,212,255,1.00);border-left-color:rgba(218,212,255,1.00);border-right-color:rgba(218,212,255,1.00);border-top-color:rgba(218,212,255,1.00);}
+.r-by8dw1{margin:24px;}
+.r-cdmcib{border-bottom-left-radius:3px;border-bottom-right-radius:3px;border-top-left-radius:3px;border-top-right-radius:3px;}
+.r-cpet4d{border-bottom-left-radius:999px;border-bottom-right-radius:999px;border-top-left-radius:999px;border-top-right-radius:999px;}
+.r-crgep1{margin:0px;}
+.r-d045u9{border-bottom-width:2px;border-left-width:2px;border-right-width:2px;border-top-width:2px;}
+.r-d23pfw{padding:24px;}
+.r-dta0w2{flex:2;}
+.r-edyy15{padding:8px;}
+.r-eg6o18{border-bottom-style:dashed;border-left-style:dashed;border-right-style:dashed;border-top-style:dashed;}
+.r-egco7n{border-bottom-color:rgba(253,195,137,1.00);border-left-color:rgba(253,195,137,1.00);border-right-color:rgba(253,195,137,1.00);border-top-color:rgba(253,195,137,1.00);}
+.r-fx7oqy{border-bottom-color:rgba(0,0,255,1.00);border-left-color:rgba(0,0,255,1.00);border-right-color:rgba(0,0,255,1.00);border-top-color:rgba(0,0,255,1.00);}
+.r-gav1f{border-bottom-color:rgba(24,28,31,1.00);border-left-color:rgba(24,28,31,1.00);border-right-color:rgba(24,28,31,1.00);border-top-color:rgba(24,28,31,1.00);}
+.r-hvic4v{display:none;}
+.r-hwh8t1{margin:8px;}
+.r-jqra5g{border-bottom-color:rgba(55,65,81,1.00);border-left-color:rgba(55,65,81,1.00);border-right-color:rgba(55,65,81,1.00);border-top-color:rgba(55,65,81,1.00);}
+.r-jxo161{border-bottom-color:rgba(255,204,203,1.00);border-left-color:rgba(255,204,203,1.00);border-right-color:rgba(255,204,203,1.00);border-top-color:rgba(255,204,203,1.00);}
+.r-kdyh1x{border-bottom-left-radius:6px;border-bottom-right-radius:6px;border-top-left-radius:6px;border-top-right-radius:6px;}
+.r-krxsd3{display:-webkit-box;}
+.r-m2nopt{border-bottom-color:rgba(43,46,57,1.00);border-left-color:rgba(43,46,57,1.00);border-right-color:rgba(43,46,57,1.00);border-top-color:rgba(43,46,57,1.00);}
+.r-m7id7e{flex:unset;}
+.r-m9k8lk{border-bottom-color:rgba(223,255,240,1.00);border-left-color:rgba(223,255,240,1.00);border-right-color:rgba(223,255,240,1.00);border-top-color:rgba(223,255,240,1.00);}
+.r-nsbfu8{padding:16px;}
+.r-p4pd8u{border-bottom-color:rgba(36,42,49,1.00);border-left-color:rgba(36,42,49,1.00);border-right-color:rgba(36,42,49,1.00);border-top-color:rgba(36,42,49,1.00);}
+.r-qwd59z{border-bottom-left-radius:1px;border-bottom-right-radius:1px;border-top-left-radius:1px;border-top-right-radius:1px;}
+.r-rs99b7{border-bottom-width:1px;border-left-width:1px;border-right-width:1px;border-top-width:1px;}
+.r-t60dpp{padding:0px;}
+.r-texgdz{margin:80px;}
+.r-tuq35u{padding:4px;}
+.r-tyhe3k{border-bottom-left-radius:64px;border-bottom-right-radius:64px;border-top-left-radius:64px;border-top-right-radius:64px;}
+.r-xoduu5{display:inline-flex;}
+.r-xyw6el{padding:12px;}
+.r-ywje51{margin:auto;}
+.r-z2wwpe{border-bottom-left-radius:4px;border-bottom-right-radius:4px;border-top-left-radius:4px;border-top-right-radius:4px;}
+.r-zhp00w{padding:2px;}
+[stylesheet-group="2.1"]{}
+.r-10x3wzx{padding-bottom:40px;padding-top:40px;}
+.r-11yq8vr{margin-left:40px;margin-right:40px;}
+.r-1e081e0{padding-left:12px;padding-right:12px;}
+.r-1guathk{padding-left:24px;padding-right:24px;}
+.r-1h4fu65{padding-bottom:24px;padding-top:24px;}
+.r-1hy1u7s{margin-left:24px;margin-right:24px;}
+.r-1isdzm1{padding-left:80px;padding-right:80px;}
+.r-1jgb5lz{margin-left:auto;margin-right:auto;}
+.r-1p02zvt{padding-left:48px;padding-right:48px;}
+.r-1p4rafz{padding-left:2px;padding-right:2px;}
+.r-1p6iasa{margin-bottom:4px;margin-top:4px;}
+.r-1pn2ns4{padding-left:8px;padding-right:8px;}
+.r-1r5su4o{margin-bottom:16px;margin-top:16px;}
+.r-1unineu{margin-bottom:40px;margin-top:40px;}
+.r-1vvnge1{padding-bottom:2px;padding-top:2px;}
+.r-1w3m5we{padding-bottom:80px;padding-top:80px;}
+.r-1ybube5{margin-left:8px;margin-right:8px;}
+.r-1ydw1k6{margin-left:16px;margin-right:16px;}
+.r-1yzf0co{padding-bottom:16px;padding-top:16px;}
+.r-4amgru{margin-left:4px;margin-right:4px;}
+.r-5njf8e{padding-bottom:8px;padding-top:8px;}
+.r-5wp0in{padding-left:40px;padding-right:40px;}
+.r-c8eef1{margin-bottom:8px;margin-top:8px;}
+.r-g4w12b{padding-left:94px;padding-right:94px;}
+.r-g8va3u{margin-left:80px;margin-right:80px;}
+.r-lz04qo{margin-left:-4px;margin-right:-4px;}
+.r-mgi0kt{margin-left:-24px;margin-right:-24px;}
+.r-mk0yit{padding-left:0px;padding-right:0px;}
+.r-mvpalk{margin-left:0px;margin-right:0px;}
+.r-oyd9sg{padding-bottom:4px;padding-top:4px;}
+.r-pw2am6{margin-bottom:24px;margin-top:24px;}
+.r-r0h9e2{margin-bottom:0px;margin-top:0px;}
+.r-r26ds4{margin-bottom:80px;margin-top:80px;}
+.r-rjfia{padding-bottom:0px;padding-top:0px;}
+.r-s1qlax{padding-left:4px;padding-right:4px;}
+.r-ymttw5{padding-left:16px;padding-right:16px;}
+[stylesheet-group="2.2"]{}
+.r-100vyta{margin-top:7px;}
+.r-1029d6i{top:-24px;}
+.r-105ug2t{pointer-events:auto!important;}
+.r-109y4c4{height:1px;}
+.r-10drpc{color:rgba(0,73,215,1.00);}
+.r-10kz8ia{color:rgba(228,79,137,1.00);}
+.r-10ptun7{height:16px;}
+.r-10pyoum{color:rgba(5,5,5,1.00);}
+.r-10sqg0u{margin-bottom:1px;}
+.r-10x49cs{font-size:10px;}
+.r-10xqauy{padding-top:env(safe-area-inset-top);}
+.r-111w7nw{box-shadow:0px 1px 2px rgba(0,0,0,0.69);}
+.r-113qch9{cursor:auto;}
+.r-116b19x{padding-left:40px;}
+.r-119vxgs{border-top-style:dashed;}
+.r-119zq30{border-left-width:4px;}
+.r-11c0sde{margin-top:24px;}
+.r-11f42r{height:314px;}
+.r-11g3r6m{padding-right:24px;}
+.r-11j9u27{visibility:hidden;}
+.r-11mo1y0{margin-bottom:7px;}
+.r-11mpjr4{background-color:rgba(223,223,223,1.00);}
+.r-11udlyb{background-color:rgba(0,150,136,1.00);}
+.r-11vxtcu{background-color:rgba(211,220,228,1.00);}
+.r-11wrixw{margin-left:0px;}
+.r-11yh6sk{overflow-x:hidden;}
+.r-11ys0m{-webkit-break-before:auto;break-before:auto;}
+.r-123mryc{color:rgba(185,94,4,1.00);}
+.r-127358a{animation-name:r-9p3sdl;}
+.r-127gp16{max-width:150px;}
+.r-12dqhl9{height:calc(100vh - 80px);}
+.r-12mrs02{object-fit:contain;}
+.r-12v2sbk{background-color:rgba(36,42,49,0.50);}
+.r-12vffkv>*{pointer-events:auto;}
+.r-12vffkv{pointer-events:none!important;}
+.r-12ym1je{width:18px;}
+.r-12zb1j4{margin-right:7px;}
+.r-135wba7{line-height:24px;}
+.r-13hce6t{margin-left:4px;}
+.r-13i40vn{box-shadow:0px 12px 13px rgba(0,0,0,0.02);}
+.r-13kc5u0{margin-left:1px;}
+.r-13l2t4g{border-right-width:1px;}
+.r-13ll0g2{color:rgba(10,48,105,1.00);}
+.r-13lvk87{margin-left:110px;}
+.r-13qz1uu{width:100%;}
+.r-13tjlyg{transition-duration:0.1s;}
+.r-13yce4e{border-top-width:0px;}
+.r-142tt33{-webkit-text-decoration-line:line-through;text-decoration-line:line-through;}
+.r-144uupt{left:2px;}
+.r-146iojx{max-width:300px;}
+.r-1472mwg{height:24px;}
+.r-14792hc{left:-64px;}
+.r-14bkmb3{bottom:-3px;}
+.r-14eup4l{top:3px;}
+.r-14gqq1x{margin-top:4px;}
+.r-14kuze9{border-right-color:rgba(164,78,237,1.00);}
+.r-14lw9ot{background-color:rgba(255,255,255,1.00);}
+.r-14sbq61{background-color:rgba(33,150,243,1.00);}
+.r-14taxks{width:196px;}
+.r-14utu6a{line-height:8px;}
+.r-14vq63g{background-color:rgba(3,58,22,1.00);}
+.r-14yzgew{line-height:18px;}
+.r-150rngu{-webkit-overflow-scrolling:touch;}
+.r-157h22z{background-color:rgba(45,50,58,1.00);}
+.r-15czi30{background-image:linear-gradient(90deg, #e44f89, #c62c68);}
+.r-15d4u6f{background-color:rgba(145,176,240,1.00);}
+.r-15g7tld{margin-bottom:80px;}
+.r-15m1z73{margin-left:40px;}
+.r-15n4387{outline-color:#2662d7;}
+.r-15o5oer{bottom:auto;}
+.r-15ysp7h{min-height:32px;}
+.r-15zivkp{margin-bottom:4px;}
+.r-16dba41{font-weight:400;}
+.r-16l9doz{height:auto;}
+.r-16r7sh{right:-16px;}
+.r-16vg0q1{max-width:225px;}
+.r-16y2uox{flex-grow:1;}
+.r-173mn98{align-self:flex-end;}
+.r-1777fci{justify-content:center;}
+.r-17bb2tj{animation-duration:0.75s;}
+.r-17giqoz{box-shadow:0px 0px 7px rgba(0,0,0,0.52);}
+.r-17grq5a{margin-right:-8px;}
+.r-17leim2{background-repeat:repeat;}
+.r-17rnw9f{line-height:30px;}
+.r-17s6mgv{justify-content:flex-end;}
+.r-17tb59b{opacity:0.7;}
+.r-17tloay{opacity:0.6;}
+.r-17wrw06{color:rgba(180,26,26,1.00);}
+.r-17y5xlg{border-left-color:rgba(245,247,249,1.00);}
+.r-184en5c{z-index:1;}
+.r-18ayb63{border-right-color:rgba(227,232,237,1.00);}
+.r-18kxxzh{flex-grow:0;}
+.r-18nhz7w{top:-3px;}
+.r-18p6if4{border-right-width:2px;}
+.r-18u37iz{flex-direction:row;}
+.r-18y5qoh{color:rgba(165,214,255,1.00);}
+.r-190thrv{color:rgba(145,75,5,1.00);}
+.r-19554kt{width:90px;}
+.r-19907ok{-moz-transition:opacity ease 200ms;-webkit-transition:opacity ease 200ms;transition:opacity ease 200ms;}
+.r-19akecc{color:rgba(175,245,180,1.00);}
+.r-19bdk51{border-right-color:rgba(211,61,61,1.00);}
+.r-19byhck{flex-basis:32%;}
+.r-19eyfmh{width:640px;}
+.r-19lq7b1{top:16px;}
+.r-19qrga8{margin-top:3px;}
+.r-19r33im{letter-spacing:1.2px;}
+.r-19tq15n{margin-top:80px;}
+.r-19wmn03{width:20px;}
+.r-19z077z{touch-action:none;}
+.r-1a3cspq{background-color:rgba(40,49,67,1.00);}
+.r-1abnn5w{animation-play-state:paused;}
+.r-1acpoxo{width:36px;}
+.r-1aerykh{border-top-color:rgba(211,220,228,1.00);}
+.r-1aockid{width:40px;}
+.r-1armvtb{font-size:8px;}
+.r-1awozwy{align-items:center;}
+.r-1axcl7z{border:1px solid #d3dce4;}
+.r-1ay1djp{animation-duration:1s;}
+.r-1azx6h{max-height:480px;}
+.r-1b00too{background-color:rgba(236,239,241,1.00);}
+.r-1b096ap{border-bottom-color:rgba(36,42,49,1.00);}
+.r-1b1g84l{bottom:-8px;}
+.r-1b3fm86{background-color:undefined;}
+.r-1b43r93{font-size:14px;}
+.r-1bcbbo8{color:rgba(17,99,41,1.00);}
+.r-1bnj018{color:rgba(92,105,117,1.00);}
+.r-1bwgafa{-webkit-text-decoration-color:rgba(136,153,168,1.00);text-decoration-color:rgba(136,153,168,1.00);}
+.r-1c681wc{color:rgba(77,222,152,1.00);}
+.r-1c6unfx{forced-color-adjust:none;}
+.r-1ce3o0f{max-height:80vh;}
+.r-1ceczpf{min-height:24px;}
+.r-1clhhh9{-moz-transition-property:all;-webkit-transition-property:all;transition-property:all;}
+.r-1cmwbt1{gap:8px;}
+.r-1cu4yvr{max-height:calc(min(640px, 100% - 160px));}
+.r-1cvj4g8{margin-top:1px;}
+.r-1d09ksm{align-items:baseline;}
+.r-1d2f490{left:0px;}
+.r-1d4mawv{margin-right:4px;}
+.r-1d5kdc7{flex-direction:column-reverse;}
+.r-1d7fvdj{justify-content:space-evenly;}
+.r-1d9grui{border-bottom-color:rgba(211,220,228,1.00);}
+.r-1ddef8g{-webkit-text-decoration-line:underline;text-decoration-line:underline;}
+.r-1dernwh{height:70%;}
+.r-1dlgt49{max-height:30px;}
+.r-1dmvmgl{background-color:rgba(36,42,49,1.00);}
+.r-1dn12g7{line-height:48px;}
+.r-1dpl46z{border-bottom-right-radius:4px;}
+.r-1dqbpge{cursor:text;}
+.r-1dumtqg{background-color:rgba(253,195,137,1.00);}
+.r-1e7him5{min-width:220px;}
+.r-1ea14ly{border-right-color:rgba(95,69,255,1.00);}
+.r-1efo1hp{border-bottom-color:rgba(43,46,57,1.00);}
+.r-1ei5mc7{cursor:inherit;}
+.r-1eic64l{color:rgba(198,44,104,1.00);}
+.r-1enofrn{font-size:12px;}
+.r-1eqgwh6{color:rgba(228,203,250,1.00);}
+.r-1etz4cy{color:rgba(194,217,255,1.00);}
+.r-1euycsn{flex-direction:row-reverse;}
+.r-1ewcgjf{box-shadow:0px 1px 3px rgba(0,0,0,0.5);}
+.r-1exrs8c{outline:none;}
+.r-1f23bpq{text-color:#ffffff;}
+.r-1f2v84d{color:rgba(204,207,212,1.00);}
+.r-1f4ipl0{left:29px;}
+.r-1f529hi{line-height:14px;}
+.r-1fd96xs{padding-left:50px;}
+.r-1fe0xdi{left:0%;}
+.r-1ff274t{text-align:right;}
+.r-1fi01yr{background-color:rgba(55,65,81,1.00);}
+.r-1fiaf3z{opacity:0.05;}
+.r-1fo40xd{top:80px;}
+.r-1fq43b1{flex-basis:100%;}
+.r-1g7fiml{height:30px;}
+.r-1g80fh1{margin-right:80px;}
+.r-1ghhsy9{color:rgba(52,109,219,1.00);}
+.r-1gigy5k{border-bottom-color:rgba(45,50,58,1.00);}
+.r-1glc72y{border-bottom-color:rgba(245,247,249,1.00);}
+.r-1h0z5md{justify-content:flex-start;}
+.r-1h815vi{right:92%;}
+.r-1h8ys4a{padding-top:4px;}
+.r-1h9q8wt{color:rgba(69,69,69,1.00);}
+.r-1habvwh{align-items:flex-start;}
+.r-1hgij0u{color:rgba(164,78,237,1.00);}
+.r-1hjwoze{height:18px;}
+.r-1hlnpa{height:3px;}
+.r-1hnwopk{outline-color:#8137c2;}
+.r-1hpgsb4{;}
+.r-1hqdnve{box-shadow:0px 0px 4px inset rgba(0,0,0, 0.08);}
+.r-1hrvmjx{border-top-color:rgba(55,65,81,1.00);}
+.r-1hsi953{min-height:180px;}
+.r-1hvjb8t{padding-right:4px;}
+.r-1hy97zq{padding-top:80px;}
+.r-1hycxz{width:350px;}
+.r-1i6wzkk{-moz-transition-property:opacity;-webkit-transition-property:opacity;transition-property:opacity;}
+.r-1i7sdiz{box-shadow:0px 4px 10px rgba(0,0,0,0.05);}
+.r-1i93rbr{right:0%;}
+.r-1ielgck{animation-duration:300ms;}
+.r-1ifxtd0{margin-bottom:16px;}
+.r-1ik5qf4{max-width:500px;}
+.r-1iln25a{word-wrap:normal;}
+.r-1ioqa4e{border-top-right-radius:7px;}
+.r-1ipicw7{width:300px;}
+.r-1j7aebl{width:880px;}
+.r-1janqcz{width:16px;}
+.r-1jg9483{width:8px;}
+.r-1jj8364{margin-left:auto;}
+.r-1jkjb{margin-left:8px;}
+.r-1jnzvcq{padding-bottom:80px;}
+.r-1jocfgc{width:290px;}
+.r-1jpmnxg{word-wrap:anywhere;}
+.r-1jrm8ja{background-color:rgba(185,94,4,1.00);}
+.r-1jsra8{box-shadow:inset 0px 0px 0px 1px #e3e8ed;}
+.r-1jtaemc{border-left-color:rgba(36,42,49,1.00);}
+.r-1jxfwug{border-top-width:2px;}
+.r-1k1q3bj{max-height:300px;}
+.r-1k25im9{height:26px;}
+.r-1kb76zh{margin-right:8px;}
+.r-1kf75xu{color:rgba(12,105,61,1.00);}
+.r-1kfrs79{font-weight:600;}
+.r-1kihuf0{align-self:center;}
+.r-1kjq87h{width:376px;}
+.r-1knl56f{animation-name:r-1hunrpy;}
+.r-1kvn7zp{max-height:150px;}
+.r-1kx0pzc{background-image:radial-gradient(rgba(0, 0, 0, 0.1), #181c1f);}
+.r-1l0m7dr{background-image:radial-gradient(rgba(0, 0, 0, 0.1), #ffffff);}
+.r-1l7z4oj{padding-bottom:16px;}
+.r-1l94q7l{box-shadow:inset 0px 0px 1px rgb(0 0 0 / 30%);}
+.r-1ld3bg{top:-4px;}
+.r-1ldzwu0{animation-timing-function:linear;}
+.r-1ljd8xs{border-left-width:1px;}
+.r-1lky6n1{background-color:rgba(227,232,237,1.00);}
+.r-1lnfjr6{-webkit-background-clip:text;}
+.r-1lnt56z{color:rgba(211,220,228,1.00);}
+.r-1loqt21{cursor:pointer;}
+.r-1m04atk{padding-left:8px;}
+.r-1m4drjs{top:-6px;}
+.r-1maqer6{max-width:860px;}
+.r-1md8qp7{right:-40px;}
+.r-1mdbw0j{padding-bottom:0px;}
+.r-1mdsxwj{color:rgba(237,159,81,1.00);}
+.r-1mgmw1x{background-image:linear-gradient(90deg, #5f45ff, #442fc8);}
+.r-1mhtwjo{left:-3px;}
+.r-1mkpi1y{max-width:max(50%, 300px);}
+.r-1mlwlqe{flex-basis:auto;}
+.r-1mnahxq{margin-top:0px;}
+.r-1moh23t{bottom:16px;}
+.r-1mrlafo{background-position:0;}
+.r-1ms9ukt{bottom:-5px;}
+.r-1mtwht8{color:rgba(210,168,255,1.00);}
+.r-1muvv40{animation-iteration-count:infinite;}
+.r-1n20pny{width:140px;}
+.r-1n6k3lk{color:rgba(36,42,49,1.00);}
+.r-1na1l7e{animation-play-state:running;}
+.r-1ndx55c{background-color:rgba(248,250,255,1.00);}
+.r-1nf4jbm{color:rgba(59,69,78,1.00);}
+.r-1niwhzg{background-color:rgba(0,0,0,0.00);}
+.r-1nj16ve{left:-10px;}
+.r-1nlw0im{bottom:8px;}
+.r-1nq9s1i{color:rgba(145,176,240,1.00);}
+.r-1ny4l3l{outline-style:none;}
+.r-1o9jcv2{max-width:660px;}
+.r-1ocf4r9{scroll-snap-type:y mandatory;}
+.r-1odw9d6{background-color:rgba(20,23,28,1.00);}
+.r-1oec5bt{opacity:0.2;}
+.r-1oep0n4{left:-12px;}
+.r-1ois7e2{color:rgba(55,65,81,1.00);}
+.r-1or9b2r{height:10px;}
+.r-1osy6ei{color:rgba(255,220,215,1.00);}
+.r-1oszu61{align-items:stretch;}
+.r-1otgn73{touch-action:manipulation;}
+.r-1ow6zhx{margin-left:16px;}
+.r-1oy60ga{transform:translateX(-12px);}
+.r-1p0dtai{bottom:0px;}
+.r-1p3vkdf{border-right-color:rgba(45,50,58,1.00);}
+.r-1p5i0ed{bottom:-24px;}
+.r-1p69tiw{border-top-color:rgba(43,46,57,1.00);}
+.r-1peese0{margin-bottom:24px;}
+.r-1pgixoa{border-right-left-radius:4px;}
+.r-1ph75f1{height:80px;}
+.r-1pi2tsx{height:100%;}
+.r-1pl7oy7{min-height:48px;}
+.r-1pos5eu{vertical-align:middle;}
+.r-1ptriwd{right:2px;}
+.r-1pyaxff{padding-right:8px;}
+.r-1q142lx{flex-shrink:0;}
+.r-1q3nxaj{z-index:300;}
+.r-1q6j1ae{right:-88px;}
+.r-1q6rxnj{padding-right:110px;}
+.r-1q77oe7{background-color:rgba(171,183,202,1.00);}
+.r-1q9jyb7{-webkit-filter:blur(16px) contrast(110%) hue-rotate(10deg) brightness(1.2) saturate(1.2);filter:blur(16px) contrast(110%) hue-rotate(10deg) brightness(1.2) saturate(1.2);}
+.r-1qc3rpd{transform:scaleY(-1);}
+.r-1qd0xha{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+.r-1qdbj55{animation-name:r-ndfo3d;}
+.r-1qefu2b{right:-3px;}
+.r-1qhn6m8{padding-left:16px;}
+.r-1quu1zo{;}
+.r-1r0uwd5{color:rgba(255,166,87,1.00);}
+.r-1r74h94{left:8px;}
+.r-1r8g8re{height:36px;}
+.r-1rasi3h{color:rgba(136,153,168,1.00);}
+.r-1rbj2e8{outline-color:#f5f7f9;}
+.r-1rdth4h{border-left-color:rgba(55,65,81,1.00);}
+.r-1rho1gz{box-shadow:0px 12px 13px rgba(0,0,0,0.12);}
+.r-1rkdych{max-width:1040px;}
+.r-1rla0r3{background-image:linear-gradient(90deg, #d33d3d, #b41a1a);}
+.r-1rnoaur{overflow-y:auto;}
+.r-1ro0kt6{flex-basis:0%;}
+.r-1ro7rbe{right:100%;}
+.r-1rttkqs{width:400px;}
+.r-1s3egr7{z-index:100;}
+.r-1s8p94s{max-width:832px;}
+.r-1sc18lr{padding-bottom:88px;}
+.r-1sncvnh{transform:translateZ(0px);}
+.r-1sxrcry{background-size:auto;}
+.r-1t2qqvi{flex-basis:50%;}
+.r-1t7uo4s{object-fit:cover;}
+.r-1t8m4kl{text-shadow:0px 0px 3px rgba(36,42,49,1.00);}
+.r-1tazni7{cursor:not-allowed;}
+.r-1ts5s6y{aspect-ratio:1.7777777777777777;}
+.r-1ttybm1{border-top-color:rgba(45,50,58,1.00);}
+.r-1ty4vvm{left:40px;}
+.r-1tymxbh{box-shadow:5px 0px 7px rgba(36,42,49,0.60);}
+.r-1u8kdu{bottom:24px;}
+.r-1ua3vzd{background-color:rgba(223,255,240,1.00);}
+.r-1ub1aon{transform:translateY(100%);}
+.r-1udbk01{text-overflow:ellipsis;}
+.r-1ufdtu9{background-image:linear-gradient(270deg, #e3e8ed 10%, #f5f7f9, #e3e8ed 90%);}
+.r-1ufr4wv{z-index:9;}
+.r-1ug9s38{box-shadow:inset 0px 0px 0px 1px #374151;}
+.r-1ui5ee8{font-size:32px;}
+.r-1ul06mb{margin-left:32px;}
+.r-1ulgld5{color:rgba(255,123,114,1.00);}
+.r-1umr4j1{border-bottom-color:rgba(164,78,237,1.00);}
+.r-1uql0sn{top:-1.2em;}
+.r-1ur4h4l{bottom:-16px;}
+.r-1ur9v65{padding-top:40px;}
+.r-1ut4w64{margin-bottom:-1px;}
+.r-1uwte3a{padding-bottom:40px;}
+.r-1uypc71{animation-timing-function:ease-in;}
+.r-1v4p587{border-bottom-color:rgba(24,28,31,1.00);}
+.r-1v6e3re{min-width:48px;}
+.r-1v7fmog{background-color:rgba(236,243,255,1.00);}
+.r-1v7sw2p{background-size:50% 80px;}
+.r-1vamr63{max-width:720px;}
+.r-1vckr1u{background-color:rgba(245,247,249,1.00);}
+.r-1vex5ub{color:rgba(68,47,200,1.00);}
+.r-1vo7ria{color:rgba(38,98,215,1.00);}
+.r-1vutw0s{background-color:rgba(103,6,12,1.00);}
+.r-1vz48go{background-image:radial-gradient(rgba(255, 255, 255, 0.1), #181c1f);}
+.r-1vzi8xi{vertical-align:middle;}
+.r-1w2pmg{height:0px;}
+.r-1w6e6rj{flex-wrap:wrap;}
+.r-1waj0vo{-moz-transition:opacity ease 800ms;-webkit-transition:opacity ease 800ms;transition:opacity ease 800ms;}
+.r-1wb8bfx{text-decoration-thickness:2px;}
+.r-1wbh5a2{flex-shrink:1;}
+.r-1wezhl{margin-left:80px;}
+.r-1wfhzrg{height:120px;}
+.r-1wghi3f{top:-8px;}
+.r-1wtj0ep{justify-content:space-between;}
+.r-1wv73ep{align-self:baseline;}
+.r-1ww30s9{max-width:30px;}
+.r-1wyvozj{left:50%;}
+.r-1wyyakw{z-index:-1;}
+.r-1wzrnnt{margin-top:16px;}
+.r-1x35g6{font-size:24px;}
+.r-1x93onp{width:110px;}
+.r-1xbve24{height:6px;}
+.r-1xcajam{position:fixed;}
+.r-1xnzce8{-moz-user-select:text;-webkit-user-select:text;user-select:text;}
+.r-1xoqk23{background-color:rgba(68,47,200,1.00);}
+.r-1xy5wl5{width:128px;}
+.r-1y14msn{border-bottom-color:rgba(55,65,81,1.00);}
+.r-1y4ih6u{color:rgba(129,55,194,1.00);}
+.r-1y9xkqr{left:8%;}
+.r-1yb8zos{background-color:rgba(162,169,185,1.00);}
+.r-1ybp48z{background-image:linear-gradient(90deg, #cc3131, #b41a1a);}
+.r-1ygmrgt{padding-top:24px;}
+.r-1ylffjs{-webkit-text-decoration-style:dotted;text-decoration-style:dotted;}
+.r-1yv4afn{border-top-color:rgba(227,232,237,1.00);}
+.r-1yvhtrz{width:32px;}
+.r-1yxedwg{top:8px;}
+.r-1yyzdbt{border-left-color:rgba(227,232,237,1.00);}
+.r-23aq58{border-right-color:rgba(204,49,49,1.00);}
+.r-257lmc{width:1180px;}
+.r-2745a1{-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+.r-285fr0{min-width:16px;}
+.r-29dh1f{background-image:linear-gradient(90deg, #eceff1, #e3e8ed);}
+.r-2awvau{min-width:-webkit-max-content;min-width:-moz-max-content;min-width:max-content;}
+.r-2eszeu::-webkit-scrollbar{display:none}
+.r-2eszeu{scrollbar-width:none;}
+.r-2fm7cc{color:rgba(139,148,158,1.00);}
+.r-2fw26j{outline-offset:0px;}
+.r-2jelyo{background-color:rgba(24,28,31,1.00);}
+.r-2jxp4q{background-color:rgba(34,39,46,1.00);}
+.r-2kxcpj{inset:0px;}
+.r-2llsf{min-height:100%;}
+.r-2o02ov{margin-top:40px;}
+.r-2tavb8{background-color:rgba(0,0,0,0.60);}
+.r-2zpn8w{-webkit-break-inside:avoid;break-inside:avoid;}
+.r-30o5oe{-moz-appearance:none;-ms-appearance:none;-webkit-appearance:none;appearance:none;}
+.r-30qeir{bottom:-4px;}
+.r-36ujnk{font-style:italic;}
+.r-37tt59{line-height:32px;}
+.r-3da1kt{height:8px;}
+.r-3dgjpp{border-top-color:rgba(36,42,49,1.00);}
+.r-3hw5f6{color:rgba(149,56,0,1.00);}
+.r-3mc0re{right:8px;}
+.r-3mtglp{row-gap:16px;}
+.r-3o833n{background-color:rgba(251,232,240,1.00);}
+.r-3pxcvb{border-bottom-color:rgba(255,255,255,1.00);}
+.r-3s2u2q{white-space:nowrap;}
+.r-417010{z-index:0;}
+.r-432wen{width:3px;}
+.r-44c749{border-bottom-left-radius:7px;}
+.r-493a2x{width:680px;}
+.r-4d76ec{height:200px;}
+.r-4dj0k7{box-shadow:0px 1px 2px rgba(0,0,0,0.12);}
+.r-4gszlv{background-size:cover;}
+.r-4jz4xt{background-image:linear-gradient(90deg, #374151, #374151);}
+.r-4v7adb{height:5px;}
+.r-5cpxsl{stroke-width:3;}
+.r-5is6sd{max-width:460px;}
+.r-5kkj8d{border-top-width:1px;}
+.r-5ks0hp{right:3.5px;}
+.r-5kx3fr{page-break-inside:avoid;}
+.r-5oul0u{margin-bottom:8px;}
+.r-5soawk{width:10px;}
+.r-5xr8s6{outline-width:2px;}
+.r-60emj1{background-color:rgba(255,204,203,1.00);}
+.r-61z16t{margin-right:0px;}
+.r-633pao{pointer-events:none!important;}
+.r-6dt33c{opacity:1;}
+.r-6k4xqk{margin-top:-40px;}
+.r-6t5ypu{border-bottom-left-radius:4px;}
+.r-6taxm2:-ms-input-placeholder{color:var(--placeholderTextColor);opacity:1;}
+.r-6taxm2::-moz-placeholder{color:var(--placeholderTextColor);opacity:1;}
+.r-6taxm2::-webkit-input-placeholder{color:var(--placeholderTextColor);opacity:1;}
+.r-6taxm2::placeholder{color:var(--placeholderTextColor);opacity:1;}
+.r-6uxfom{margin-left:24px;}
+.r-6wscbn{max-width:252px;}
+.r-73dpzl{border-top-color:rgba(245,247,249,1.00);}
+.r-7a29px{width:64px;}
+.r-7b7h2f{left:100%;}
+.r-7cikom{font-size:inherit;}
+.r-7l9xyp{background-color:rgba(255,255,255,0.20);}
+.r-7q8q6z{cursor:default;}
+.r-7xmw5f{width:-webkit-fit-content;width:-moz-fit-content;width:fit-content;}
+.r-81rbui{animation-name:r-1ak6360;}
+.r-855088{border-left-color:rgba(0,0,0,0.00);}
+.r-88pszg{margin-right:16px;}
+.r-8akbws{-webkit-box-orient:vertical;}
+.r-8d26hk{margin-bottom:40px;}
+.r-8hc5te{width:6px;}
+.r-8v5hsd{color:rgba(126,231,135,1.00);}
+.r-9030i9{box-shadow:0px 4px 10px rgba(0,0,0,0.99);}
+.r-9111t9{padding-right:410px;}
+.r-92ng3h{width:1px;}
+.r-934yyj{padding-left:34px;}
+.r-9358xi{background-color:rgba(35,131,226,0.14);}
+.r-95jzfe{padding-top:16px;}
+.r-97e31f{padding-bottom:env(safe-area-inset-bottom);}
+.r-97prym{flex-basis:16px;}
+.r-99m41f{color:rgba(110,119,129,1.00);}
+.r-9aemit{padding-right:0px;}
+.r-9ji8r7{transform:translateY(0%);}
+.r-9jpwak{min-width:auto;}
+.r-a21fva{box-shadow:0px -1px 2px rgba(0,0,0,0.69);}
+.r-a2tzq0{justify-content:space-around;}
+.r-a5pmau{margin-right:2px;}
+.r-a9hzal{height:660px;}
+.r-adacv{min-height:64px;}
+.r-adyw6z{font-size:20px;}
+.r-ah5dr5>*{pointer-events:none;}
+.r-ah5dr5{pointer-events:auto!important;}
+.r-ak0haq{color:rgba(121,192,255,1.00);}
+.r-aqxs90{-moz-transition:opacity 500ms ease-in, z-index 1000ms ease-in;-webkit-transition:opacity 500ms ease-in, z-index 1000ms ease-in;transition:opacity 500ms ease-in, z-index 1000ms ease-in;}
+.r-ar5de{height:112px;}
+.r-b4cb4{max-height:440px;}
+.r-b88u0q{font-weight:700;}
+.r-bcqeeo{min-width:0px;}
+.r-bcycc3{box-shadow:0px -1px 2px rgba(0,0,0,0.12);}
+.r-bgnin{min-width:150px;}
+.r-bnwqim{position:relative;}
+.r-bsjocg{@media print:[object Object];}
+.r-bta5j5{right:40px;}
+.r-buy8e9{overflow-y:hidden;}
+.r-bv2aro{padding-left:env(safe-area-inset-left);}
+.r-bxaprw{border-top-left-radius:7px;}
+.r-c68hjy{color:rgba(161,161,161,1.00);}
+.r-c8fpu0{background-color:rgba(0,136,71,1.00);}
+.r-cdhzog{padding-right:80px;}
+.r-ceakki{border-right-color:rgba(245,247,249,1.00);}
+.r-cpa5s6{scroll-snap-align:start;}
+.r-cqilzk{height:400px;}
+.r-d822y2{color:rgba(5,80,174,1.00);}
+.r-deolkf{box-sizing:border-box;}
+.r-dflpy8{height:1.2em;}
+.r-dkge59{background-color:rgba(170,184,194,1.00);}
+.r-dnmrzs{max-width:100%;}
+.r-dse9kg{outline-style:auto;}
+.r-dvzd6p{right:-1px;}
+.r-dvzwsg{border-left-color:rgba(211,220,228,1.00);}
+.r-dwliz8{border-left-width:2px;}
+.r-e1k2in{right:16px;}
+.r-e9uq0i{animation-duration:1200ms;}
+.r-ea455c{border:none;}
+.r-eafdt9{transition-duration:0.15s;}
+.r-ecifi{max-width:970px;}
+.r-ehq7j7{background-size:contain;}
+.r-epq5cr{height:2px;}
+.r-eqo98v{top:24px;}
+.r-eqz5dr{flex-direction:column;}
+.r-ero68b{min-height:40px;}
+.r-eu3ka{height:40px;}
+.r-f5cfds{min-height:160px;}
+.r-fdjqy7{text-align:left;}
+.r-flmpir{border-bottom-color:rgba(40,49,67,1.00);}
+.r-fnigne{border-right-width:0px;}
+.r-fpub7{color:rgba(0,0,0,0.00);}
+.r-g3mlsw{animation-name:r-t2lo5v;}
+.r-gay1rn{border-right-color:rgba(34,39,46,1.00);}
+.r-gg6oyi{font-family:gitbook-content-font,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
+.r-ggadg3{left:-2px;}
+.r-givd4m{left:-5px;}
+.r-gl891g{min-width:420px;}
+.r-gtdqiz{position:-webkit-sticky;position:sticky;}
+.r-gu0qjt{padding-left:32px;}
+.r-gxnn5r{border-left-width:0px;}
+.r-gxopl6{left:316px;}
+.r-gy4na3{padding-left:0px;}
+.r-gys0vz{color:rgba(0,136,71,1.00);}
+.r-h1b427{width:225px;}
+.r-h2mvr{min-width:8px;}
+.r-h2q2x{transform:scaleX(-1);}
+.r-h3s6tt{height:48px;}
+.r-h7ga17{background-color:rgba(43,46,57,1.00);}
+.r-h7gdob{color:currentColor;}
+.r-ha54is{icon-color:#a2a9b9;}
+.r-hbpseb{line-height:22px;}
+.r-hd655f{color:rgba(162,169,185,1.00);}
+.r-homxoj{color:inherit;}
+.r-hq6u89{left:92%;}
+.r-htfu76{margin-left:-8px;}
+.r-hu79xy{min-width:196px;}
+.r-hvns9x{max-width:400px;}
+.r-hxflta{padding-right:env(safe-area-inset-right);}
+.r-i023vh{padding-right:16px;}
+.r-i7h7g2{-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);}
+.r-i8xx8x{color:rgba(207,34,46,1.00);}
+.r-ia06lx{background-color:rgba(115,92,255,1.00);}
+.r-ibjss6{background-color:rgba(136,153,168,1.00);}
+.r-icoktb{opacity:0.5;}
+.r-ifefl9{min-height:0px;}
+.r-ihd41t{border:1px solid #374151;}
+.r-iphfwy{padding-bottom:4px;}
+.r-ipm5af{top:0px;}
+.r-iqs06e{background-image:radial-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 1));}
+.r-ir6n1k{border-top-right-radius:6px;}
+.r-ixzivm{@media print:[object Object];}
+.r-iyfy8q{width:auto;}
+.r-j300sb{animation-name:r-1rx4pb;}
+.r-jfrpv2{color:rgba(130,80,223,1.00);}
+.r-jn0m22{top:54px;}
+.r-jn5ml{right:-5px;}
+.r-jvuzdy{top:-5px;}
+.r-jwli3a{color:rgba(255,255,255,1.00);}
+.r-jxjwwx{left:24px;}
+.r-k200y{align-self:flex-start;}
+.r-k923pl{background-color:rgba(218,212,255,1.00);}
+.r-kcufgn{cursor:ew-resize;}
+.r-key0ze{height:240px;}
+.r-kicko2{border-top-left-radius:4px;}
+.r-kls4rr{padding-right:40px;}
+.r-knv0ih{margin-top:8px;}
+.r-kquydp{right:-4px;}
+.r-ky29hr{bottom:2px;}
+.r-l0gwng{width:200px;}
+.r-l13dpy{z-index:200;}
+.r-l27s25{background-color:rgba(204,207,212,1.00);}
+.r-l9hqf4{box-shadow:0px 1px 1px rgba(0,0,0,0.69);}
+.r-l9st2p{-webkit-text-decoration-color:rgba(162,169,185,1.00);text-decoration-color:rgba(162,169,185,1.00);}
+.r-labphf{height:-webkit-fit-content;height:-moz-fit-content;height:fit-content;}
+.r-lchren{margin-right:auto;}
+.r-lhdc14{color:rgba(96,39,145,1.00);}
+.r-lk1fr1{icon-color:#8899a8;}
+.r-lltvgl{overflow-x:auto;}
+.r-lp8vj9{color:rgba(190,130,242,1.00);}
+.r-lqms97{margin-left:-1px;}
+.r-lrsllp{width:24px;}
+.r-lrvibr{-moz-user-select:none;-webkit-user-select:none;user-select:none;}
+.r-lv5dtd{padding-left:110px;}
+.r-lx1l9k{background-image:radial-gradient(rgba(255, 255, 255, 0.1), #ffffff);}
+.r-m0vln2{border-left-color:rgba(43,46,57,1.00);}
+.r-m2pi6t{padding-left:4px;}
+.r-m5arl1{width:2px;}
+.r-mabqd8{height:32px;}
+.r-majxgm{font-weight:500;}
+.r-mbgqwd{margin-right:24px;}
+.r-me5xia{height:104px;}
+.r-mfh4gg{scroll-snap-type:x mandatory;}
+.r-mfzc6t{background-color:rgba(0,0,0,0.10);}
+.r-mhe3cw{z-index:10;}
+.r-ms8t9i{border-left-width:3px;}
+.r-mwitap{pointer-event:none;}
+.r-n9piew{min-height:260px;}
+.r-na6qhi{;}
+.r-ng8e2f{cursor:-webkit-grab;cursor:-moz-grab;cursor:grab;}
+.r-nkouq2{box-shadow:-5px 0px 7px rgba(36,42,49,0.60);}
+.r-notknq{border-top-right-radius:4px;}
+.r-nvplwv{animation-timing-function:ease-out;}
+.r-nvvorq{top:3.5px;}
+.r-nwxazl{line-height:40px;}
+.r-nzcix3{border-bottom-color:rgba(227,232,237,1.00);}
+.r-o8yidv{border-top-left-radius:6px;}
+.r-o9xkwf{top:2px;}
+.r-obd0qt{align-items:flex-end;}
+.r-oebo59{height:128px;}
+.r-onxxid{background-color:rgba(27,30,33,0.77);}
+.r-op3p1c{width:520px;}
+.r-orgf3d{opacity:0;}
+.r-ou6ah9{border-top-left-radius:0px;}
+.r-oucylx{border-bottom-color:rgba(0,0,0,0.00);}
+.r-oz83uh{box-shadow:0px 1px 1px rgba(0,0,0,0.12);}
+.r-p1pxzi{margin-bottom:0px;}
+.r-pex7a0{color:rgba(130,7,30,1.00);}
+.r-pi8zqv{box-shadow:0px 0px 7px rgba(0,0,0,0.04);}
+.r-pm2fo{border-bottom-left-radius:0px;}
+.r-pm9dpa{max-height:100%;}
+.r-puj83k{padding-left:24px;}
+.r-py1axk{border-bottom-right-radius:7px;}
+.r-q4m81j{text-align:center;}
+.r-qd89wu{max-width:900px;}
+.r-qk8207{background-color:rgba(248,242,254,1.00);}
+.r-qklmqi{border-bottom-width:1px;}
+.r-ql8eny{min-height:200px;}
+.r-qn3fzs{padding-bottom:24px;}
+.r-qyrhsv{border-right-color:rgba(40,49,67,1.00);}
+.r-r1s0sa{background-color:rgba(255,235,233,1.00);}
+.r-r7ey0d{background-color:rgba(218,212,255,0.50);}
+.r-r9hte5{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);}
+.r-rs94m5{background-image:url("data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjxzdmcKICAgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIgogICB4bWxuczpjYz0iaHR0cDovL2NyZWF0aXZlY29tbW9ucy5vcmcvbnMjIgogICB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiCiAgIHhtbG5zOnN2Zz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciCiAgIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKICAgdmVyc2lvbj0iMS4xIgogICB2aWV3Qm94PSIwIDAgMSAxIgogICBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWluWU1pbiBtZWV0Ij4KICA8cGF0aAogICAgIGQ9Ik0gMC4wNDAzODA1OSwwLjYyNjc3NjcgMC4xNDY0NDY2MSwwLjUyMDcxMDY4IDAuNDI5Mjg5MzIsMC44MDM1NTMzOSAwLjMyMzIyMzMsMC45MDk2MTk0MSB6IE0gMC4yMTcxNTcyOSwwLjgwMzU1MzM5IDAuODUzNTUzMzksMC4xNjcxNTcyOSAwLjk1OTYxOTQxLDAuMjczMjIzMyAwLjMyMzIyMzMsMC45MDk2MTk0MSB6IgogICAgIGlkPSJyZWN0Mzc4MCIKICAgICBzdHlsZT0iZmlsbDojZmZmZmZmO2ZpbGwtb3BhY2l0eToxO3N0cm9rZTpub25lIiAvPgo8L3N2Zz4K");}
+.r-rwqe4o{width:48px;}
+.r-s09aw7{background-image:linear-gradient(to left, #735cff, rgb(109 28 169), rgb(96 104 191), #008847, #FFD139, #b95e04, #d33d3d);}
+.r-s0e3za{padding-left:80px;}
+.r-sa2ff0{min-height:100vh;}
+.r-sfbmgh{z-index:9999;}
+.r-sga3zk{height:64px;}
+.r-sgscqh{width:250px;}
+.r-t12b5v{border-top-right-radius:0px;}
+.r-t3lkjx{background-color:rgba(228,79,137,1.00);}
+.r-t9hbny{background-color:rgba(211,61,61,1.00);}
+.r-tceitz{left:16px;}
+.r-tni569{background-color:rgba(11,79,47,1.00);}
+.r-tskmnb{padding-top:8px;}
+.r-tsynxw{text-transform:uppercase;}
+.r-ty80ws{max-width:1510px;}
+.r-u529wo{transform:translateY(-2px);}
+.r-u6sd8q{background-repeat:no-repeat;}
+.r-u8s1d{position:absolute;}
+.r-u92y06{background-color:rgba(255,165,0,1.00);}
+.r-u9bbvc{;}
+.r-u9z937{bottom:80px;}
+.r-ubezar{font-size:16px;}
+.r-ud0q2t{letter-spacing:1px;}
+.r-ufs8t{background-clip:text;}
+.r-uibjmv{font-family:gitbook-code-font, Menlo, monospace;}
+.r-upfvwg{box-shadow:0px 0px 1px rgb(255 255 255 / 30%);}
+.r-uweo6c{bottom:136px;}
+.r-ux9zog{background-color:rgba(51,61,85,1.00);}
+.r-v2u3o6{right:4px;}
+.r-v5byei{top:-12px;}
+.r-vjwmdu{max-width:75px;}
+.r-vlcob{color:rgba(24,28,31,1.00);}
+.r-vo4d95{max-width:680px;}
+.r-vq47rg{color:rgba(211,61,61,1.00);}
+.r-vvn4in{background-position:center;}
+.r-w0va4e{margin-right:40px;}
+.r-w9n8ly{transition-delay:200ms;}
+.r-wc24c3{z-index:20;}
+.r-wech8c{max-width:1280px;}
+.r-wgabs5{border-bottom-width:2px;}
+.r-wk8lta{padding-top:0px;}
+.r-ws9h79{left:4px;}
+.r-wwqw7s{left:-1px;}
+.r-wy61xf{height:72px;}
+.r-x1dlf0{max-width:200px;}
+.r-x3cy2q{background-size:100% 100%;}
+.r-x3dn3n{height:196px;}
+.r-xb2eav{font-size:40px;}
+.r-xd3gw5{border-left-color:rgba(164,78,237,1.00);}
+.r-xd6kpl{padding-bottom:8px;}
+.r-xifl00{left:-4px;}
+.r-xky0vn{background-color:rgba(104,60,17,1.00);}
+.r-xnn892{background-color:rgba(218,251,225,1.00);}
+.r-xx3c9p{animation-name:r-imtty0;}
+.r-xzortm{margin-right:-16px;}
+.r-y3rmyz{width:120px;}
+.r-ye2ihm{background-image:none;}
+.r-yh6aho{background-image:linear-gradient(270deg, #2b2e39 10%, #22272e, #2b2e39 90%);}
+.r-yj30ev{right:24px;}
+.r-yrgyi6{white-space:pre;}
+.r-ywxogp{color:rgba(115,92,255,1.00);}
+.r-z3s97b{border-right-color:rgba(43,46,57,1.00);}
+.r-z4opwe{border-top-color:rgba(164,78,237,1.00);}
+.r-z80fyv{height:20px;}
+.r-z9jf92{color:rgba(234,242,247,1.00);}
+.r-zchlnj{right:0px;}
+.r-zh076v{height:100vh;}
+.r-zits6j{right:8%;}
+.r-zmljjp{border-bottom-right-radius:0px;}
+.r-zo7nv5{-webkit-column-gap:16px;column-gap:16px;}
+.r-ztyd71{background-color:rgba(0,0,0,0.20);}
+@-webkit-keyframes r-1ak6360{0%{background-position-x:0%;}100%{background-position-x:100%;}}
+@-webkit-keyframes r-1hunrpy{0%{transform:translateY(100%);}100%{transform:translateY(0%);}}
+@-webkit-keyframes r-1rx4pb{0%{transform:translateX(-100%);}100%{transform:translateX(400%);}}
+@-webkit-keyframes r-9p3sdl{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+@-webkit-keyframes r-imtty0{0%{opacity:0;}100%{opacity:1;}}
+@-webkit-keyframes r-ndfo3d{0%{transform:translateY(0%);}100%{transform:translateY(100%);}}
+@-webkit-keyframes r-t2lo5v{0%{opacity:1;}100%{opacity:0;}}
+@keyframes r-1ak6360{0%{background-position-x:0%;}100%{background-position-x:100%;}}
+@keyframes r-1hunrpy{0%{transform:translateY(100%);}100%{transform:translateY(0%);}}
+@keyframes r-1rx4pb{0%{transform:translateX(-100%);}100%{transform:translateX(400%);}}
+@keyframes r-9p3sdl{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+@keyframes r-imtty0{0%{opacity:0;}100%{opacity:1;}}
+@keyframes r-ndfo3d{0%{transform:translateY(0%);}100%{transform:translateY(100%);}}
+@keyframes r-t2lo5v{0%{opacity:1;}100%{opacity:0;}}
+[stylesheet-group="10"]{}
+[data-rnwrdesktop-13lvk87]{margin-left:110px;}
+[data-rnwrdesktop-166pt5r]{width:max(220px, calc(100vw - max(300px, calc((100vw - 970px) / 2 - 0px)) - 750px - 110px - 300px - 0px));}
+[data-rnwrdesktop-16y2uox-1wbh5a2-1ro0kt6]{flex-basis:0%;flex-grow:1;flex-shrink:1;}
+[data-rnwrdesktop-18u37iz]{flex-direction:row;}
+[data-rnwrdesktop-1hy97zq-1q6rxnj-lv5dtd-9111t9]{padding-left:110px;padding-right:410px;padding-top:80px;}
+[data-rnwrdesktop-1jkjb]{margin-left:8px;}
+[data-rnwrdesktop-1kb76zh]{margin-right:8px;}
+[data-rnwrdesktop-1ph75f1]{height:80px;}
+[data-rnwrdesktop-1q6rxnj]{padding-right:110px;}
+[data-rnwrdesktop-1uwte3a]{padding-bottom:40px;}
+[data-rnwrdesktop-1x93onp-h3s6tt]{height:48px;width:110px;}
+[data-rnwrdesktop-fnigne]{border-right-width:0px;}
+[data-rnwrdesktop-gg6oyi-adyw6z-135wba7-b88u0q]{font-family:gitbook-content-font,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;line-height:24px;}
+[data-rnwrdesktop-gg6oyi-xb2eav-1dn12g7-b88u0q]{font-family:gitbook-content-font,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:40px;font-weight:700;line-height:48px;}
+[data-rnwrdesktop-hidden]{display: none;}
+[data-rnwrdesktop-iyfy8q-1qhn6m8-11g3r6m-1h0z5md]{justify-content:flex-start;padding-left:16px;padding-right:24px;width:auto;}
+[data-rnwrdesktop-visible]{display: flex;}
+[stylesheet-group="11"]{}
+@media (max-width: 1024px) and (max-width: 9999999.494850524510111312253100114px) { [data-rnwr1024-eqz5dr] {flex-direction:column;} }
+@media (max-width: 1024px) and (max-width: 9999999.494850524511810511510598108101px) { [data-rnwr1024-visible] {display: flex;} }
+@media (max-width: 1024px) and (max-width: 9999999.49485052454910510212011610048px) { [data-rnwr1024-1ifxtd0] {margin-bottom:16px;} }
+@media (max-width: 1430px) and (max-width: 9999999.495251484511810511510598108101px) { [data-rnwr1430-visible] {display: flex;} }
+@media (max-width: 1490px) and (max-width: 9999999.4952574845104105100100101110px) { [data-rnwr1490-hidden] {display: none;} }
+@media (max-width: 1490px) and (max-width: 9999999.495257484511810511510598108101px) { [data-rnwr1490-visible] {display: flex;} }
+@media (max-width: 1490px) and (max-width: 9999999.49525748454955555510299105px) { [data-rnwr1490-1777fci] {justify-content:center;} }
+[stylesheet-group="12"]{}
+@media (max-width: 700px) and (max-width: 9999999.5548484510111312253100114px) { [data-rnwr700-eqz5dr] {flex-direction:column;} }
+@media (max-width: 700px) and (max-width: 9999999.55484845103103541111211054511798101122971144549515311998975545491071021141155557px) { [data-rnwr700-gg6oyi-ubezar-135wba7-1kfrs79] {font-family:gitbook-content-font,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;line-height:24px;} }
+@media (max-width: 700px) and (max-width: 9999999.55484845103103541111211054549117105531011015645110119120971221084598565611748113px) { [data-rnwr700-gg6oyi-1ui5ee8-nwxazl-b88u0q] {font-family:gitbook-content-font,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:32px;font-weight:700;line-height:40px;} }
+@media (max-width: 700px) and (max-width: 9999999.55484845104105100100101110px) { [data-rnwr700-hidden] {display: none;} }
+@media (max-width: 700px) and (max-width: 9999999.554848451051211021215611345103121521109751451054850511181044549119981045397504549104481225310910045px) { [data-rnwr700-iyfy8q-gy4na3-i023vh-1wbh5a2-1h0z5md-] {flex-shrink:1;justify-content:flex-start;padding-left:0px;padding-right:16px;width:auto;} }
+@media (max-width: 700px) and (max-width: 9999999.554848451151039751122107px) { [data-rnwr700-sga3zk] {height:64px;} }
+@media (max-width: 700px) and (max-width: 9999999.5548484511810511510598108101px) { [data-rnwr700-visible] {display: flex;} }
+@media (max-width: 700px) and (max-width: 9999999.55484845491111195412210412045px) { [data-rnwr700-1ow6zhx-] {margin-left:16px;} }
+@media (max-width: 700px) and (max-width: 9999999.554848454911111954122104120px) { [data-rnwr700-1ow6zhx] {margin-left:16px;} }
+@media (max-width: 700px) and (max-width: 9999999.55484845491195410154114106454955555510299105px) { [data-rnwr700-1w6e6rj-1777fci] {flex-wrap:wrap;justify-content:center;} }
+@media (max-width: 700px) and (max-width: 9999999.5548484549511085011652103px) { [data-rnwr700-13l2t4g] {border-right-width:1px;} }
+@media (max-width: 700px) and (max-width: 9999999.55484845505653102114484510512110212156113451011175110797px) { [data-rnwr700-285fr0-iyfy8q-eu3ka] {height:40px;min-width:16px;width:auto;} }
+@media (max-width: 700px) and (max-width: 9999999.5548484557531061221021014549113104110541095645105485051118104px) { [data-rnwr700-95jzfe-1qhn6m8-i023vh] {padding-left:16px;padding-right:16px;padding-top:16px;} }
+@media (max-width: 970px) and (max-width: 9999999.5755484510111312253100114px) { [data-rnwr970-eqz5dr] {flex-direction:column;} }
+@media (max-width: 970px) and (max-width: 9999999.5755484549491191141051201194510711011848105104px) { [data-rnwr970-11wrixw-knv0ih] {margin-left:0px;margin-top:8px;} }
+@media (max-width: 970px) and (max-width: 9999999.5755484554491224954116455311111710848117px) { [data-rnwr970-61z16t-5oul0u] {margin-bottom:8px;margin-right:0px;} }
+[stylesheet-group="13"]{}
+@media (max-width: 700px) and (max-width: 9999999.55484845105485051118104454955555510299105px) { [data-rnwr700-i023vh-1777fci] {justify-content:center;padding-right:16px;} }
+@media (max-width: 700px) and (max-width: 9999999.55484845105485051118104px) { [data-rnwr700-i023vh] {padding-right:16px;} }
+[stylesheet-group="20"]{}
+[data-rnwi-handle="nearest"] [data-rnwinearest-1nf4jbm-]{color:rgba(59,69,78,1.00);}
+body:not(.dragging) [data-rnwi--1ghhsy9-hover-focus]:hover, body:not(.dragging) [data-rnwi--1ghhsy9-hover-focus]:focus{color:rgba(52,109,219,1.00);}
+body:not(.dragging) [data-rnwi--1ntk80j--focus]:focus{border-bottom-color:rgba(164,78,237,1.00);border-left-color:rgba(164,78,237,1.00);border-right-color:rgba(164,78,237,1.00);border-top-color:rgba(164,78,237,1.00);}
+body:not(.dragging) [data-rnwi-190qawg-hover-focus]:hover, body:not(.dragging) [data-rnwi-190qawg-hover-focus]:focus{border-bottom-color:rgba(227,232,237,1.00);border-left-color:rgba(227,232,237,1.00);border-right-color:rgba(227,232,237,1.00);border-top-color:rgba(227,232,237,1.00);}
+body:not(.dragging) [data-rnwi-1b00too-hover]:hover{background-color:rgba(236,239,241,1.00);}
+body:not(.dragging) [data-rnwi-1vckr1u-hover-focus]:hover, body:not(.dragging) [data-rnwi-1vckr1u-hover-focus]:focus{background-color:rgba(245,247,249,1.00);}
+body:not(.dragging) [data-rnwi-5xr8s6-dse9kg-2fw26j-15n4387-focus-visible]:focus-visible{outline-color:#2662d7;outline-offset:0px;outline-style:auto;outline-width:2px;}
+body:not(.dragging) [data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible]:focus-visible{outline-color:#8137c2;outline-offset:0px;outline-style:auto;outline-width:2px;}
+body:not(.dragging) [data-rnwi-handle="BaseCard"]:hover [data-rnwibasecard--1hgij0u-hover-focus], body:not(.dragging) [data-rnwi-handle="BaseCard"]:focus [data-rnwibasecard--1hgij0u-hover-focus]{color:rgba(164,78,237,1.00);}
+body:not(.dragging) [data-rnwi-handle="BaseCard"]:hover [data-rnwibasecard--1hgij0u-hover]{color:rgba(164,78,237,1.00);}
+body:not(.dragging) [data-rnwi-handle="button"]:hover [data-rnwibutton--1hgij0u-hover-focus], body:not(.dragging) [data-rnwi-handle="button"]:focus [data-rnwibutton--1hgij0u-hover-focus]{color:rgba(164,78,237,1.00);}
+body:not(.dragging) [data-rnwi-handle="button"]:hover [data-rnwibutton-1bnj018-hover-focus], body:not(.dragging) [data-rnwi-handle="button"]:focus [data-rnwibutton-1bnj018-hover-focus]{color:rgba(92,105,117,1.00);}
+body:not(.dragging) [data-rnwi-handle="nearest"]:hover [data-rnwinearest--1ghhsy9-hover-focus], body:not(.dragging) [data-rnwi-handle="nearest"]:focus [data-rnwinearest--1ghhsy9-hover-focus]{color:rgba(52,109,219,1.00);}
+body:not(.dragging) [data-rnwi-handle="nearest"]:hover [data-rnwinearest--1hgij0u-hover-focus], body:not(.dragging) [data-rnwi-handle="nearest"]:focus [data-rnwinearest--1hgij0u-hover-focus]{color:rgba(164,78,237,1.00);}
+body:not(.dragging) [data-rnwi-handle="nearest"]:hover [data-rnwinearest-1nf4jbm-hover-focus], body:not(.dragging) [data-rnwi-handle="nearest"]:focus [data-rnwinearest-1nf4jbm-hover-focus]{color:rgba(59,69,78,1.00);}
+body:not(.dragging) [data-rnwi-u529wo-aq1qub-c1zw6o-1khlhp8-1cut0bx-na6qhi--hover]:hover{box-shadow:0px 12px 13px rgba(0,0,0,0.02);transform:translateY(-2px);}</style>
+                <style>
+                    html,
+                    body {
+                        -webkit-font-smoothing: antialiased;
+                        text-rendering: optimizelegibility;
+                        width: 100%;
+                        min-height: 100vh;
+                        user-select: none;
+                        outline: none;
+                        position: relative;
+                    }
+                    /* Avoid Chrome to see Safari hack */
+                    @supports (-webkit-touch-callout: none) {
+                        html,
+                        body,
+                        .gitbook-root {
+                            /* The hack for Safari */
+                            min-height: -webkit-fill-available;
+                        }
+                    }
+                    .gitbook-root {
+                        display: flex;
+                        min-height: 100vh;
+                    }
+                </style>
+            
+        <script type="text/javascript" defer src="https://cdn.iframe.ly/embed.js" async></script>
+        <script
+            type="text/javascript"
+            defer
+            src="https://cdn.polyfill.io/v2/polyfill.js?features=Intl.~locale.en"
+            crossorigin="anonymous"
+        ></script>
+       
+    </head>
+    <body>
+        <div class="gitbook-root"><div class="css-175oi2r r-13awgt0 r-12vffkv"><div class="css-175oi2r r-13awgt0 r-12vffkv"><!--$--><div data-rnwrdesktop-hidden="true" data-rnwr700-visible="true" class="css-175oi2r"><header data-rnwrdesktop-1ph75f1="true" data-rnwr700-sga3zk="true" class="r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-14lw9ot r-nzcix3 r-qklmqi r-184en5c r-18u37iz r-1awozwy"><div class="css-175oi2r r-6koalj r-18u37iz r-1jgb5lz r-ty80ws r-1pn2ns4 r-13qz1uu r-1awozwy"><div aria-label="Show Table of Content" role="button" data-rnwrdesktop-hidden="true" data-rnwr700-visible="true" data-rnwi-1vckr1u-hover-focus="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="button" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-rs99b7 r-18u37iz r-18kxxzh r-1777fci r-1ny4l3l r-eu3ka r-1bnj018 r-1kb76zh r-18c69zk r-mk0yit r-1aockid" style="transition-duration:0.15s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" preserveAspectRatio="xMidYMid meet" data-rnwibutton-1bnj018-hover-focus="true" data-rnwi-handle="nearest" class="r-h7gdob" style="vertical-align:middle;width:18px;height:18px"><path d="M3 12h18M3 6h18M3 18h18"></path></svg></div><a href="/mit6-s081/" aria-label="MIT6.S081" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" data-rnwrdesktop-iyfy8q-1qhn6m8-11g3r6m-1h0z5md="true" data-rnwr700-iyfy8q-gy4na3-i023vh-1wbh5a2-1h0z5md-="true" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s" data-testid="public.headerHomeLink"><div class="css-175oi2r r-6wscbn r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1h0z5md r-1awozwy"><div class="css-175oi2r"><div data-rnwrdesktop-visible="true" data-rnwr700-hidden="true" class="css-175oi2r"><div class="css-175oi2r r-18u37iz r-1awozwy r-1777fci r-z2wwpe r-14lw9ot r-1l94q7l r-88pszg" style="width:40px;height:40px;overflow-x:hidden;overflow-y:hidden"><div class="css-175oi2r r-1awozwy r-1777fci" style="width:40px;height:40px"><div dir="auto" class="css-1rynq56 r-1nf4jbm" style="font-size:28px">M</div></div></div></div><div data-rnwrdesktop-hidden="true" data-rnwr700-visible="true" class="css-175oi2r"><div class="css-175oi2r r-18u37iz r-1awozwy r-1777fci r-z2wwpe r-14lw9ot r-1l94q7l r-88pszg" style="width:24px;height:24px;overflow-x:hidden;overflow-y:hidden"><div class="css-175oi2r r-1awozwy r-1777fci" style="width:24px;height:24px"><div dir="auto" class="css-1rynq56 r-1nf4jbm" style="font-size:16.799999999999997px">M</div></div></div></div></div><div dir="auto" data-rnwrdesktop-gg6oyi-adyw6z-135wba7-b88u0q="true" data-rnwr700-gg6oyi-ubezar-135wba7-1kfrs79="true" class="css-1rynq56 r-1udh08x"><span data-rnwinearest-1nf4jbm-="true" data-rnwinearest--1hgij0u-hover-focus="true" data-rnwi-handle="nearest" class="css-1qaijid r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a">MIT6.S081</span></div></div></a><div data-rnwr700-hidden="true" class="css-175oi2r r-18u37iz r-17s6mgv r-1awozwy r-1ro0kt6 r-16y2uox r-1wbh5a2 r-1qhn6m8"></div><div data-rnwrdesktop-visible="true" data-rnwr700-hidden="true" class="css-175oi2r r-1jj8364 r-puj83k r-1pyaxff r-16vg0q1 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div aria-label="Search…" data-rnwi-190qawg-hover-focus="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-42olwf r-kdyh1x r-rs99b7 r-eu3ka r-13qz1uu r-18u37iz r-1wtj0ep r-1awozwy r-1qhn6m8 r-1pyaxff" style="background-color:rgba(0,0,0,0.05);transition-duration:0.15s"><div class="css-175oi2r r-18u37iz r-1awozwy"><svg viewBox="0 0 24 24" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018 r-1kb76zh" style="vertical-align:middle;width:16px;height:16px"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 4a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM2 10.5a8.5 8.5 0 1117 0 8.5 8.5 0 01-17 0z" fill="currentColor"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M15.093 15.093a1 1 0 011.414 0l5.2 5.2a1 1 0 01-1.414 1.414l-5.2-5.2a1 1 0 010-1.414z" fill="currentColor"></path></svg><div dir="auto" data-rnwinearest-1nf4jbm-hover-focus="true" data-rnwi-handle="nearest" class="css-1rynq56 r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Search…</div></div><div class="css-175oi2r"><div class="css-175oi2r r-14lw9ot r-z2wwpe r-1472mwg r-s1qlax r-7xmw5f r-18u37iz r-1awozwy"><div dir="auto" class="css-1rynq56 r-gg6oyi r-1enofrn r-1kfrs79 r-19r33im r-14yzgew r-tsynxw r-1hgij0u">⌃K</div></div></div></div></div><div data-rnwrdesktop-hidden="true" data-rnwr700-visible="true" class="css-175oi2r r-1jj8364 r-puj83k r-1pyaxff"><div aria-label="Search…" role="button" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="button" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-rs99b7 r-18u37iz r-18kxxzh r-1777fci r-1ny4l3l r-z2wwpe r-mabqd8 r-1bnj018 r-mk0yit r-1yvhtrz" style="transition-duration:0.15s"><svg viewBox="0 0 24 24" fill="none" preserveAspectRatio="xMidYMid meet" data-rnwibutton--1hgij0u-hover-focus="true" data-rnwi-handle="nearest" class="r-h7gdob" style="vertical-align:middle;width:16px;height:16px"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 4a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM2 10.5a8.5 8.5 0 1117 0 8.5 8.5 0 01-17 0z" fill="currentColor"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M15.093 15.093a1 1 0 011.414 0l5.2 5.2a1 1 0 01-1.414 1.414l-5.2-5.2a1 1 0 010-1.414z" fill="currentColor"></path></svg></div></div></div></header><div data-rnwrdesktop-hidden="true" data-rnwr700-visible="true" class="css-175oi2r"></div></div><div data-rnwrdesktop-18u37iz="true" data-rnwr700-eqz5dr="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2"><div data-rnwrdesktop-visible="true" data-rnwr1430-visible="true" data-rnwr700-hidden="true" class="css-175oi2r r-k200y r-14lw9ot r-18ayb63 r-13l2t4g r-zh076v r-1rnoaur r-gtdqiz r-ipm5af r-18u37iz r-17s6mgv" style="width:max(300px, calc((100vw - 910px) / 2 - 0px))" data-testid="page.desktopTableOfContents"><nav aria-label="Table of contents" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ipicw7 r-eqz5dr"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-puj83k"><div data-rnwrdesktop-hidden="true" data-rnwr700-visible="true" class="css-175oi2r r-14lw9ot r-nzcix3 r-qklmqi r-sga3zk r-1pn2ns4 r-1wtj0ep r-1awozwy r-18u37iz"><div aria-label="Close" role="button" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="button" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-rs99b7 r-18u37iz r-18kxxzh r-1777fci r-1ny4l3l r-z2wwpe r-eu3ka r-1bnj018 r-1kihuf0 r-mk0yit r-1aockid" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" data-rnwibutton--1hgij0u-hover-focus="true" data-rnwi-handle="nearest" class="r-h7gdob" style="vertical-align:middle;width:18px;height:18px"><path d="M12.424 4.424a.6.6 0 00-.848-.848L8 7.15 4.424 3.576a.6.6 0 10-.848.848L7.15 8l-3.575 3.576a.6.6 0 00.848.848L8 8.85l3.576 3.575a.6.6 0 00.848-.848L8.85 8l3.575-3.576z" fill="currentColor"></path></svg></div></div><div data-rnwrdesktop-visible="true" data-rnwr700-hidden="true" class="css-175oi2r r-sga3zk r-18u37iz r-1777fci r-1awozwy"><a href="/mit6-s081/" aria-label="MIT6.S081" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" data-rnwrdesktop-16y2uox-1wbh5a2-1ro0kt6="true" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s" data-testid="public.headerHomeLink"><div class="css-175oi2r r-6wscbn r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1h0z5md r-1awozwy"><div class="css-175oi2r"><div data-rnwrdesktop-visible="true" data-rnwr700-hidden="true" class="css-175oi2r"><div class="css-175oi2r r-18u37iz r-1awozwy r-1777fci r-z2wwpe r-14lw9ot r-1l94q7l r-88pszg" style="width:40px;height:40px;overflow-x:hidden;overflow-y:hidden"><div class="css-175oi2r r-1awozwy r-1777fci" style="width:40px;height:40px"><div dir="auto" class="css-1rynq56 r-1nf4jbm" style="font-size:28px">M</div></div></div></div><div data-rnwrdesktop-hidden="true" data-rnwr700-visible="true" class="css-175oi2r"><div class="css-175oi2r r-18u37iz r-1awozwy r-1777fci r-z2wwpe r-14lw9ot r-1l94q7l r-88pszg" style="width:24px;height:24px;overflow-x:hidden;overflow-y:hidden"><div class="css-175oi2r r-1awozwy r-1777fci" style="width:24px;height:24px"><div dir="auto" class="css-1rynq56 r-1nf4jbm" style="font-size:16.799999999999997px">M</div></div></div></div></div><div dir="auto" data-rnwrdesktop-gg6oyi-adyw6z-135wba7-b88u0q="true" data-rnwr700-gg6oyi-ubezar-135wba7-1kfrs79="true" class="css-1rynq56 r-1udh08x"><span data-rnwinearest-1nf4jbm-="true" data-rnwinearest--1hgij0u-hover-focus="true" data-rnwi-handle="nearest" class="css-1qaijid r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a">MIT6.S081</span></div></div></a><div class="css-175oi2r r-1kihuf0 r-1ybube5"></div></div><div data-rnwrdesktop-visible="true" data-rnwr700-hidden="true" class="css-175oi2r r-qklmqi r-190qawg r-tskmnb r-1l7z4oj r-1pyaxff r-gy4na3 r-18u37iz"><div aria-label="Search…" data-rnwi-190qawg-hover-focus="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-42olwf r-kdyh1x r-rs99b7 r-eu3ka r-13qz1uu r-18u37iz r-1wtj0ep r-1awozwy r-1qhn6m8 r-1pyaxff" style="background-color:rgba(0,0,0,0.05);transition-duration:0.15s"><div class="css-175oi2r r-18u37iz r-1awozwy"><svg viewBox="0 0 24 24" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018 r-1kb76zh" style="vertical-align:middle;width:16px;height:16px"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 4a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM2 10.5a8.5 8.5 0 1117 0 8.5 8.5 0 01-17 0z" fill="currentColor"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M15.093 15.093a1 1 0 011.414 0l5.2 5.2a1 1 0 01-1.414 1.414l-5.2-5.2a1 1 0 010-1.414z" fill="currentColor"></path></svg><div dir="auto" data-rnwinearest-1nf4jbm-hover-focus="true" data-rnwi-handle="nearest" class="css-1rynq56 r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Search…</div></div><div class="css-175oi2r"><div class="css-175oi2r r-14lw9ot r-z2wwpe r-1472mwg r-s1qlax r-7xmw5f r-18u37iz r-1awozwy"><div dir="auto" class="css-1rynq56 r-gg6oyi r-1enofrn r-1kfrs79 r-19r33im r-14yzgew r-tsynxw r-1hgij0u">⌃K</div></div></div></div></div><div class="css-175oi2r r-150rngu r-eqz5dr r-11yh6sk r-1rnoaur r-1sncvnh r-1ro0kt6 r-16y2uox r-1wbh5a2"><div class="css-175oi2r r-1yzf0co r-1sc18lr"><!--$--><div class="css-175oi2r"><a href="/mit6-s081/" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">简介</div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec01-introduction-and-examples" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec01 Introduction and Examples (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec03-os-organization-and-system-calls" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec03 OS Organization and System Calls (Frans)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec04-page-tables-frans" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec04 Page tables (Frans)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec05-calling-conventions-and-stack-frames-risc-v" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec05 Calling conventions and stack frames RISC-V (TA)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec06-isolation-and-system-call-entry-exit-robert" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec06 Isolation &amp; system call entry/exit (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec08-page-faults-frans" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec08 Page faults (Frans)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.424 5.576a.6.6 0 010 .848l-4 4a.6.6 0 01-.848 0l-4-4a.6.6 0 01.848-.848L8 9.15l3.576-3.575a.6.6 0 01.848 0z" fill="currentColor"></path></svg></div></a><div class="css-175oi2r r-bnwqim r-1jkjb r-14gqq1x r-5oul0u"><div class="css-175oi2r r-1jkjb"><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec08-page-faults-frans/8.1-page-fault-basics" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1rasi3h">8.1 Page Fault Basics</div></a></div><!--/$--></div><div class="css-175oi2r r-1jkjb"><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec08-page-faults-frans/8.2-lazy-page-allocation" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1rasi3h">8.2 Lazy page allocation</div></a></div><!--/$--></div><div class="css-175oi2r r-1jkjb"><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec08-page-faults-frans/8.3-zero-fill-on-demand" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1rasi3h">8.3 Zero Fill On Demand</div></a></div><!--/$--></div><div class="css-175oi2r r-1jkjb"><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec08-page-faults-frans/8.4-copy-on-write-fork" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="background-color:rgba(182,133,224,0.10);transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-hbpseb r-1hgij0u r-b88u0q">8.4 Copy On Write Fork</div></a></div><!--/$--></div><div class="css-175oi2r r-1jkjb"><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec08-page-faults-frans/8.5-demand-paging" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1rasi3h">8.5 Demand Paging</div></a></div><!--/$--></div><div class="css-175oi2r r-1jkjb"><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec08-page-faults-frans/8.6-memory-mapped-files" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1rasi3h">8.6 Memory Mapped Files</div></a></div><!--/$--></div><div class="css-175oi2r r-11vxtcu r-1p0dtai r-1d2f490 r-u8s1d r-ipm5af r-92ng3h"></div></div></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec09-interrupts" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec09 Interrupts (Frans)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec10-multiprocessors-and-locking" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec10 Multiprocessors and locking (Frans)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec11-thread-switching-robert" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec11 Thread switching (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec13-sleep-and-wakeup-robert" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec13 Sleep &amp; Wake up (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec14-file-systems-frans" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec14 File systems (Frans)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec15-crash-recovery-frans" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec15 Crash recovery (Frans)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec16-file-system-performance-and-fast-crash-recovery-robert" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec16 File system performance and fast crash recovery (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec17-virtual-memory-for-applications-frans" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec17 Virtual memory for applications (Frans)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec18-os-organization-robert" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec18 OS organization (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec19-virtual-machines-robert" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec19 Virtual Machines (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec20-kernels-and-hll-frans" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec20 Kernels and HLL (Frans)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec21-networking-robert" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec21 Networking (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec22-meltdown-robert" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh r-15zivkp" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec22 Meltdown (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--><!--$--><div class="css-175oi2r"><a href="/mit6-s081/lec23-rcu-robert" data-rnwrdesktop-fnigne="true" data-rnwr700-13l2t4g="true" data-rnwi-1b00too-hover="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-z2wwpe r-rs99b7 r-18u37iz r-1ceczpf r-1pn2ns4 r-1kb76zh" style="transition-duration:0.15s"><div dir="auto" class="css-1rynq56 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-oyd9sg r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018">Lec23 RCU (Robert)</div><div tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy" style="transition-duration:0.15s"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" class="r-1bnj018" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.576 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L9.15 8 5.576 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><!--/$--></div></div></div><div class="css-175oi2r r-1p0dtai r-u8s1d r-13qz1uu r-184en5c"><div class="css-175oi2r r-10ptun7" style="background-image:linear-gradient(3.141592653589793rad,#ffffff00,#ffffff)"></div><div class="css-175oi2r r-ymttw5 r-1l7z4oj r-14lw9ot"><a href="https://www.gitbook.com/?utm_source=content&amp;utm_medium=trademark&amp;utm_campaign=-MHZoT2b_bcLghjAOPsJ" data-rnwi--1ghhsy9-hover-focus="true" data-rnwi-5xr8s6-dse9kg-2fw26j-15n4387-focus-visible="true" data-rnwi-handle="nearest" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy r-1b00too r-1xfd6ze r-5njf8e r-ymttw5" style="transition-duration:0.15s"><svg viewBox="0 0 1000 1000" fill="none" preserveAspectRatio="xMidYMid meet" data-rnwi--1ghhsy9-hover-focus="true" data-rnwi-5xr8s6-dse9kg-2fw26j-15n4387-focus-visible="true" data-rnwi-handle="nearest" class="r-1rasi3h" style="vertical-align:middle;width:40px;height:40px"><path fill-rule="evenodd" clip-rule="evenodd" d="M562.168 159.724l325.95 162.727c15.062 7.519 15.298 28.898.404 36.746L465.19 582.283a82.875 82.875 0 01-75.639.83L123.74 450.409c-32.376-12.972-68.568 10.748-68.568 46.474 0 28.728 16.256 54.991 41.99 67.839l266.48 133.036c16.267-16.537 38.918-26.795 63.967-26.795 24.334 0 46.404 9.68 62.558 25.394L822.075 521.45a89.893 89.893 0 01-1.385-15.755c0-49.44 40.14-89.519 89.655-89.519S1000 456.255 1000 505.695c0 49.439-40.14 89.518-89.655 89.518-24.21 0-46.178-9.581-62.31-25.153L515.94 745.065a90.036 90.036 0 011.324 15.417c0 49.439-40.14 89.518-89.655 89.518s-89.655-40.079-89.655-89.518c0-4.572.343-9.063 1.006-13.451L68.622 612.068C26.566 591.072 0 548.153 0 501.205v-26.15c0-35.755 19.82-68.574 51.49-85.261l435.039-229.24a82.87 82.87 0 0175.639-.83zM427.609 794.912c19.044 0 34.483-15.415 34.483-34.43 0-19.016-15.439-34.431-34.483-34.431-19.044 0-34.482 15.415-34.482 34.431 0 19.015 15.438 34.43 34.482 34.43zm517.219-289.217c0 19.015-15.438 34.43-34.483 34.43-19.044 0-34.482-15.415-34.482-34.43s15.438-34.43 34.482-34.43c19.045 0 34.483 15.415 34.483 34.43z" fill="currentColor"></path></svg><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-1qhn6m8"><div dir="auto" data-rnwinearest--1ghhsy9-hover-focus="true" data-rnwi-handle="nearest" class="css-1rynq56 r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1rasi3h">Powered By <span class="css-1qaijid r-b88u0q">GitBook</span></div></div></a></div></div></nav></div><div class="css-175oi2r r-13awgt0" style="background-color:rgba(255,255,255,1.00)"><!--$--><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><main class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-eqz5dr"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh="true" class="css-175oi2r r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div class="css-175oi2r r-eqz5dr r-1ygmrgt r-1peese0"><div class="css-175oi2r r-18u37iz"><div data-rnwrdesktop-1x93onp-h3s6tt="true" data-rnwr700-285fr0-iyfy8q-eu3ka="true" class="css-175oi2r r-18u37iz r-17s6mgv r-1awozwy"></div><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2"><h1 data-rnwrdesktop-gg6oyi-xb2eav-1dn12g7-b88u0q="true" data-rnwr700-gg6oyi-1ui5ee8-nwxazl-b88u0q="true" class="r-1xnzce8 r-crgep1 r-1nf4jbm" data-testid="page.title">8.4 Copy On Write Fork</h1></div><div data-rnwrdesktop-hidden="true" data-rnwr1490-visible="true" data-rnwr700-visible="true" class="css-175oi2r r-18u37iz r-1awozwy"><div aria-label="Page actions" role="button" data-rnwi-1vckr1u-hover-focus="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="button" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-1awozwy r-42olwf r-rs99b7 r-18u37iz r-18kxxzh r-1777fci r-1ny4l3l r-eu3ka r-1bnj018 r-18c69zk r-mk0yit r-1aockid" style="transition-duration:0.15s" data-testid="pageCompactToolbar.paletteButton"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" data-rnwibutton-1bnj018-hover-focus="true" data-rnwi-handle="nearest" class="r-h7gdob" style="vertical-align:middle;width:18px;height:18px"><path d="M8 2.4a1.1 1.1 0 100 2.2 1.1 1.1 0 000-2.2zM8 6.9a1.1 1.1 0 100 2.2 1.1 1.1 0 000-2.2zM8 11.4a1.1 1.1 0 100 2.2 1.1 1.1 0 000-2.2z" fill="currentColor"></path></svg></div></div></div><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx="true" class="css-175oi2r r-1wzrnnt"></div><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx="true" class="css-175oi2r"></div></div></div></div><div data-rnwrdesktop-1uwte3a="true" class="css-175oi2r"><div class="css-175oi2r r-bnwqim"><div data-testid="page.contentEditor" data-slate-editor="true" data-document-key="7b658ddd3ec4413f975bfca4d96e54e1" data-key="7b658ddd3ec4413f975bfca4d96e54e1" autoCorrect="on" spellcheck="true" style="outline:none;white-space:pre-wrap;word-wrap:break-word"><div style="content-visibility:auto;contain-intrinsic-size:0 40px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="5cd102ff41aa4263a14b8716b060aabe" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="5cd102ff41aa4263a14b8716b060aabe" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="54ee55c2ac294c449299aa45a80a0df8"><span data-offset-key="54ee55c2ac294c449299aa45a80a0df8:0">下一个是一个非常常见的优化，许多操作系统  都实现了它，同时它也是后面一个实验的内容。这就是copy-on-write fork，有时也称为COW fork。</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 88px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="82e9a66ecabe4d428ccd120d9cc3a7b5" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="82e9a66ecabe4d428ccd120d9cc3a7b5" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="dc4bdd67cf3140199b758ce314def4ea"><span data-offset-key="dc4bdd67cf3140199b758ce314def4ea:0">当Shell处理指令时，它会通过fork创建一个子进程。fork会创建一个Shell进程的拷贝，所以这时我们有一个父进程（原来的Shell）和一个子进程。Shell的子进程执行的第一件事情就是调用exec运行一些其他程序，比如运行echo。现在的情况是，fork创建了Shell地址空间的一个完整的拷贝，而exec做的第一件事情就是丢弃这个地址空间，取而代之的是一个包含了echo的地址空间。这里看起来有点浪费。</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 232px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="9e728bb59917460c9146dc872633a70f" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-95jzfe r-1l7z4oj"><div data-block-content="9e728bb59917460c9146dc872633a70f" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div data-rnwr700-1w6e6rj-1777fci="true" class="css-175oi2r r-18u37iz r-1777fci r-zo7nv5 r-3mtglp"><div data-slate-void="true" data-key="dd6fe5b00a044a3abbbdbd40732ac9ad"><div><div class="css-175oi2r r-z2wwpe r-bnwqim"><div data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73" style="transition-duration:0.15s"><img alt="" src="https://906337931-files.gitbook.io/~/files/v0/b/gitbook-legacy-files/o/assets%2F-MHZoT2b_bcLghjAOPsJ%2F-MMidiGrWWP5Do6c9hwf%2F-MMjs294uvJMihNXEnSm%2Fimage.png?alt=media&amp;token=bf43b7d6-b65a-4a61-9f98-2a3fde9fb4c1" decoding="async" style="width:100%;height:auto;border-top-left-radius:4px;border-top-right-radius:4px;border-bottom-right-radius:4px;border-bottom-left-radius:4px;max-width:100%"/></div></div></div></div></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 64px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="24c6119f786d44f2816b9b0d2cdd085c" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="24c6119f786d44f2816b9b0d2cdd085c" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="b800c76764714139bb163be7c49c775e"><span data-offset-key="b800c76764714139bb163be7c49c775e:0">所以，我们最开始有了一个父进程的虚拟地址空间，然后我们有了子进程的虚拟地址空间。在物理内存中，XV6中的Shell通常会有4个page，当调用fork时，基本上就是创建了4个新的page，并将父进程page的内容拷贝到4个新的子进程的page中。</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 232px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="0ec7c4b634724a4d8d39f732b2d31bce" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-95jzfe r-1l7z4oj"><div data-block-content="0ec7c4b634724a4d8d39f732b2d31bce" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div data-rnwr700-1w6e6rj-1777fci="true" class="css-175oi2r r-18u37iz r-1777fci r-zo7nv5 r-3mtglp"><div data-slate-void="true" data-key="8f1f6575bf1e4009b2e11328a5f180f3"><div><div class="css-175oi2r r-z2wwpe r-bnwqim"><div data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73" style="transition-duration:0.15s"><img alt="" src="https://906337931-files.gitbook.io/~/files/v0/b/gitbook-legacy-files/o/assets%2F-MHZoT2b_bcLghjAOPsJ%2F-MMidiGrWWP5Do6c9hwf%2F-MMjtSVtD4aJB6PMR83g%2Fimage.png?alt=media&amp;token=05cb5346-42d3-4d27-b64d-7acb8ba455dd" decoding="async" style="width:100%;height:auto;border-top-left-radius:4px;border-top-right-radius:4px;border-bottom-right-radius:4px;border-bottom-left-radius:4px;max-width:100%"/></div></div></div></div></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 64px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="1830709f929a491bb1b08a4b1a25fb91" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="1830709f929a491bb1b08a4b1a25fb91" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="ba9e1849b99748aeb2dbe4252cd8e49c"><span data-offset-key="ba9e1849b99748aeb2dbe4252cd8e49c:0">但是之后，一旦调用了exec，我们又会释放这些page，并分配新的page来包含echo相关的内容。所以对于这个特定场景有一个非常有效的优化：当我们创建子进程时，与其创建，分配并拷贝内容到新的物理内存，其实我们可以直接共享父进程的物理内存page。所以这 里，我们可以设置子进程的PTE指向父进程对应的物理内存page。</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 64px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="602064e9a5e04afc83ea590ab9260c45" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="602064e9a5e04afc83ea590ab9260c45" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="038dec91bcbb4e3ba73b281aaaa03540"><span data-offset-key="038dec91bcbb4e3ba73b281aaaa03540:0">当然，再次要提及的是，我们这里需要非常小心。因为一旦子进程想要修改这些内存的内容，相应的更新应该对父进程不可见，因为我们希望在父进程和子进程之间有强隔离性，所以这里我们需要更加小心一些。为了确保进程间的隔离性，我们可以将这里的父进程和子进程的PTE的标志位都设置成只读的。</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 232px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="903d6217bb0f4f819a093ac0c0dbf8fc" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-95jzfe r-1l7z4oj"><div data-block-content="903d6217bb0f4f819a093ac0c0dbf8fc" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div data-rnwr700-1w6e6rj-1777fci="true" class="css-175oi2r r-18u37iz r-1777fci r-zo7nv5 r-3mtglp"><div data-slate-void="true" data-key="8b0502fa46124acfa658905d4303304c"><div><div class="css-175oi2r r-z2wwpe r-bnwqim"><div data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73" style="transition-duration:0.15s"><img alt="" src="https://906337931-files.gitbook.io/~/files/v0/b/gitbook-legacy-files/o/assets%2F-MHZoT2b_bcLghjAOPsJ%2F-MMidiGrWWP5Do6c9hwf%2F-MMjvLvMe8CobFN8-afp%2Fimage.png?alt=media&amp;token=fa092f13-afdf-4891-822d-7cab88f2872f" decoding="async" loading="lazy" style="width:100%;height:auto;border-top-left-radius:4px;border-top-right-radius:4px;border-bottom-right-radius:4px;border-bottom-left-radius:4px;max-width:100%"/></div></div></div></div></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 64px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="fe5f3953121c47d8b18b33d9dba7b492" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="fe5f3953121c47d8b18b33d9dba7b492" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="c7d8d67416e44c3a897103d5959a1193"><span data-offset-key="c7d8d67416e44c3a897103d5959a1193:0">在某个时间点，当我们需要更改内存的内容时，我们会得到page fault。因为父进程和子进程都会继续运行，而父进程或者子进程都可能会执行store指令来更新一些全局变量，这时就会触发page fault，因为现在在向一个只读的PTE写数据。</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 88px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="cdf6651723e64c17bf94f5504257d228" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="cdf6651723e64c17bf94f5504257d228" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="12cff80e64a244608f399a0435eb0bdb"><span data-offset-key="12cff80e64a244608f399a0435eb0bdb:0">在得到page fault之后，我们需要拷贝相应的物理page。假设现在是子进程在执行store指令，那么我们会分配一个新的物理内存page，然后将page fault相 关的物理内存page拷贝到新分配的物理内存page中，并将新分配的物理内存page映射到子进程。这时，新分配的物理内存page只对子进程的地址空间可见，所以我们可以将相应的PTE设置成可读写，并且我们可以重新执行store指令。实际上，对于触发刚刚page fault的物理page，因为现在只对父进程可见，相应的PTE对于父进程也变成可读写的了。</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 232px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="dd666d990c2441658e213e8ede0cbb8b" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-95jzfe r-1l7z4oj"><div data-block-content="dd666d990c2441658e213e8ede0cbb8b" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div data-rnwr700-1w6e6rj-1777fci="true" class="css-175oi2r r-18u37iz r-1777fci r-zo7nv5 r-3mtglp"><div data-slate-void="true" data-key="1183f9c87b274a00a8782836f7c3807c"><div><div class="css-175oi2r r-z2wwpe r-bnwqim"><div data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73" style="transition-duration:0.15s"><img alt="" src="https://906337931-files.gitbook.io/~/files/v0/b/gitbook-legacy-files/o/assets%2F-MHZoT2b_bcLghjAOPsJ%2F-MMidiGrWWP5Do6c9hwf%2F-MMjwgQ0xT6_bDgbtOid%2Fimage.png?alt=media&amp;token=8d124d47-9789-4851-9c60-078549f42a1f" decoding="async" loading="lazy" style="width:100%;height:auto;border-top-left-radius:4px;border-top-right-radius:4px;border-bottom-right-radius:4px;border-bottom-left-radius:4px;max-width:100%"/></div></div></div></div></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 64px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="38b5a9c3a16340a3ace2dca2e994e421" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="38b5a9c3a16340a3ace2dca2e994e421" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="53b5cee306ae4cebb13c8f64f8872288"><span data-offset-key="53b5cee306ae4cebb13c8f64f8872288:0">所以现在，我们拷贝了一个page，将新的page映射到相应的用户地址空间，并重新执行用户指令。重新执行用户指令是指调用userret函数（注，详见6.8），也即是lec06中介绍的返回到用户空间的方法。</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 232px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="0f1b42b3e97f4dedbd7ee89f3e8ecb0b" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-95jzfe r-1l7z4oj"><div data-block-content="0f1b42b3e97f4dedbd7ee89f3e8ecb0b" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div data-rnwr700-1w6e6rj-1777fci="true" class="css-175oi2r r-18u37iz r-1777fci r-zo7nv5 r-3mtglp"><div data-slate-void="true" data-key="f392c511d8554f21a45f20bd4fd28a2e"><div><div class="css-175oi2r r-z2wwpe r-bnwqim"><div data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73" style="transition-duration:0.15s"><img alt="" src="https://906337931-files.gitbook.io/~/files/v0/b/gitbook-legacy-files/o/assets%2F-MHZoT2b_bcLghjAOPsJ%2F-MMidiGrWWP5Do6c9hwf%2F-MMjxNJ_8jYdQsSSzmGE%2Fimage.png?alt=media&amp;token=ab579739-0270-448d-b345-8922262b4a1b" decoding="async" loading="lazy" style="width:100%;height:auto;border-top-left-radius:4px;border-top-right-radius:4px;border-bottom-right-radius:4px;border-bottom-left-radius:4px;max-width:100%"/></div></div></div></div></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 440px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><blockquote data-key="e888591266cf41abb96f7f8e50f012f1" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-95jzfe r-1l7z4oj"><div data-block-content="e888591266cf41abb96f7f8e50f012f1" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-1yyzdbt r-119zq30 r-1bnj018 r-1qhn6m8 r-bnwqim"><div class="css-175oi2r"><div data-key="d4bca4736f8f4777a60c5884ff1df07e" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="d4bca4736f8f4777a60c5884ff1df07e" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="3521b976e4004e62aa7b5af25346a428"><span data-offset-key="3521b976e4004e62aa7b5af25346a428:0">学生提问：我们如何发现父进程写了这部分内存地址？是与子进程相同的方法吗？</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="eddc3329ab254334be7346de845a08c9" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="eddc3329ab254334be7346de845a08c9" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="545424282a694714ae62af024da9a1f4"><span data-offset-key="545424282a694714ae62af024da9a1f4:0">Frans教授：是的，因为子进程的地址空间来自于父进程的地址空间的拷贝。如果我们使用了特定的虚拟地址，因为地址空间是相同的，不论是父进程还是子进程，都会有相同的处理方式。</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="dab19c477df9427ca7d9592583199b25" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="dab19c477df9427ca7d9592583199b25" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="9fafe27b09fe464cb1a9a6e61b41f91d"><span data-offset-key="9fafe27b09fe464cb1a9a6e61b41f91d:0">学生提问：对于一些没有父进程的进程，比如系统启动的第一个进程，它会对于自己的PTE设置成只读的吗？还是设置成可读写的，然后在fork的时候再修改成只读的？</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="c642c08c1cd0431c82b796762bb6ce2f" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="c642c08c1cd0431c82b796762bb6ce2f" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="09f46a4a50ff412ea5201aa65a8382b7"><span data-offset-key="09f46a4a50ff412ea5201aa65a8382b7:0">Frans教授：这取决于你。实际上在lazy lab之后，会有一个copy-on-write lab。在这个lab中，你自己可以选择实现方式。当然最简单的方式就是将PTE设置成只读的，当你要写这些page时，你会得到一个page fault，之后你可以再按照上面的流程进行处理。</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="f8e6a9a885624e2f81afff9373c379f4" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="f8e6a9a885624e2f81afff9373c379f4" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="bb61949797be4698ad15a83f8860c057"><span data-offset-key="bb61949797be4698ad15a83f8860c057:0">学生提问：因为我们经常会拷贝用户进程对应的page，内存硬件有没有实现特定的指令来完成拷贝，因为通常来说内存会有一些读写指令，但是因为我们现在有了从page a拷贝到page b的需求，会有相应的拷贝指令吗？</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="f89483e2c19f4ec79408d0596793c581" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="f89483e2c19f4ec79408d0596793c581" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="9c02eb346a014990994e44933c74d67d"><span data-offset-key="9c02eb346a014990994e44933c74d67d:0">Frans教授：x86有硬件指令可以用来拷贝一段内存。但是RISC-V并没有这样的指令。当然在一个高性能的实现中，所有这些读写操作都会流水线化，并且按照内存的带宽速度来运行。</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="a1dfa90ed9994c8eb4a39f68628b7846" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="a1dfa90ed9994c8eb4a39f68628b7846" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="9fd253b9870c4aa6864d97c19ae968b5"><span data-offset-key="9fd253b9870c4aa6864d97c19ae968b5:0">在我们这个例子中，我们只需要拷贝1个page，对于一个未修改的XV6系统，我们需要拷贝4个page。所以这里的方法明显更好，因为内存消耗的更少，并且性能会更高，fork会执行的更快。</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="89624c4735464bf686ad19d51ce052ef" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="89624c4735464bf686ad19d51ce052ef" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="c6e6d82b2524463fb0025b631ebef620"><span data-offset-key="c6e6d82b2524463fb0025b631ebef620:0">学生提问：当发生page fault时，我们其实是在向一个只读的地址执行写操作。内核如何能分辨现在是一个copy-on-write fork的场景，而不是应用程序在向一个正常的只读地址写数据。是不是说默认情况下，用户程序的PTE都是可读写的，除非在copy-on-write fork的场景下才可能出现只读的PTE？</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="1dee61071d4e46f688c18157cc756260" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="1dee61071d4e46f688c18157cc756260" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="3d46acf98e39402c882ebf0f53f5dbc9"><span data-offset-key="3d46acf98e39402c882ebf0f53f5dbc9:0">Frans教授：内核必须要能够识别这是一个copy-on-write场景。几乎所有的page table硬件都支持了这一点。我们之前并没有提到相关的内容，下图是一个常见的多级page table。对于PTE的标志位，我之前介绍过第0bit到第7bit，但是没有介绍最后两位RSW。这两位保留给supervisor software使用，supervisor softeware指的就是内核。内核可以随意使用这两个bit位。所以可以做的一件事情就是，将bit8标识为当前是一个copy-on-write page。</span></span></div></div></div></div></div></blockquote></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 232px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="3cb0f916c61f4dcebd37a52868c1532d" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-95jzfe r-1l7z4oj"><div data-block-content="3cb0f916c61f4dcebd37a52868c1532d" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div data-rnwr700-1w6e6rj-1777fci="true" class="css-175oi2r r-18u37iz r-1777fci r-zo7nv5 r-3mtglp"><div data-slate-void="true" data-key="1c369d13ea6949788a0a2d25f9368427"><div><div class="css-175oi2r r-z2wwpe r-bnwqim"><div data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73" style="transition-duration:0.15s"><img alt="" src="https://906337931-files.gitbook.io/~/files/v0/b/gitbook-legacy-files/o/assets%2F-MHZoT2b_bcLghjAOPsJ%2F-MMidiGrWWP5Do6c9hwf%2F-MMk2SxJ_cq94IMH6I6W%2Fimage.png?alt=media&amp;token=e0dad55b-5c74-4da0-a3b0-a89d462eda58" decoding="async" loading="lazy" style="width:100%;height:auto;border-top-left-radius:4px;border-top-right-radius:4px;border-bottom-right-radius:4px;border-bottom-left-radius:4px;max-width:100%"/></div></div></div></div></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 120px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><blockquote data-key="1ce66eee754b4ef897b7a2a3e6aed539" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-95jzfe r-1l7z4oj"><div data-block-content="1ce66eee754b4ef897b7a2a3e6aed539" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-1yyzdbt r-119zq30 r-1bnj018 r-1qhn6m8 r-bnwqim"><div class="css-175oi2r"><div data-key="a639c6d04f27447d9292e52b4759f214" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="a639c6d04f27447d9292e52b4759f214" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="aacb25eae0284cf49ec22642dfe53139"><span data-offset-key="aacb25eae0284cf49ec22642dfe53139:0">当内核在管理这些page table时，对于copy-on-write相关的page，内核可以设置相应的bit位，这样当发生page fault时，我们可以发现如果copy-on-write bit位设置了，我们就可以执行相应的操作了。否则的话，比如说lazy allocation，我们就做一些其他的处理操作。</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="f01dc54a04e443c9b7b3b37fa2e3931a" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="f01dc54a04e443c9b7b3b37fa2e3931a" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="4ef508103baf453989dbf7c993f8f725"><span data-offset-key="4ef508103baf453989dbf7c993f8f725:0">在copy-on-write lab中，你们会使用RSW在PTE中设置一个copy-on-write标志位。</span></span></div></div></div></div></div></blockquote></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 88px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="0e9ab029c4924185829635127793ec94" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="0e9ab029c4924185829635127793ec94" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="bdcbc9a852d94e89ac15e6a4fe24dc11"><span data-offset-key="bdcbc9a852d94e89ac15e6a4fe24dc11:0">在copy-on-write lab中，还有个细节需要注意。目前在XV6中，除了trampoline page外，一个物理内存page只属于一个用户进程。trampoline page永远也不会释放，所以也不是什么大问题。但是对于这里的物理内存page，现在有多个用户进程或者说多个地址空间都指向了相同的物理内存page，举个例子，当父进程退出时我们需要更加的小心，因为我们要判断是否能立即释放相应的物理page。如果有子进程还在使用这些物理page，而内核又释放了这些物理page，我们将会出问题。那么现在释放内存page的依据是什么呢？</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 64px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="db25a9b0ad8044cfbf7fb562a91bfb69" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="db25a9b0ad8044cfbf7fb562a91bfb69" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="25396056968a4770930810911aa03365"><span data-offset-key="25396056968a4770930810911aa03365:0">我们需要对于每一个物理内存page的引用进行计数，当我们释放虚拟page时，我们将物理内存page的引用数减1，如果引用数等于0，那么我们就能释放物理内存page。所以在copy-on-write lab中，你们需要引入一些额外的数据结构或者元数据信息来完成引用计数。</span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 248px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><blockquote data-key="518fec6014d8448f98e44da13f78dc11" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-95jzfe r-1l7z4oj"><div data-block-content="518fec6014d8448f98e44da13f78dc11" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2 r-1yyzdbt r-119zq30 r-1bnj018 r-1qhn6m8 r-bnwqim"><div class="css-175oi2r"><div data-key="7695a4cca795411586ce3f66cf6b6fe7" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="7695a4cca795411586ce3f66cf6b6fe7" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="c2d43dd767a6459cb0ebd6af76251e61"><span data-offset-key="c2d43dd767a6459cb0ebd6af76251e61:0">学生提问：我们应该在哪存储这些引用计数呢？因为如果我们需要对每个物理内存page的引用计数的话，这些计数可能会有很多。</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="ec48949dd8f649b19e321acbfc36b2dc" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="ec48949dd8f649b19e321acbfc36b2dc" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="5e9ce830c6914f6f99e5ce6aa1def4ee"><span data-offset-key="5e9ce830c6914f6f99e5ce6aa1def4ee:0">Frans教授：对于每个物理内存page，我们都需要做引用计数，也就是说对于每4096个字节，我们都需要维护一个引用计数（似乎并没有回答问题）。</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="ac82bd8423724c8999524c0dced90d49" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="ac82bd8423724c8999524c0dced90d49" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="902abfa12e85405897472643945770de"><span data-offset-key="902abfa12e85405897472643945770de:0">学生提问：我们可以将引用计数存在RSW对应的2个bit中吗？并且限制不超过4个引用。</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="e642d3dd331442e6b068ce321adcd3e8" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="e642d3dd331442e6b068ce321adcd3e8" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="98a9dfcf3e114611a1a32d8b7102d2bd"><span data-offset-key="98a9dfcf3e114611a1a32d8b7102d2bd:0">Frans教授：讲道理，如果引用超过了4次，那么将会是一个问题。因为一个内存引用超过了4次，你将不能再使用这里的优化了。但是这里的实现方式是自由的。</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="9a84ab873d08453ea1938dea0971b26c" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="9a84ab873d08453ea1938dea0971b26c" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="8a998d12d2d549eb9d1255ead45a7f51"><span data-offset-key="8a998d12d2d549eb9d1255ead45a7f51:0">学生提问：真的有必要额外增加一位来表示当前的page是copy-on-write吗？因为内核可以维护有关进程的一些信息...</span></span></div></div></div></div><div class="css-175oi2r"><div data-key="c5b5b856c26c4d1ba1827b421e5c1790" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-1h8ys4a r-iphfwy"><div data-block-content="c5b5b856c26c4d1ba1827b421e5c1790" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-fdjqy7 r-1bnj018 r-1xnzce8"><span data-key="6dc6a5b71e4d4db1b3c9f14d79d834e8"><span data-offset-key="6dc6a5b71e4d4db1b3c9f14d79d834e8:0">Frans教授：是的，你可以在管理用户地址空间时维护一些其他的元数据信息，这样你就知道这部分虚拟内存地址如果发生了page fault，那么必然是copy-on-write场景。实际上，在后面的一个实验中，你们需要出于相同的原因扩展XV6管理的元数据。在你们完成这些实验时，具体的实现是很自由的。</span></span></div></div></div></div></div></blockquote></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 40px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="00f0ada70f4544f2b39acf8a862cb441" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="00f0ada70f4544f2b39acf8a862cb441" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="f372c85f85244041a51046fc92f4666a"><span data-offset-key="f372c85f85244041a51046fc92f4666a:0"><span data-slate-zero-width="n">​</span></span></span></div></div></div></div></div></div></div></div><div style="content-visibility:auto;contain-intrinsic-size:0 40px"><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh-1777fci="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx-="true" class="css-175oi2r"><div class="css-175oi2r"><div data-key="f27ef287d4834f8fb218ba912c3c9a3b" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1yzf0co r-tskmnb r-xd6kpl"><div data-block-content="f27ef287d4834f8fb218ba912c3c9a3b" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-eqz5dr r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-bnwqim r-417010 r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-gg6oyi r-ubezar r-16dba41 r-135wba7 r-1nf4jbm r-fdjqy7 r-1xnzce8"><span data-key="8a50b0c76422482c8407deec56c63973"><span data-offset-key="8a50b0c76422482c8407deec56c63973:0"><span data-slate-zero-width="n">​</span></span></span></div></div></div></div></div></div></div></div></div></div><div data-rnwrdesktop-1q6rxnj="true" data-rnwr1490-1777fci="true" data-rnwr700-i023vh="true" class="css-175oi2r r-11c0sde r-18u37iz r-1777fci"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-ecifi"><div data-rnwrdesktop-13lvk87="true" data-rnwr700-1ow6zhx="true" class="css-175oi2r"><div data-rnwrdesktop-18u37iz="true" data-rnwr970-eqz5dr="true" class="css-175oi2r r-1peese0"><a href="/mit6-s081/lec08-page-faults-frans/8.3-zero-fill-on-demand" data-rnwrdesktop-1kb76zh="true" data-rnwr970-61z16t-5oul0u="true" data-rnwi-u529wo-aq1qub-c1zw6o-1khlhp8-1cut0bx-na6qhi--hover="true" data-rnwi--1ntk80j--focus="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="BaseCard" class="css-175oi2r r-lrvibr r-1loqt21 r-1otgn73 r-190qawg r-z2wwpe r-rs99b7 r-1udh08x r-1clhhh9 r-18u37iz r-1awozwy r-nsbfu8 r-1ro0kt6 r-16y2uox r-1wbh5a2" style="background-color:rgba(255,255,255,1.00);transition-duration:0.15s"><div class="css-175oi2r r-88pszg"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" data-rnwibasecard--1hgij0u-hover="true" data-rnwi-handle="nearest" class="r-1rasi3h" style="vertical-align:middle;width:24px;height:24px"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.924 3.576a.6.6 0 010 .848L3.95 7.4H13.5a.6.6 0 110 1.2H3.949l2.975 2.976a.6.6 0 01-.848.848l-4-4a.6.6 0 010-.848l4-4a.6.6 0 01.848 0z" fill="currentColor"></path></svg></div><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2 r-obd0qt"><div class="css-175oi2r"><div dir="auto" class="css-1rynq56 r-gg6oyi r-1enofrn r-16dba41 r-14yzgew r-1rasi3h">Previous</div></div><div dir="auto" data-rnwibasecard--1hgij0u-hover-focus="true" data-rnwi-handle="nearest" class="css-1rynq56 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a r-gg6oyi r-ubezar r-135wba7 r-majxgm r-1nf4jbm">8.3 Zero Fill On Demand</div></div></a><a href="/mit6-s081/lec08-page-faults-frans/8.5-demand-paging" data-rnwrdesktop-1jkjb="true" data-rnwr970-11wrixw-knv0ih="true" data-rnwi-u529wo-aq1qub-c1zw6o-1khlhp8-1cut0bx-na6qhi--hover="true" data-rnwi--1ntk80j--focus="true" data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="BaseCard" class="css-175oi2r r-lrvibr r-1loqt21 r-1otgn73 r-190qawg r-z2wwpe r-rs99b7 r-1udh08x r-1clhhh9 r-18u37iz r-1awozwy r-nsbfu8 r-1ro0kt6 r-16y2uox r-1wbh5a2" style="background-color:rgba(255,255,255,1.00);transition-duration:0.15s"><div class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2"><div class="css-175oi2r"><div dir="auto" class="css-1rynq56 r-gg6oyi r-1enofrn r-16dba41 r-14yzgew r-1rasi3h">Next</div></div><div dir="auto" data-rnwibasecard--1hgij0u-hover-focus="true" data-rnwi-handle="nearest" class="css-1rynq56 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a r-gg6oyi r-ubezar r-135wba7 r-majxgm r-1nf4jbm">8.5 Demand Paging</div></div><div class="css-175oi2r r-1ow6zhx"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" data-rnwibasecard--1hgij0u-hover="true" data-rnwi-handle="nearest" class="r-1rasi3h" style="vertical-align:middle;width:24px;height:24px"><path fill-rule="evenodd" clip-rule="evenodd" d="M9.076 3.576a.6.6 0 01.848 0l4 4a.6.6 0 010 .848l-4 4a.6.6 0 01-.848-.848L12.052 8.6H2.5a.6.6 0 010-1.2h9.552L9.076 4.424a.6.6 0 010-.848z" fill="currentColor"></path></svg></div></a></div><div class="css-175oi2r r-1ygmrgt r-1yv4afn r-5kkj8d"><div data-rnwrdesktop-18u37iz="true" data-rnwr1024-eqz5dr="true" class="css-175oi2r r-1awozwy r-1wtj0ep"><div data-rnwr1024-1ifxtd0="true" class="css-175oi2r r-1ro0kt6 r-16y2uox r-1wbh5a2"><div dir="auto" class="css-1rynq56 r-1rasi3h r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb">Last modified <span aria-label="2020-11-26 14:35 UTC" class="css-1qaijid">2yr ago</span></div></div><div data-rnwrdesktop-visible="true" data-rnwr1024-visible="true" class="css-175oi2r"></div></div></div></div></div></div></div></main></div><aside aria-label="Page outline" data-rnwrdesktop-166pt5r="true" data-rnwr1490-hidden="true" data-rnwr700-hidden="true" class="r-1oszu61 r-1xc7w19 r-1phboty r-1yadl64 r-deolkf r-6koalj r-1mlwlqe r-eqz5dr r-1q142lx r-crgep1 r-ifefl9 r-bcqeeo r-t60dpp r-417010 r-k200y r-1rnoaur r-gtdqiz r-pw2am6 r-1mkpi1y" style="top:24px;max-height:calc(100vh - 24px)" data-testid="page.outline"><div class="css-175oi2r r-hu79xy r-1peese0"><div class="css-175oi2r r-5njf8e r-wk8lta r-1mdbw0j"><div data-rnwi-5xr8s6-dse9kg-2fw26j-1hnwopk-focus-visible="true" data-rnwi-handle="nearest" tabindex="0" class="css-175oi2r r-1i6wzkk r-lrvibr r-1loqt21 r-1otgn73 r-18u37iz r-1awozwy r-1guathk r-oyd9sg r-dnmrzs r-7xmw5f" style="transition-duration:0.15s"><div class="css-175oi2r r-1kb76zh"><svg viewBox="0 0 16 16" fill="none" preserveAspectRatio="xMidYMid meet" data-rnwinearest--1hgij0u-hover-focus="true" data-rnwi-handle="nearest" class="r-1rasi3h" style="vertical-align:middle;width:18px;height:18px"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.525 3.474a2.4 2.4 0 00-3.394 0L7.717 4.89a.6.6 0 01-.848-.849l1.414-1.414a3.6 3.6 0 015.091 5.091L11.96 9.131a.6.6 0 01-.849-.848l1.414-1.414a2.4 2.4 0 000-3.395zm-1.272 1.273a.6.6 0 010 .849l-5.657 5.657a.6.6 0 01-.849-.849l5.657-5.657a.6.6 0 01.849 0zM4.889 6.87a.6.6 0 010 .848L3.474 9.131a2.4 2.4 0 103.395 3.394l1.414-1.414a.6.6 0 01.848.849l-1.414 1.414a3.6 3.6 0 11-5.091-5.091L4.04 6.869a.6.6 0 01.849 0z" fill="currentColor"></path></svg></div><div dir="auto" data-rnwinearest--1hgij0u-hover-focus="true" data-rnwi-handle="nearest" class="css-1rynq56 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a r-gg6oyi r-1b43r93 r-16dba41 r-hbpseb r-1bnj018 r-1ro0kt6 r-16y2uox r-1wbh5a2">Copy link</div></div></div></div></aside></div><!--/$--></div></div><!--/$--></div></div></div>
+        <script>
+            // Rendered with GitBook 10.9.262-436ae9093c05e28ab7ebb323584bf39c60221dc6-4202023843
+            // Space -MHZoT2b_bcLghjAOPsJ
+            
+            window.__GITBOOK_WAS_SSR = true;
+            window.__GITBOOK_INITIAL_PROPS__ = "㞂‖འ츂аⶁ䱀⸑ₖ〭\u000eʸѠබ̙䐄僗ḳ킜冐賘䀇䀜휉ࠐ͚ࠒ\rࠒ࢘SᙜØÀ΀⌼郊飀ĭḲ㒘상聊㨀တ∬䓩娤㌨Ȅ䨇倦Ѻ䨰i᐀位M\u0015A&ೌﴀ㤀ᄰ氀夀⼀ㅬ咊耭犀甪쥺聱E\u000f˴芀⭁耩　祶耥䤲ꛉ닣㋶耵㉺Ⅼ突쨤쇺뉢끉哬눤窢준昻쩬놦廒ራ䦲䨸㊀✼䫁4&恔鈛Ꙅꚰ쨀艩胜ᙓ↕儘㩀દ@醌鴤ꩌ耍ꯩ몈皁୮阱氪e氳㸣쬥Ⓤ䒪飒怆ᘕ钬嬤褛⁃⊤ẓ憽婑哩㐡Ј筘怃瑖쁐鋣\u001d튄耆䣌⠈渌ꄀ萸䁤ࠥቈ먀昈∙؂ꅃ큰倨দ쇀샡\udc19舏䘑熰ᔾ౳䞃⬌鈄皤ꕃ„敉伳Ⱡ悦ࠨ㠤ꈄ蕁쁠倌㺁䁇ꍠ週⒋珟䓐Ɖ㈀ᘩ턨鑓㏐偆戋᳀嬈\u0006䉟ꂄĝ﷓∧帯ꊫᥒ昕趀ꃀ劘戹આ撡⻸軌调ʈ做฀蒻琘웑ੰО紀զ젔䐎ځ胵찈소ށ຃\u0005⤨Յ 䨊ꅁᴥᯐ쀸∅Q匷庀ĥ䂔ᮤ퇴\u0007찀ꢄ줎Ӏᑨ阠䦒喜㍜㝣Łဏ㄄⁴鬡 紒ኅ\udd84　擈옕ਆᢿῆѵለ⧴╈噣ᕦᇷ≉➉ढ舂꡹]ꀅﵬ臒画䀤βᲂ৉狜輫짲ﲀ꠩ଢꈟ嗼ⅿ툪恀갢ં悸ㄎ䉀吽ࠫ삜⼈⊈蔖舠㭬ゎ⏀攅䈨ꨢ宠⅓=Ќ젦ិ儴ᰆאఓೇ㈝팩\ud8f4魄ၹ⌔쁑䑁됀脛丟蝜៴킠−肈ꌇ侨ᩛ㛙㓁Э箠鈀ᘱꥊĆ즌紀၀⅊ῑ鶲Сࠅ누Ā䉞ሄ茆v㌒핍⑸\ud844馗嗇㓝뜽샶㵏䤜꽛셂璗䨈䁮㾯ꀀ｝ꐇ쬰骻䊜Ḁ孄ㆴ䡥ૠ꫞挆퇾瑱꤁퇺ጛ膄庹馀燿卂巽⠝쑍膽杯Ⴄ㰙Ṇṿ䒀똡㰟\ud918ᛰ死⟵ᶈ䯮䜾萭훉⠯햶呐⬧⫦秐⾘ᚅ酸弖탈ェ㪠譪ᑸ혀䃈帞饑ճ挴ᶬԠ봰㣌،蓐鰗හ툐䈉ᬄ聕@⁷ᥭ寖춽유‒᷄᳍㇝꿚魉劑噐ᱨ恰➱ǣ㝛ꑴ燻\udf19·ᷟ璙༓쳰벯ᯈ㭬鬈봆ǚ術蟴急ᅗ鐝繠龔쯇羚෤ﰞֱ∨᠛虴袙倦荂瀍氆✃璃襘恡ꨴ䀿Ꝝ荄Ɍ䧡`Ёí䢁〨˘ꐶ٠砧㤰䈤\u0000";
+            window.__GITBOOK_INITIAL_STATE__ = "㞂⁦ॠ上惎Ű㶬䀮净ค〱밃퀋䀬耒ũ 职Ęྠ\ude00젎怅聖Ȉސ§\u0014멌ぱ䏅쀴谀黨䀄톧캺븀᠁적ዡᒀ⼀我嚜ꉠ㪹胖鐃蠄倁麞뽅瀈렁⨺釛Қ骐Ȳ邸ƨÚ僐Ĉ䉐⫺儦ᥲ㪩팧ꤤ˚倚㠃㍕৚兠㎓ԥ\uda90ɱ쥑扐h犨呹▻盍跚觀秠뮘鄦部ʈ⃐ʩ烠ヅ먪ꤥ瓠륡ꓐ얦頃⡂㷋籎詒ǜ쀦ࠁ蒁ᐴꊁ蝂섥咵您銅റ룬挬ᣅ쨠ƻ쌐〈䱀໧肩 ഈ؆むⅈ䠱谅䒒䇡᱌煮ΖǀŜ鈈ℌਁ傁샠ဤ㝅䄆ꔬ腊΃蛨䅌㠄ʩ嚁Ƒ䒊Ⰻ舔⋁惴㡚꤂ᷳ䕐䵖؍킅‪ᕯ䈎ກ퀲끐ࠅ婈ꗷ爽⚀ㄟ\u0002처㠜ం\ud801㙔楓綾椤ᬜᎣ᠁᳀ꄑ宎䎧ヅ吂鳼ꆁɈ뎔⚬ࢡ臛쀊͓⾀肐肘䰄ֳ鉬㐇းખWƁ捠\uda06 懐絚躀ે䁧㶺䡵궿䃅橧쏛װ果廿糁肙؟֤퀄ਁᑠمäꀀቁ㰕݀|롓ଌ熺ፁ靝ꑙń倒⥞呔鼆侒ਚ螡顖ᎅᄜ䁤蜩Ă敡ᔟ珐琄岱㠒ᢁ⃠䬃酃釶ܱ̉븾藃㨀剤夝퐇갘䴓쓉㩍鏤씹䵒✑圑᳆㇂犜术䕀巠Й畝쭱\uddf7䏘⼫읕벼蟇쥽\udf43쯱ķᅛꜝ眏\uda29ﲄ̜쀸㰬Ԁ䮅⒝猌മՁ鐐㷘莀琀Ά―ഄण鱀刞ঠປ檆䎀퐰ဉ˴ꀃ伷渥䎀䔼闔첻ⷵ﴾ꐁ탷唽氼ᠾ蘤룰ᰎ膈琾蜃ᣰ〕㎠켳쾣ꁰᰌ᠆˨ǘղ䔄灕ธↀ孑ꐀⲋዘ⌭⭪횷괛ř門䊉㖐겪ܝⴝᰒ퀁춝鳈헏狗傱횣䪯皺芛컶㷐㼆只膾胋冄࿫T堌΁࠵哯᝺萁艀遇ᢅ筞\uda8c`喱预㨷戙㕻⧢ᵛꃀ嵬懛廭곰ǃ诵ᄘᮍ뉱짚矇楱屉﯌鿝⧪皙ꘙ邷\ud9dd⫤헴誒虅剜鈤葬咄⠉ǌٚ戁껔爁巒䡔⸁@뀸ഄ℈⳷덫㜊艙ᐠ⸑僠㰈܂䄈暵꣪뫂ྲ䀘䈊ㄤ㵨끮玗馀ﻲ쨌䁷僄Ŕ㤏ও度ꑨᰭ譒슲괜ᫎ끬鬻翔಴흱챫螞ͷᶢ놘欀မ頑絲睤쇅枷䯈㎠媂궿ᒃ舴൐ؕ͹먧⛼ဃ郐憡좣㜷䂹弫聅䂔䀰䘞䠙梭臰ᄃ⁔ᚂ〖ແ렿ؐ成荦峈꧅뀰㹠죺䌳盛ᆲ癟ꧣ✡ᮖ䰹㸊敌榅ㆈ⇉馅⟇䃺㬶誐ƨ\udf5aὴ逻灈ꨁ⇨Ίꁠቃව๾곰၉ꒌ㠛例Ⰻ촇ℌఴᷙ꼨췽ࠧ裠殏凎婧굏̠틠㱅뭉ဴᠣᐡ醌␎䧦ህ㨧ᠡ뀒⮕琠逖痈聐ᮉ聭䎃쬎Ô瀖֔툐Ƀꄇ赱摲셙欈庛噩ᗋ⠠㚘\uddbb踃钎츀R㨎慨紐慌妆넱ࢳ际ɠ㨀造幁兓惄ᠢ⡊ꎠ䔶찱巄얘謕扬嶋샛㗇뢐送㢠¼ƙ郠\u0006䲀路䏹\uda32ꦀ檤疈ກ聠ӛ☱蘀Ҫ琖ꆕㆃ膟჊씱ኩ豷ꏔ直ϑ〈䈕ᔇ卺粴炄٧긠졀㹌\u0000Ѐʖꇐ\t䇢뱌ፁ⨏犞㑝䶞ꑵ穦쩂唐➀暴䝎芳呑烷Ḇ\uda95䳰〵웤ဈꇜ‎Ȩ満䃆ᩉÔ䕁\udce3ᇡ䱹貱혶쟘訝ᕤ៱ﹿ턃\ud904飕먘꘮鐷\u0010㭗䗨挒愬喇넘궝먣膾ҙㆤ㷍큸ࢤꪤ鲀␻߀尉ↁਫ਼\ud9e0㨀Ú둍胰အ̅ၽกꐓ蜁䰱臀⌀冐竖x৅竤Ø쑠胀й愘䤜菶툈㭄㤠耼ܲ艰ℂΰҀꐲǓ셔ᲄ홧鲲뵒࣓焌蜰딁矖픀膾ࢥㄢ闩›Hट䜬ꈖ\ud9d6栠ⵃᢊກ瀳영찗͠⌘堞엗‐ஂ悵ᤲ頱舰‹Ɉન悏竤ࢦᠠᡓڊꀫ킄渎艐㔠蛘ᮅ꣜ᑂ蠨ੀ쮘쒪渍⃰媂苫䉀㨂Áꐾ۠砟䉀⧃懀刏稒㪳灰ṃ☲쓀ꘞ璄₏卨㠄谘呲䫵栤踆⊘ࡂ߭窿샡鹇ͩ\udf16ꀰ片셌㤀⑮਀ᰜĉ恠즎쐄㬈ꃷᮃ탃엡⦸߁吁蜬섖ᨅ吸ᴆ댃ꂑ髤㌀\ud82c냠踜삌㴊䂄ᩇ팄闫䆁Ԁ砏ꔠ⊛ᐜ祏꜂퐃瀬椀鰚ȩᰟŰ枎ð紱⪄炠旁\ud81aݙ裼ቀ⸟丨㠈⯗芊@퀈䛁舽Ͱ亘砪惒̘ਂ倆ऱ⠹‸쇀ҏԜ㎇ⰷ葐렝୐砫퟽ή쀠ᢈ⊀㣝਀เ뀂䎠牃ꀄ㰓퀟챡렎줪龽⌞ঀᬂ邒㟀怴ࠜ谡෡槼ዝḀ軽㥧ꖾΰ퍌摢ఓ聠鈰䕐즈䄈䩂灅Ỡ⓷듂唆멠严ۨ匑쇮刅Ĕᩅבֿ瓁蓀렢쒪肌㒊ꀵ튣㟤ᓨ䀁ށ舂֨瘜⺘⠀↾᪽₤琋틠᠎蜓々궛봀ǂ恶્뀃֐ѓࡴ茐ā쇍䢪\udcb3☺`㰜菛秬뉡ઁ㴽稇΃鉠蒶᝾쌘老쇈⒍彩⯟囀樭힏炐溒؈ㄜ놁픎䄔ᶃ烝䀏୐尼ᒠҒ媎怩鮁ꁫ瀽쒐ꀹ↠銙懖\udafa䠼ḉᣲ쌘ꗻ娧\ud801ݫ䪡㭤쑐⠃\u0003΀㨀䁞荟嶲䠡ؠᜂ䁗ꑰ㓡π㏂ጲߘ⠅值ٌ᠀䡮菋満ၸϠ㸅场ⴶ簓葰㨅著ꍰ䜂怎ލ簍꠱쓊℃Qƀ媃䜈䁈ᴂၒ吀\uda87※䜃끓ܬ⫵꡸⁠狂䠻׏䀋혺۟溃ꀒᔃ匁᠎珨兵탊ꍠ䜇艰䉀㝇⁸➬㥢恮̃ꁑ֨ά쀞ܬᰧ湠舐燴³솈抴倈۴㺂弃蘐㷀ꠗ猈돃큯蜠ᢇ舊唅၊ꈐᎄꃮ垣䠨԰蒀ꡢ՝ᴆ‱蜤⸆⁢赳㏆䱂힂猄썬痬ᆇ鴼䪡ꀁ΀☁ꐷ@。䡤쁠Ҁ坢輰㤀虌垳芀濥恚耘腃䔅혴艈牃怔䎃滴꨾Ԡ䪢聲샿ᰅ値԰䔇푿㒸틶‾`㬅ꠁՔ溅ふ敺拣콊ꍈЄܞ۸刃㰏Ҡ媂䠶ٌ〆䣼ಪ猀萬ΐ̇␏؈狄ꀷ0ⳑ쀝Ҹ霃$溃瀢眬刅ဗʀ،捀ະ衆࠽ĔɄ偅̘罁瀑䄘灄뢶Ր㜀ﭓ¨℄倞Ռ⠂䠁\u0010䮌嵨仨侇␄蒪䨇挈䁐핊쁍ઃ᠎衠㒀怣蜤想켴肄㸀贐Ɍ灅Ⲑ聮穲怞㨆쐽恈㒄灠聓滰】腰ᰆࡨ䬼刃逴蟘\udb89࿀蠃㱹聀Ā㠡لꡕ耰攃켈Ϝᜂ䠃薨儃瀬Ǡ㪌㽆鈐滷Ⳳ䏐䨆뎐㏇ᓽ샠々ࢌ쯜䨂茪撪ḃ갾荈਱ᐢꌬ뺆‴茘▍씽Ϻ呃ᠷ畬뜆‍ϟ硕⼓蓽ᗉ咲즠媀〡Ę㺃tᰃ怓蜤皅泊豐ᢁ΀Ṁဤ蔐㉀裌耎㔐℅〽삀璥湮菠囈⌈쉀慇艒ǀ᠃끤쏐ᆂ䁖철㏇␑蓼莇孑ź㸃㙕\udd48耂䁈儇…ؠࡀ怈䓤봃으鑗ꃰઃ䠊̀蠑䔷䀉ۗฃ쀏ʷ㚲唷ɠᢀ⭰狅】䏠Ӊ蠓菳。息苠䈶茼猂䠺ǐ㸁ꀺ煰垧갧ۯḁ肾虌ṍၒŮᰭ䝯肨ᜪ約脒쁑ݍ℅⁠蒪嘱犽퀤刁聊ꗴ؇〽Ҫ戁쀰\u0000ﰉ䃠㩈ꅠ̀ǌ酖Ԑ☀鳕ܧ㠀Ⱪ䥰य삖໸༁ꪼܬ眫䋲Ϝ砣\udc3bۯ㴀ꠄ芬䳱琁ΐ匁耣ꅈᆪ耘耿䂃+䄘溂ၴꏠᐣ켹茪˄倮ǈ⪠ꠎ荠㴆ꉀ⒀뎀⠇‶昏艊ꊺ밇し訌㣋핕ǐᨂ䡤芺놅ၸ⏠戭嘚ฃ❉ᑋ࿀趎촠峌瀗Ҭᦥ程않쁸⌘★蓬ꢄɂ怱耰ᴆ郼࣪醳盜垧ᡳ߯㺌ï舺븀瀈ᾲႜ䮫켮줦좁쀄蔠䜅ၳŒ᠅ၝ가酂怗ƈ㏃逻ނ㤆稜珠垠ံ俀틸⛸ᜇ䪺ڣ唃蓡ۯ唃\udc720ㆀ␡۟䨁蠮Ơ擀ކ탲恅ӂꟴꃊ捠␃\udc45ٌЅ暲ϐ★〮胘ᰌꑰ㶇쓪ⶢ㴃\udc34薬뺁䭑8㬅둊ꏀ唇␹]筃㰭成ꗋɠ᠀꠭腘૨穠蕍䋑Űā屒΃㺅滄輠ᆁ쁏珜̀䀂䌼ᎃ\udc64鈞봅稂䜠เ배\u0010؀臶﭅횱肠Ἁ砳꬀΅稻[г퀼Ɉ䪣큌☀颃聠㷂Ԅ質ꑝ뀸㤃恀䒪ࠃ(Әࡃ\udc0a⒄鬎ݯ☇舤蕺橀聸☚쯬\udc08䖨㜂負ᇮࡓՠꎇǄ䜠猅ꘘݐⰇ〻֎鳏ǲ엋奦ㄬ׸ࠀ㠬Ѩᛍ䆣狀ꠂ肄䔂ြպ⠂앁렃ᠲ쏧ửﰃ膏䔏ばᡀ㨂ၲ԰ℂ䟠媂쏜҆冼ޱࠅ稳삄̂쀰H局⓰ᤔᤰĸ砣ꁲ셩᠃㱓ٌ叵䆑䗅縙䚇℀飕ڤﬞ૓옠ɇ㻮蘠唇舑蒠狀꺨ഠ੯Ҹѵ҃쀹ۇ⒃뵋ㆁ㡶䁠垬們䂄☂ၺ⯭䯭쀜⌼⠣\udc01ܱ鴅堻ƀ瓮躶荠ࡌꩊꔠ㏩쓸ⅰࠅઊ鎀ꠛ꫗Ḅ솗҄싫싆鯀ᄰ块ꊚ㬁ᐜ넔㬂탩鼧ࡀ钡ߘ밅⛲Ơઇ絩鴤砢B㸇舃ź\ud9afᆌ᠁퓌፤ޕ༅蝐㔛怄蛒뾧艻ṋ烋匛뀋熼ǔ뇃ֽŅ뀇›԰☁ᐏǣ㶈恠蕺௮李퀸勶鈿欍〼ꢮ뜁铠茤蘀톷Ϩ⟫쀃聄๟₳유᠄瀄薨▨䡛ؠ㏅ꗨ⿲ꗗ꘠穳큈⊞姯髀垡蠈䇔〃㰲퇽ᜅ荛䣎ꠇ頾肂\udd8eꗅ͚膳\udc60쒾퓢쁠臬ᅂ嘗ΐ䓴頂䁩魚䀑聇ᢃ퀬Ր刭ꊸ؈怭཈⓻㤁㠞ΰ৮$༄妰ᣵ퓐鵑ΰઁ䬈䵮䱒₮ꠅୡ઺㰁슓臐㘁ᑸ⇀⸩떏͈悅叺ộ0䅨캊ꈐ粊魿覈犡冑茼㮴뺸պ䁩街ꋀ紩퀸Ĵ꽩蔊䩱淅ψ鎃恟➭籽\ud964઄色͠　Ʊ鹊쁽洏唄シ۸絧䴗Ơ潚싑ԉ䯭ぇߴ䕍⨦̼Η듒퓭铪뉠滜ꁤ똠　蘈䨆䰊귓遲샠ᴇⱲ䞂ᢀသ䍠ᰇ쏀䢄狅띕؟⮓遐苕ﰾṫ鏠爆孅ҁ툫㰾C鑫\ud917ś⢍꠹ۭ葒ɗᄸၚ蔰ⳋ덯艠㰃筶퀰ᢃ*楆贴嵫鑄贂⢨ᔩᐅ퀐孲䡅Ͱ悀㠍飐㠙䕪鑫쒂诶틐䔰櫍团蚳뺆\ud988䞘狃ꁍ퍰疍ࡥຳꤙ鵵ꍠ䝔틊ˠ媄ꨆ鴂裬幉ᜁ롢ؠ㊨鬠ኙ⬄莐ຊ耳쐇㨇‷¤娸䍊봰᧛ᡙꭽ뒆絬ܬ狫殱薨㘁及ꏨ帳瀗͈䟝⵸㖢ኝ꠱ܧ␅췩妈㘆쒎ܫ鑨㠷̘䨅倶ΰ咮钡趓렁΅믛鴘螛ㆅ䬸ܤ㎷歫㠸澆霖큺돯䱤싀儅〯䭫莁ꀈ`ड賿䭈䱕齻렳갻㼤柙㼒̇폜췃뒁᠈ປ묨꠻\u0010㜃\udf6b㩈㷁㠩㧠搃쀡އⰆ疝㼧쪠䀞͑蓑@䪠てB뚸圹·Ϡ䜆Đ픆ޅ뮤ꏊꃰ䟘갬뤔㣎뎷Ț녇⁅刐㺀剎鴣䇫毳훻䪧‟둖ꣁ鵗蛆誻灤괐ᎃ쐑츉ꘇⰱ델萧\udbdcܚ쀃蔠५끲䇔튱䚕੠狀䁇̼␀萸֨㴃逤ܬ戅ᶊ롍踎鴴궐㵤뮪䪳뚾ࡲˠ㸂蜘컌ꄡ돠艉\udfef舾脲襩ሽː패寔䋄棰㐌·ⶏ͍꛼뵲䄨碡᠏ʷ밅ဳ읻欻耧㳬ﵲ蒅\ud889浟鰵杳Ң긇໩橈䳒잸ɫ윅궝ۨ爃䣳ۨ䪠ꠡ亳쨂般̼ઃ怐댊頁젎쪯䑓럘U룂俠㰀줘솓ޫ઻綁ₚᗝ藙ﻀ‟툶쏾鑣耗롰ȳᜀ鰕䀄萨蕁\udf6e獞舵艬쒳蚗g─厘⺂腰ⓞ댅⴯м쪽ሰ䔵ꈹ춇衬䨀룑壦ץ螀㰇怡줵轰ꔭ䁆À䪡‟雐坁裁⏤⁗\udcc0㐃䞄\u0003⛀ᵨ砄㩌଎肀℃䁢Ǡ݀爆ᦶ栛ꜩ☄ 莿㝵氇耑䎐ல构灏°ױ㴀ࠉ籲ႄ頇蜄㍒鿲瀷ꙸ戫岌뻯咈坰砂㭷틄➜܇›㣉Ӏ衁鸒၎㘠─ဈ쵡䈨Ꭲ梒欘쁟꞉撒ꉗ䙳뼜領끱ꢬౠȁꞐ㗔楙〠愘⪁鹢xҮ俧ᒐ숪ୁ伆⠂昇熊霁⧅橈蚣騂ﰛ ஹā쀺ÿჃ먈ཾ⣨ገ氁唃胈ᇽ㈁ࠕᱏী֠昜顲ᱞᰇ疯Ȇ쭑㫈痛\uda02ׂ蜀戁ꂡ藀̪鶖倎ැ촩耜์࣠ኰ䐟唑᪰싒섅ꦔ璚칀㽺ｇ䂥물\ud803䀀褢힁␴쬢臋޸⥨㨝ಠ㝑砞\ud83d᫫À✀딠䌐࿉苈䃭莀ⶴ툁ⅾꫝᮂᜁඣ숕ࢾ⒁젏耐Ϡቁ鉫℈ö즁ဃ욝膏❠Ԁ瀄怇ܤ⿩먊潞ڈ࿺ꈅ缅ఁ擃鈊ಕ䗯ꏂ광ာϪ䦀꿖ꠠ헂ᒣ䢅祎鰜⎀栎䀩㢜ڼ즀硓奈ۘⰀ詂溧䂨꤫拰㒀瀈萘쁨ղ⠁暎㱼ဗᣩ熍軂စ馟惩⒀瓉옻ꀌͺ讀욫긚Ǡ΀ܧ䪓̍쟀㰀䈜遶ϡ胁吁穊ꃵ侱ퟤ좍Ĩކ䘨ሎ籩譒꼂퇆ꢄ胰஀억톾΀筂ꓒ⇱䀸⍡찀恞큌㢀䖋ඓʃ丝ં襈䀞$㰐ꐇ+좜໱㟡辵‡ߐ˨䁜삗ꞛꏃ먌㢱〒☀అ吸蒩⼉濆倅㩮ܠዅ쾧ꁓèᄪƋ屾Ⓜ׀ш렛ㅜɕ⦄홮舨ࡎὥꠁ₍⡰Ⰹ\ud809)ଡ଼抁븆쀃茦a닧榹恦죖☄㡋聹ꙮᶀ옓ꁲ䃏଀愄ቌ䀉ࢠ넇詅扦ĩ餵җ䀆톸ᥰ鈰斂䂗ⰎὫ㦎耇怐㉠뫁們脒၈㰁嵸ኡ染爯耼ðἌ鼪太즬鬍喬᰷䪢㕐ﰣې錃쬌荷芈ෆ䤂첇膛荀䟈耀ºՆ︍䣔椃ങ䀱썐㦀ဇ쀘̚㇀ញ᠂䀩覭䜀潏໽䒥໡歈聙ⴠ\udc12局㣆π଄ǒ䅂۵齀稖牚﨨ʠ匇ଐ膭棔萁〉ﰚԐ▍ᔇ恒テ즁섃\ud9a0钒ഇ盆狂탥ᅚ礠閬똈䏽鉐\udf07思鑋꙰ː驁䀈¯賰馌橹₨ᯰ昗쳽퇐ቌ嚒䠝ᅀ\udfc0ꠞãꍱ⚊䐯ڦ̾膀态쀾苫趴﬐␨ኚ캧⿳졊ꀵ膈㩄⹆逨曰⿌\udee7蜳䵞䋓預홌࿜吁㪣괂䃰Ȋ⡱ᐘᢅᩴ䤬싥艀ᗂ䘣\u001f뀻즬魣䠩Ǔ茔릥╍截퉠䴁씡ၒᩐᾊ\udd03뀆풠́㥥苟넔┸뜛肰ƛȡ밉ꀍꆓૠ㘧숽䘉԰㜤偪泭礰ᕆᔁ㺉惨෰ല騮妿Ϡ⡀謝䌔୉຀쒳降ƿ謌늸ꥌ邑쀰Ѐ覘砘㯸܁᠅䂤ᢀ谋䩌स㲩㥡\u0018䥉໺洑វ듥层ꀻௐɀ瀾àፚ䰏඗ꃷමࠀ\uda54賛鲽Ḓ】䊞츾瀝Ɠƭ毱䫝䆔Ϡ჌թ稳ਸཞ申⌞᥀甈〚恻肝苬萀쀳0ኀ஦劝├ཾ㺀向쁘Ϩጀꃀു뫑᥊ꘄဋᖕ嬀橞ᆊݞ椀뒐怏萊쎼\uded3䲎苠ڕ古밅亀힗ඉ蠔쁬煰௱ࡢ퉹쇠萃뾓虗Ḁ盥ꓸ↼졀爂怸呜เ狃退벂ʁ䁀ง杧歴ᵺ\udf06姣쳼逍훎葰ী쁅ʅ蠆≳瀔⅞腮䈨鸋聐ǰࡘ糓駘à젨䪷섎谓␃盏쪐ռ끡굥냨Ƞ뿓용ފ岺妏瀟쏨ႌᶢ沲ü챠䪖䌍앇ϳ諐銧켰㉠遡년骑ᥑ춶⌁ௌٸ澀麂ꁻ莐⢁鼃聂榘Ჹ个㼞愈ㅣ걄恼ǎ㍽籚릧칀Ⱡ늞췭엺古✌檂㏀ୱ樇样䇘ୀꟈ䀀ᑤṘ傘轜쀡쩄裵婖쁽鄾쨢ᰀ䠑䄹榃⳻Ｑ䂀티襒꾜䀹ǈł臣쑰䁭荥玳ꅕ줔㦁\ud803⇥虤㄀퉽틘֠敇渇ꄋꏋొઝ੷཰殺䪱╮埐Ⰲ⑄끂Ӄ↬넪紡顼Ꜳ꒶薸屎ᬼ\ud908᳃̀⯢켁ꔾ苶\udf6e뵍쩞莀䪣㡄恸Ơ΁偡狜ꈞ譏笢臉ʧㆂ븎䉸á夁❄帢蘀괌㠍鳠ැ㩕䕘炙⋃략樆艨訾횠鈏⌴ࡀ쀒눴Ǆڸ鄃섨ꠘྀ\ud800퀉섓ጀ⸀鬘๸ē뤘℅昢䎭ᇀ况뾢聆ɉ宕㾍ჿ陀⮠쒊ꁿ⢉૕怉쀘ˠ⋈׀郡嘘ꝰ굚”Ⱦ⺀〃뵻溘ⴕ媽ਹꍺ관䩚〒뤑㨵횁煗ǆ㬨䃟暍眡刣˦쾀賂㹩撎偠煻紴⩐듯ጀ骚䜫哚ࣩᔃ䀎䈔迈꒩啐˅刁吂灢ưᣀ좓㨅쪭偉㐩撜낿ሰ꒍䋣샺唹은녣蒒\ud860ࣗ᧔滋閎珀ࣽꠍ礧〠ྠ⣶洚⪗嬭嫘᠈ᲃᕺɀ﨏䲧‡野昂쀸\udd32쫴粚氎见մ呕恚ꮖހ섇ɞĎ斀ᨁ눖瘠ጁꖯ聕ë釀鿏쒷殂๰❹耖仃༯ꊀ啗줏㡡꫁и捔쩀媃ဋ聴׸紪렋粑πꐀꕯ쫩❏ᰧ톼냩䉠Ꮢ櫋Ŵ䅠ᑢ뜭⸦ⴞ驏⩹چ⁲պ㳣䓕ꤝ֫䦀뚵⎎耒่俒覱䀴怦间ꤌیᣃ쉩兔頟į⤦ঊ²殳ໝ鯫們䇈ᙜヷ젙鶸崃奅䕜ḴԔ宐萏ꁢɳ騎\udd74䒒ˠ浒㵀䀚や㴲礣鞶เ\uda0b榱׮΀䨁╘뚷⢀㥡樊鑗樦䊠炖ࢭ闑霙ᕰꭉ渧ހ㷳䰆쀨͈㛥㰃䠓賲잠⬑\ud955৳齖﹞삈ౠ컆\udd08삻❹ᚶ蠖쑩ᄔᨅ濡8塙熔护ӄ垒嬓ᇈꦢʙ灁陕큻ቯ㫹ᩥ슲慔޶至唉岖芰涊夃壛闈հ尖崛┴활鋏ꯐᩁ庂灎訵伀⛖魅䀢튂ꎕ\ude1cȡ瞁꣇﬚Ǟ굥蘇搱ǉे❩逢蚓U齕魂蜾쁀ࠃ憋ᗜ愩籵Ძ㛝Ʋ麩庍큥様ᑐᦧ펨ᨧ棽増셉î垖㠘볞컙頗臐ꅯꞢ啑쟼퀵렎塉敺㸀툈ڳ覤ў뜭꒼჈燦뗍뙪๔ꊮ젻ˇ쾠؆࠲诗曺赥ᆩ\u0004䪑넁맭퀢䭶쾀唈白⭤췘뱹鸉ﰼ8♔쳁頛뛬ㇶ湀㗣ዠ戂襗躷⩀㟀긓藿슠尀々쨪歲\ud948ᰜ퀮Ϝ㦕舆び颜ഠꥄ콕䎳팪∕谂䊶톫뽚蹛뤓莐ᑀ喃鴼♫样㺮鉞㜬㍁駎梑䇐ᗉᰍ륝►HᜃⳀ郄Ȭ頼ꙛ镀ៜ錱冯惘ੳͺ䮎艇⻢㬒꠬ꅋ➝ኀ늑綽쫃ㅃ휰ެⵙ찀䡺긂冁祢퍕ᤩĉ琖ᎀᬀ將켁䧇둀\udd00〦祣ầ砠ꁇꕩҹ돭觮曒꠮鵎ꈀ⚝=ꈨ㴻䷝گ૥䨆ꒊ䙚ꬄ䗒ꓦ彧൨躧一쀛㵣ɷ⁀鰃場膻럌䰄欁\ud8b6걀ᆥ旄ɋ㤓퓦ꍯ耜ଙ\udf01챥쫴滗꧍샋═㦁街ꍦ骅﭅ܳ娹烙瀁抅⯜㩀ỵ㢜Ŏ撛됄Āᨁ꧈ᥭꍜ琶͹䰀쵣퀞㛀寫휭쁬ŜƼ꟒杼೰䰁䞐㢮쟀〃ℐ\ude1a뉿澘힓聑直٠훦ꐖ*ญ㰍꼸䀄芀ҙ뒋됕꽀﷏裮꨽엙垡肦Ā윀本臊⮇⤴ó\u0007䒑่ט﭅큠Π猝叆 䛄준梄棆嵖雚⨘⌑䮡Ꜩǰᷦ嘝죑跱꜓㉠Иጲ\udc06硯ﯦ슃쪉᠃䗈À̀遱籬Ϙᓊ崂〷ȗ鎌刱䎹℣퉰垆㑾꨺桀ཤ戎⡆邶だ젚逡䲒敨찂䥾⮈졪婙鯔鰂ጃꀛ聆޸⼧簗批᫜렄戊 寞켹趎쓐챰燤㉅䀋爇찁\ude4aꏇꪆⰔ瀿ᤱ娠紻ꑛ鈜ϐᣀ㟞烿덀\udb92蜫‫଩예敋ↀ삷뎉揁ళ쁏ᖌÕ簭稨膛䓀㈄̼¨ກ﯂❸净뢫ዅ㐟༂몰䪎կ㪋Ḵ쳳仹跀渇ĺ숉柋ꎆ⁈Ǜ럁콇Vꋙⵌ程逇㠳쏠萳難᱐᪂齀ऀ넡Ǌ쓠轆䃯朠瓙䀉㍩勁ዖ⦁륆텼蠁肘꣪颂ϥ脬ᘀစ听⧑脸怅ꠋꃓ〠☁—ể겠᐀㉎␰ι䴳䠁솲ऀ㨃丕쩐뜬ḇ쬅\u000eꥰ฀ꦃ᠒쮧䀳狋⁽屡霬㋧䷒湫ᴥᚍ茬驁؀퇚刽㒯㛦℈鱁⠸᫁搳\udc2a爋㯦º敇خ뀜᠏打㍶뺺윀鬂ᆺŐ繉ꊅ큝ץ࣑律䛠ꨁ蠸㷍Ӽ눀퀎氐艮蕐꼧瑣ꁕ᠎灛⨖ඪ쓠牃騏胜쟀厧媉塞熌ᮠ\ud9cd䔊籜楺刭퀕贓㏜ⵍ䠂ꪾ臼祦ꑚ⡞ྍↀ詄犔ɤ\udc17⪂飱꣰妲또胎ꯀ礭왇懟ڐ簔ꐏ\ud989ᜰ缱섄峒ş೘싵г랒윹ᕊ鸆钮ූ؀勎練란຋憡肒杣叝\uda45횐ڀ悃죶꣰࿦泧醞\udcff쮂女蘄恌铌Ծ䠇ⲓ쀮閅ꡙ⃦Ǹ粁ᛑ늹渫㮈\uda6d飜ಘ⎰沛厊콍\uda76✈煀鸚튍䋙쁔饌쪁߄饰֤쀁竑ග⩱ꮚ䇀앞ᔷအ냳阚ྜྷ鴂䄤݀菎閞꘡؋ᨃ硙㰐ר誄琍怩䈽㺋䯱ᠣ岃ࡐ짵耙䏐㮗芺⁶썥刐ࠀŞ貹뒂㕞婘彔㲸耘Ȑ๠ဩ䋠뜭媁采຅㇠ሁ䰶링笼瘃㰢耐Ͽ狈ꡄ悐ᆀছ㛀䅧䄀將ႏ셈੐ఓ⍩ꧢ쯐᠀￤쁇ǈ཰倃㶹ڰ뛇䔀᠀ဉ勺衄昰㬣琝瓙⺀碷橠悁ⷔꎛ憠Ꮈ翮른잕ડ썄蝖ᝍ➀䉨쐗촴԰౭뛫⼅犆㠞\udcd5䜀ߗ喛«諂᠍扢˰쾀梁䭅쬲圅씁闞࠘㝋ꍡ娇큞썐셴✁蠳↛䔆縛섄샾餫ໝ䎱ᙎ鈟鉖징꠭ꞗӬ웆⏐웖萁ꤽ싴䐻ㄆ꫒ଝ∆꺖㸺Ԫॶ鄟ꉭꁰΩჳ퀷䂨퉝緔䁮⛰⚰謐Ḯ嚇挮伞얥ᩅᏨ谜샂촎瓩ȕ값඙⌱ǋᱹ嘍퀏藿䏨ٍ첤婱낇滨벡冠邕곆읳\udadc땤ؼꭚ찕『̌Ớ҅䫛憐뱽㟌렐禣ꛌ渤棛۲佗ꜫㆸ媘ຩ耘\ud9a6ᰁ㬢팋ㄳ憁뚂紈盷ࢹ絰ᝦ䗹튎菀ᝢ围잶猟ЄŰ❎코䀘హՀฎ儺Ͳ䪍铱໘ô$ඥ䧏ాᆉ䴁딦쎭ꦨ䘺餃뀑碁 宁냺嶸ҳ┠쥫쬓퉁✃7삢風ن歾䡥텤躋澲槫ᣠ읰⣉묹쌐⩴ᣬ恿ᤶẀ쎴⁕ƀ៹څᓩô閄隠〉兦ⅾ赔﬇袏᳐ȁǳ되㳵䜀嬰敽쟰ꄿ币푥ꫩ襍웨쫈崔罹쨠儣⮮끺\udf06褄菕㸾끸놠倆ヶ䑂뒜듐臙뙰궡ࢯբ㉈⩼ꘀ웒Ռু肴䷅꒖ꡃ㥒謠㔐ඞ戃進헔뚓뺁壖濲鈁࠽짲洧絨\ude9e䵺齬〃盧꽱살ℏ⩬⹌ᅀ轢䠿⛀ڭ붞鄏鸨쇉Ⰼ؆镅\udfb3쳝ी⮰啮\ud989드嶵急Ǡ왒嶀臮냅刀伱ࡘ͂쮁븍⠃菁π沋 䀔쨖尭髜삿꿨䘈ꫴ屡㤰㍑Џ葔蜿ࣂ㢽쟇ꮚ魆쌶䜝ʿ飳訂ૂ䇃៶먀胦ꄔᨂ臨崵셂痐␴㪛ꝅ㰀ꍍ✝奋蔀鴣㵤쀾璦♨䠞嗀䍳怉岔ħ挤恾텀២ᴸ㶲먒་臖ꋽ잮튘壠﨎⹎ꯣ䳧镅尊剀஀㒧搜ˊ埇犗㢃腂̶胎ꘙРᶨ䀃耈埪➮ꭆ耆ꑐ᳴蔋皕퀒㎀〴凯뛼ꤼ选膩徚␛龣㰆గ䝂㓰잝⫉肨⁦इꍊě桠\udb34瀁괯ڴ㘌형뵨<쯦硰웺Ⴎ㔇渂ᆂ逈ڈ䞨㥂馹\udc4cᣊ龩䔱⴪聈㼳麕䋠ᖸ杒灶쀰ᗸࠃ馸隆뙀砡닿䔰ଛ봄쁷ㆂ⩥垺첪哂ꃀ斎乐습ĸ⊪꽰恂샱胑Ꚑꠞ膄褸趆턞ࡏ੠᪵騇T꧔အ䢡\udb8cṲ᢬痁䮞ࣼ땷駡셰먨ꒌ풀\ud9d3紲䛣ꥎ㘥\ud92c탌蟼乃繠茾$Ჶ僠혐३唀蔤⁰捄⏍Ꚉ䟏ᐳꍰ琁紩潐䍲ᇫ攞귘╖脐晌䚡ꈆ♪ȁ胱쥞荈㓵ࣶꞛᩫ洲\udf61鵒㎛Ṙ靺惍耙ী匆ɤ葹㧇肁瞲ꛌä苮ٍ虳䁱象編针칥ﳄ⺎냇脔ⱼ쀊佴莛䂐쫩㍌弃랑낃褜檻ꈙൂ锚訆ƌ㠠鐀굤߈梾갃ꞟ켄筀輻痲ʻ\udbb5ਃ᧍镞뺚牁谙⳾Ⴧ瑞砅ٗ蚀棎貨㐖監ꖗꐲꢵ邿뉠፬ᙫ鋒娯爄鞦聨Ơᅗ☓\ud920䇲瑟믧ꀔ屆∋曬増䂸ⴗꂄ쩫聺㙎麀は蒞Ȧ칀齆ࠖ넨ߩ灂頛ꀱ赂裸쌰ꁼꤔ⋆\udbe0ᑘ\udd47엑䗍쎦֐랎ﱙ呤䁅鷶氆\ud9c1湚ꔰ儁‚炨話ꗏآ˄軨氖U溌脢ဂⱤ跟ᵐ튫褅瘌琅뮄쳼ಘ㰁閨ጁ⇻ئ㰺ཏ壘놄၆ऐ⼧㙃꒜闈♯䕈㏁ᛛ⇷퀈ꇐ쇀満Ⅴ⋳썅≢ퟎ蹦㧨ᚾⱤ瀁琄ޥ㨴蟎Ⳅ賤腛樋஖౅뢳㙦쥄쪠빜갼۷䕁ᕒ䞻ᕆ\ud97aච␲葘헥⍮߰Ⱅ\u0004캀⛍ꕔ❴ᬋ⹔䈥ꒄŃ듛೰䃠㔯䠃쁦㾆亀ⱗ遉쀓㠐ꝃ瞊ムࡠႁ松霶\udafb詟稁肬䀜⁞ꏃ俕䂙惼䘌䀶\uda50ࡖ伛ᰏ皔飫鈋Õ搁刨頌\ud88eꢑ퉁駓̡쟠⛃澅휠ᆷ埽큮膼@欎ᣩმᜰᦺ鈈㿮ꪥ蠫瓘襽ゐ䥺橾ꩆߗ恃ြ糗ቇด銀悃䳉〩⳦ʍ왂ꏮ㽹ꅏꎸⰕ0ܔ鰀㇓\udeaeಲ\ud855饛ࢠ睘᠄ᨛ䀴䲘⊖越럠䦴ᢻǦ諼讦쵡퀡崹Ⳑ㇘Ǡ⑆爂疋ႀ胬㨦졷谀꽁๣耖㓻팪䢊̀Ƀ鏇䰰逬䯼蓄鋳\udc05꼛磃낑⿐ἒ硉Ả膥餈ڍ鞸渁铁够᫬\ud8a3䛠௔⊀ᝤ\udcac㈺偀ఇఀ匨鏃讌\ud889႔Р㼬櫃俬恉㲑⥂ꮴ瘃ဂ᤯샣剏숨૘─ࠏ蚔哰㪗䰬냄햓᥊娚캒ᇨڕ㮘홱夌ࠋ抷鈸ປሪ⊁娣綊㑱砥⍘蓶⒡ꚉ蠍鉜ꭒ蹘㚤뼰瀋倱Ӡ䦤ۘ뉸䰈랤쀙횗à+ẠȲ숎䂰᳉鏜䩠㰶신퀈䒉뉅䗗ᰬ덐툋뀆比讒즊\ude3b瓥샰ղ▸⭋줠␢ꓘዤ悋몰ꤒ팢Ჽ퉵俸觀菉렊䀍䋗鉪걀Ô혂돎儆ɘꮔ靡嬊倡蹭냠൹׮䵠谂榗⑧뇀ݠ⟲؀쓏ℹꠄ৏髼伐í圐堭䊟⟭⪀龲볉蘌T㏀ɲ￉תּ〓՞ༀ우ꆃ\u0007ᡱ∙✒ᦰ꣋䃝功⩑㙶ᝃ⮬ࠫ䒚쌴굫讦ꙣ虉歹Ҧ⬯赂渀✌\ude8cþ⮍귐⩘ⴰꆺ舸ւꙘ蒛ᇀ帨耢腘覤뢀\ude4aꀌዢ蠠ǀ›∲鼢椌낼䭐㣔ᩒ䱂\ud8ad쫎젤ോ㛎蠃舫理耂텺ី⪀⨓ᮇꑭ㍴࡫㥢祢鍬\udf3a렂ϧ蕲⍀ᆠ怚㙇爨á㍶齀혬껤掖Ǡń简䤴ህਝచ△☇뮣৻꧘ꉄ醙Ყ᳢ॣ䇀⬔藸ꍄ耚쩫ઊ◀嘒䬓詋ጢ쨁礜겂꩘ྙ耚䀁艋袠㺔륩灁缔劤ݰᨶ岸떤瀓耄륥蹔᪎컐媫Ạ쪂慠භ銜ꌅڂ몕뻞ၠ๠⽉泧퀰ﻉ腧䭲鞶Q㺊䊍놸य़ᯪ뜨瓦㨰叛ꌼ㑶᫣蜞뙫엀ܘ髐訍ᨾр錓\udead猏嘝썡ᅶ⟐쫀밊 ᪐茬껻㘦鸠엃誈\udebeυற릈㇃\udd8d풉숿좥蚸荀榣⒯썀੡ᇾ穸✌膐粪凼䲼蘜煱폀态껏ꄪ㏜ꏊꐩ鱳̠恈฀ⵁ전鼂ç袟簐裂⠑䃀芻쿶質鐂訥쪶ᛇꮃ쇊萖간먢隷ꋲ壜䔱぀熓웭ꀒշޖ樧怫暯䌀₌⿒䏢ᖌ慱쬚㊢몸졢【噛娵셐㹄⇓ဍ５ꋟ$ਡ萶梚쮇岎\u0000牌쓽㠒뒀ↇ玌蠅᪽ఋਠ玒ִ퓥댯恳ꬰ잁㛮堶對䕭䙸Ẍ릋\ud9e6ⴂ갂ŕཔ烖堃透옚懳Ĵ渡ަ沎ᡣꅊ⇌\ud92dꑃ先ⰲ晱얌㐇⋇\udbb3섂趂ﾑ∋턫\ud81d泹⠮ᖐᕆ逮тꦩ먎䏁㘰䃆儀출Ẁ蒁냭충衭\u0012੿ꙴ뺰줄㶦\udc04襀ެӶ뚀谜聒䂇涛⯐\udf03ꡆ怱펯蚭ǖ⇛㜃괶♣骉এᐚ嶣勯窕詖ಘᚾ茨ꄍ㬁쑞घ簳耣䅇儒䳳ꦤꨂᰧ枘Çꈽހⷒ문␈帧䫤㋿聫↔℘瀄伌껄䗍黦碁舊䐋퐋ꂝ앝▤쁳쓃侚ﲐƤႆ঱銳⚆꫏䃏俩ꏮ웄逩〨岤\udb74આ⋄ꩺ䛌汢耑衄ۀၨ세뇥蠰䟁㩨镂愆ࢲ⃸〗臧þ。쪫苿詭腆؎䅚轋ﳊ劓什❆帐퇀먨炽\u000e뤀ᔀ ꬖ鏫ꈰ܀ᶁ랠㩷達Տᨬ覲ѣ꣋酹좩㞠픃鞉履䃋鄬귰⃤莩劣圷삒ࢌଳᬒꁣﯧꀌ·䊐신଄闇㹊ꎼဴ灸௼鸊뜳猪蘙勝r꜈ꕸ쾡礏鄌ẕ쐤༤ฤꐀ﹍퀑슿䇀ῲ朙빯況Ξ⮧Ẇ㮊촖䀙萡ᣆ̀ᖸ楓領倚፰㥠狙쉂ꪉ\ud8c7印ꃠꗱ瘕舸恐梼덚䂖햲왰胩ꦷ඄뤪꠆䡃঄죨ˤ띨ꭹ㭃⤐肵Ζ≐ᣀ丱ẃ츸ᣤ膦ࣶਁண踧瀪耠檢⩠ᘀ랧餘ℒⒸС⾆鴒熼氚㎈鱼鴂浫雎怷㱺䄏⍃뢉౲\ud90eⴁ兎णꆱែ郸ễ耻틌婹轴ꥀᥓ흉玢䰪쏿ꌓ⎸夏Ո駞㒸뎢䖬丛砖ᎁ⸢岀ꧩ垎䔖諱읍ⷰ⮀些㳋倩琡à߀ᤠ痊ꠂ䐁聁ꗺ⳱、䘣茂䂏멸ꡀ뢉峈趄蒗걛讃쉞ꉊ黋䄠ȼȣ⠝鍲檉逎≟暲歧腵℔덐ꢐ認僮맕⍚ⴐ滢밧‚㊫筍趥㐔ꧩＦ₞妌Ț鹤瘁︋ᘵ঻聚㴌㠃⪭挛᱄螕䙈礀슁堚ࣵ配잻裀㶁㔡宑눀娾찐ᙘḁ鈏늯䧜阬⬁䘒倂㚩䳉Ӻ᧲䤒瘀쐩씁홰ဈݐ࢔ᖹ␀䦎䉯ꭧ莀ዖ꽁披⸺⤷䆮쌐͡ણ皨룵䞠ྶ⠆憁犼პ텟≨矤椓馤蘏㹢ভ踨遺禺⠣ꀓꑈή䔫ᠢꐂ宲Ƨ戴駺斛€딟䂑菭蜂뿇ဌ㨝삨恸Π㨲⪦⊏崹吙ₙ䅵㸌⫸ꪖಶ犃䂚䞆ɞ悁礢ꩺ踐莂θ쀍꤬戡抈ཀ⒪涛揧켽ﳡ抲遈᱊\ud89b個䘠稠懃梒꒩爂⹠ƪ賧ꋙ⒫뿜趈薇 㠡\u0017栵뜰璤ꥻॐՐꔒ縣Ї丣躀㧑็⯸罋폅耐塦଀캌鐆ᬁ掀꺯ᢑ肪⧕ᢨ푊ᚬ넅␋懕⠠䩂ƌ-쁎補럀췙嶊鲤⓽ꐅ걆ռࢹᐁ攖¾⡱䤃씮ꂊૻ葭魼➫䰈嘇¼函ρ訤乀ⶶ䳐킆䘖᧠䲑ꇧ퀄⁨匤旯聼鶢灬堽홭줾꿲᫄ҵﳱΎꥌ䜃蘞肗æ섍ఙⱨ䈋ă鰞ˢ鏝ቘ䠁鈟贑䂎ꌦ཈聀҂獂㢣牋룬檚⊄튓‗⠁耍礮訄킑䀲ﱐ0ీఀ﫪勉驌ɶ憕ᨘ䶹ᾅ쪀饲᪼ᤄਨשּꐁ렄n㨡࠿뎌墩调္\u0012⬟앰뤒血㘚욎É胦࿚덜᷈쀃駤ͻ䱰Ҧ㨀ﻇ耚汖ﯩ鰰♐Ԁ峥ᠩ튔梄᧠䍒ᯅ㦿葋佖Ɫ９ںň쒆啐털쇬눫ꄺˏ袨肀뭫〆낸滛謦ዢ⌀筄倊‶Ύ鵂ퟓ쬨렿愶눌됙솇䀀\ud8b8쫓덲悰嬹肎貯ǀ䪥딸ɪ꣗ไᙌĖ®ؑ൜쎩켪鄩ꊪϪ乕চ克ᒯ妮ﳡ৘୩菺瀁᭤䞣尧ꋵ潿⯀笣骋뎧☉ɇЩ⣜봁⸣ꀤ沤刑ᜄㆲ楇켋聨焔⫨℞⁀ꢡ࠹๠⛲䖣ኄᓰ菶欒뷞뤪切쎮摿躘8鿉텃蔓퉘䘅⋰␣倃㠊ᓼ鋑깂挤곢隁옉⢔ä销⑀ꥀ䔃ᐆǢ៹᫲㫣蕋ﱩ䛤刾胋ⲉ꼂䖂媇⁈䨑镦섻뀀ꐱ턽菭⨆ඣఇ怡쀕䉪ᚬ此੃꠾꘲錰䮎₊歐ꧠ⤿鐠耚ס⠸蒳剆ꆍṕ̐ƛඹ㱦䄘퓭薚ೝ蠤浫⩬礼䃙ㄿ藎眀跢྆ࠒꋌ⢸࿴ᱸ葺붇甆䓷竹笴ꜫ螞紌\ud87d旰೺ཤ᜚榡ɣ⑆褩鬶䭁㼳頔梚桞䬁쬯ヌ\ud880瀹悎톡칛ꁞ瑐鞫麐퓲䮱ⱀ᝙凪ᇧ䔺䛚ꃏත酪ꠐꞧᆍꈶ䪷隒麼ꑊ戶諥蔍ꋰ\udf43풆䜜窱ਉꉰ쏻뽂떦م\ud831䊾更淆澤ʄԾ幐ಐᲐ踷葌죂ᐳῲ㚋ᨚＫ㱙ų㧉㹺১䒭悔㲌Ḃ쒤琇璉ɐ׆㹒퉱퐅隂硸ༀ蓁胫榅\udf01쁳펾얏饄蔈䀂溚ꡘ莑ꄞ觲港웧Ȕ䲨武⟏摕厔✠Ɍ곡欇腔遜̢뚨룱埁\"੸េƻ☠﹐㹩ꪞ竚꣉ㅠ쇰䜄뼻耕䌟鍽Ǚඈꥎ斮‼ᑧ詀⁀荦נ\ud8bc⓯䑂?鰂뭂ꛈꪖ㹦ંㆡ돣蝌䔧偸ᜠ䱐㐒뻩켬繊ќ易弨䘶幐똡殧㸱৵層詁菈Ｅ\udc70謄ˣⲹ㏠됇崜墭㧀஼蹂觅辀ᰪ䃝֒ﳹ֫笞ԧø슼墒섃ﷃ褠舗ᥤ刨฀ꘀ␄肢ɛ依೾悱揢瀝肔錮얜ꎀ튐ፎⴱ祈တ㡲䤃⡄䈬⨑㄀펜䢒ᤪ话\u001e㒞燡鸄檔䗣䠬栚悄멎ﰔꨯ䂕蘟ᱺ⋲\udd6d➧횰먚഑ᩤ码硠幱遶콷鬀헫順갇×㊨׊认쮣੄勤汦猑谾㘾퉺즤溾ꀌ錫쁔ꆀ➣ﱘ漄듵錑얤렞穅ޢ碉쥟ᨲ䤃巪怎\udc2e鋸楈ꔀ䲸瘍䰺큸\udb49Θ굫ՠ넂昲뉜货馺줱씅嬉檑몔呬嗅￠К訌ஜⶄڸ멉\uda26Ⴋ\udb92ꬋ騜宊狍➉凌즪⩸蠍혴默닏䪚ᨰ㖈冄ک❸ఁꦋ嶵횬깄ꪞᴑ஘r䣌এ⎰\uddaaꧬ뀬阰솔ᘌ聸䐪鹗揇츈萠鸈劥禗睊㾴ဃ਽鶺㏤葸ⴙ岮많⯝⽹뿋왗괹ꈭ돪枖鹲跡瘯᥅嘝ꊨ宀袠쾀鞡훦芥蹛Ḷਂ胁ኟ±暈⼠눑ꘋ銶蘥䛩἟ꄞ쏻∃䀽傚䬼샴౸幩ꈃ긞耣폇῕㺠䈃☀ 𣏕禺꠵㯌囂\udd4a⢅㚤則씹ゆ市된廾﯃恫鵠圚趈ꠁ졪謖覒ࡤ텹呞顮᣹ᆙㇰ緭ស䂠팑䧪钮纚碮횟閌઒穱蘪ጆ䁟卖齹☪즂逋倠唕▇㷖끖䖤㫅ꄢꌢ鵾ざ先瘧肆曪꟨狐秏礔耗鄕ℐ䮀즀෤늈稫਍㰢⩱韄᪖㐫轹ቀⵊ唇†ꁣ臃뮦⫻\ude46咬쳢৒ᴧ㑶剠ළ垪聽ǳ谳฀鱧\udc88ꁋ蝅錀̱滏昛䙸藋䛹镞孁؆˻腟Ὑ풻\ude4b怼糑먿䇠Ễ퍓蛥뒿寋㞎޲ﺤ젊磀ӵⰤ涢苤縆︍ꇀ찕祼憘嬉ẇ慤ࠇ끕勑၊碞耤䇢僰圾並ꖡ撌׋닻莄Ġꀜ恁喏ꎔ弻◈긃Ạ䠀꫑磢㥠꾉骂뀎栕̾襳詚䠂䄬볏Ǡǈ鸣㕞醑臑Ნ吒埌핻谶⧬ꗀ⬺㆓諄씴廤Ì๒炥밙ڨ릲恞省帠Ꚅꈱᚭ戁횬俗鼚运弡钋툃鴤㽞劺ﱋ궂⒫怫躸૖ﵹ谈ハ臜ಥ䤸ᄇ鈉啀\ude60ȷ膬䮒伙⹁떊ꃽ禰৵㥡ṓ㵯螖ႹᏵ䯒넨㋋耰肓㊴俗腶眅홅⬯ꭗ赢㽞罀碴ꪔ懙葴⁀ﵸ鰋뀿Ť胦ꨓوᛣど馢뤑舥䣬尀渂쌦ᴧﳽ究䁼鄔㶃条倢즑肈倾⃑홑兦쒖⌕ဗ㻞ᓰ瀃㞁窳〮즫贰悰ێ\uddac調⛑銩流䨏랄ᚢ̦Ȱἒ蒰✇낀砻瀆쨎ࡄ짺。Ｄ儀努ྷ똙箁乖\udc49ẍ偖ư瓭λ좑ाꜴ罔ඩ輟诖ǡ젭ឰ쥊칀஢惙ᇂ隖墅하⭊訚嵐疊ꠞㄴͻ又⪢⮙茝ᖒﳑʄॷ뎵૨專ꨕ凰\udba6죱⽵俙걇戵૦橻쒱閾倅椕䋌䂛ⱀ⻰ꭝ㔂曧䍿ޞ鹾蔐뜉ྻŬʈࣸ遚쳫䔗붃鱻≝齦仚唊趆볒䪫␞驼隂큙䑯悊墌Ĝ㄀巯遈禞禣拎ḱ笋뭉瞙瑪ᅍ鷐↉꽂䦇≓磅ꔸΖက쐏䴻ಭ놥붘鳻띋蔇횋팯꜑鲀Ꮂ⭜쀌湖衙鵹㵾ᾙ郕䖅駮Ô೎虸ꭋ䁍ឬꓗኼⰲ㪄✊㲔쩤㙡⼩⢠岑ꐂ庁짍댽⳨㡑ꀩ仛쬍◗㑞璒ꍡꌷⱏᄵ쏟뺤偹适努钤䌒䍥м䥑妎帡鄑䩝顔鰂蠋왞뚻楘\ud998畸䢈砧ꡪ፰괗믆⟣﹇ᐉ䫎쥾鐖鱵궅쀅䗫Л찮‹⟐ୖ崔葸閊蜺叅\ude31曶胠䃗㫬胰㦄납螓ᎎ✋氋亴갂혼泚ࠚ쟳령줫쒒轺Ȫ뼛倛鳟낊伴湪䱠⊬ช䃰뭾ᵌ觀斡\udeea퍈䗕ᅢ踉⤀辸떘ⅬĔ⧱렊✃ꚳ␥틬璼쀰웥茾棊謁ำ⭍⍸͂ꌣ첷끁扺Ꙁ꼪䘩\ud84fᢁ੠၂톱鬏獌쒠Ⲙᰀ঒葠怦\ud826萘❏═Ʇ猭뼿䀫ꨍ棘膂쭤魁渆頽઀漎⾚쯏ڀ삧돋ⷕ⨨餻\udcdb㲦◇饠̢길엒孎䒪㻷䅤߀偘Ð採У䇷ꂁ⍚掄ㄆ겻䍁䳋䠺挫㣁챢聞熊ꔾ잻껊쁞É큰˓ヸ쳛㏢ሊ揂۾ᒘ会읏Ꜫ㹦瀚Ҹ鬸峸⛎縸泌됱ꢘ밸粹즣讏熥쌲퀵곌諐ᴉኀಃ䇄檏詈찒欋沦倝ࢀ樾ꐇ窬䪔톨♬≔체柇Żꇞ꘽ᆡ꧳蛝봶虑牱ን\ude88ဏᤴZ蚺Ŗႂ啪ꐥⶁτ䶸밚襑⿆䜮ᓺ㘮蠐㉡轘㉀：䂌ʗꚭ脂籭逾롽˒ꇥ㇜ꭈ曙쬝㠇ș䓴꥔由䭄涰ᡙ❗⡶⧥렷S⬎ꔆ뙔඙뀅쉸璇㈪湘냪춳譙䀴걐ⅿ㦸㻑ɜ蹢々镤௩ፔ틔ဵࢌ혠诌୽렓Ꮲ쇌挼耰鐇鳃ꢯᗀྌᑣ牎琤ꓙϣ뼁⛀匦ⰳꪨ墛ᬀ垸\ud9ed䘸汗Ϯ鉰⎎딓\ude8dᶪ鸅豼鬀널쐍멨益ұ鄊䛪淊怯㉇콚ᤴ簀녪个媘鄑䉰⨝ච迁倏꫍慥䞠㦴Ỉ鼤钴僘凫`Ḁꏓ봊呒퓘ᱮ㔣ꔠᨯ꺞篺೉覺턇⬀쁖锤욛㲨䝗옱넎\ud87c⵵髐ൂ魄下뫥袝쟀攀Ꟁ′룇ዔ࿭㎝嚓ꥨ☝͈Թ䈀磰騒眗푸掋垠㏢꘰쉈턺㈧珃譄ꉸ鱈ｘ氛㎻មꙊ㞀힄ꉢ䂠们磀䪋㽁悆⢕欳ⁱⳘ땍鴐娈좵浠蔰臅ꐆ䜥ᖒ쥍ጮ콦\udb1d␺ೞ눜⍠ꖈ匒ꠎ败煊폃⬧筬⠓潁뀌풤䳦똖蠌阋ꛥ颸씷媌锁ﴫꑬ۴\ud9c5職╱饓怫倍毽辚⿊뭁鷔ﶀ怠䋞ާ㬔3ᖙ籵䑄뇎䲲衤젆覞∣Ͻ쯮㉠骛頋仈〶藤뀽ꨘ적풝䂌쯽ꥉᓊ샷ഊ撿喦䫡䴙イሶ圛\udcbbሇꍘ긖歀氍\udab1\ud867ç鏒螀ꎠ톌\udd69窗엞꧑饥옡㷬쌚ス୎ᤂ䏪䢃㉋㸮ʹ袥엘逽ᜀ섪ᣦ塯蹑ാ㮺轌⸏䨋㇅蜫㊪퐠꽬력藝࣒Ṥ됀꾨ͷ샦▒Λ匪鄿寷䬖㡢䄁턎㣭쀯⅁్⠽멿킜Ոᒶ禯₨堒暉蟸\ud8e2떩猥燪쎡䢐㵔퍄Ἦ봰쑁⥅Ặ銪普䜭쀼锟礀쐉䀀錡ᐥꈵ耠᭚悇佪 큻Ɑᒘ✃霋鰥燜သʺ➞ݱી瀴䀟鄷\ud9adܒ䟄ꠌ艄냰ȡ歱섚Ɍ씺몶ዪࡷ跕韅\udd43踙캞议䟁⏉ጓ勫턫حਓḌᝅ徥䇠ᄔâકؙ੷䉗ᛮੜ⠁囊ꀐ難ࢍ脈釽㼓㳊㘞舎Ͻ䁠׎♪▷⳪씥ᾲ槩쀣罻쌁옐㮔핲橣琍ﵭ쓨奢ඊ졢㹊ᔌ갷பপ䮄䯬쒪耣ツਿ礀𢡊ࢷ䀖뭫싛尶킕䈳ꪺ⯐\ude88ꉅ淚ﴩ颛ର㱅㙳䄢伆砷䗆ೞ널㫯䢯몶죟펮ࠂ带냙쀱쿿唀찑ꩤ갞ᣴ᳗ᮎ塡獠†㢅狄쑴ᄃ⁆㘥蘀碎ļ橭㰎娢啮ꛣ駽①ࠠ勄쬒邖䶝Ꝧ盺ᯍ縸푄쥜緤ื䠎醔斷퍓諰䭱艖檬≸㡲i萖ၱ薊萶\u0004鋵珇ᣠἌ귄分稆䎝⁂جꑰ⥑\udb22胞ྋ跘阀肶㖣ᩈ䧩ᨐ옅ḍൕꊧ륀࢈ẃ䬨ꣃ였㑾팊䫴じ젦弓␲ᄳ惗馄氃ṡ䢨䎤Ż䔙ᵀ尀䠪匎鱪튄㚘誔䉘쿧℁컒儦䨐쮦溑倉멊㰞Â䳎擱稰핆瑼않묐忴ꏲ㑘筁큝퍦敱莨륒⹕펌삐Ѣ基引ଥᇛ芈Ͻ䷂\ud861΅憟쎝傄塱ত籕灍쁐䉗ᬐী渀ἣ﴾蓆攑짣㋝ᓚ돊\ud878挱ژꔙ以爝뉡盼访࿌뉫煣裧쫷䧏䱪d頏⡙↸兌⹂퉳嵬뙷વ艗ᢟ㫸퓡㧠큫脩茊줏饒ꈁꆙ苄ʕۏ᩠⨰뜑똍Éꋉ꼆ꇈ寇䎥䖥煶ěꑦ扤㴇䨅閒ě戔鐔㱖쀄һ䩓믬昑퀈库騶鎒ྥⷜ㏨醉屰㵥韲搧を俛⸆봷銝賡ⲉ옂菉㨛梪賤꥘᳔쎲㰉⪣爺棻䙡⡤홦熋哤Ȯ萫㹱炁⎅ᒨ媡⻋薰䑅ﴏ⻞틹긗ᜀ鵒蔟\udd1cꓤ被䔹觐뤳ꮏ㉑䄽➞⏴ꦭÃ੗ᄸ\udcfc䳒쾥\udd01瘋墮㤑ꅾ玛嗏윋퉲ᦤट㙲ک屧聼ℹ⍿智⋼⮏鰇⬺饉藜蚀ꏶ푮怰ꓨ钖ꏶԢ糺✂룟肟ࣆ芰뿀䤧슊蘒܉ẲⓅꀫ迬ҕᙄ 퀊쀦胮脊㩠⯢뭫鶡莦飧ㅉ쉨癲布蠤븫탊ꫦ좦樶⹂갸\uda6dቹ힕⊬᭠쉽됝쩴ἄⷀȀ砏㸞穿꠰铉ڸ⾏摃뷢덦콄\udb00㉪漆堤豀㜈ꙹతꍆ윲롢䧤賻ⴶ釰鐎剁ꁿれܞ㢸㦢殥됂觮௡ꨄ卋䫇琭鋞๛䛑ž흘檕椂⹮폈渢痐獐ᤒ—뛡䕀Ḣ雑鸀ꠢꁪ馀̀༥뼲殥둕 ꉸ\udb0b쌜\ud856者且炚\udfb1⡢玼\ud8a7般쐔ఁⵆⁿ逑䠬椹雓㦣윛Ã㤢麒艼饲錄ﺞ䲽熇콱৾峮≫頰秪⢽㘨뜁⚌䨎\udc12✈Uࡴ㍺닝㜱桓侮쨓㯖蕈恅討᪔游댌㮫혫һΊ檀䷊⿏\ud8e3ە獐혋袓㘀児覫䄒镂췖晁蓮폠펺晙撄娳ဌ．ၠ놝㋯⮪頚Ʌ쾄楱秕㵱❰䆫ὔ睺⣘儈惴\ude23᫰釨褊쉑⨳ధ…\ud8a2簄܍⥹ൂ李⮒㄂ヿ쨥蚪㯰氀衖瓸鄤Dꅊ줳論ꂹኖ藶ຢ顼\udcd8ᖠ⊒୳㒠醨褲⼭ѐ袉췌륡쪮ꀨ碳摀ഓꖡꢢ㰆퀲눿அ⍷ꐓࡢ娓!력녑⾩㺠؁䀂徊뺖蝔ޏ➆㜀墤沸ꦘ鷐ᓂ඙綕첎怫澠쳒ꔼ抠瘞ɜ٢⹌春䤓ດ郟膚᪂ړᚐ졕䰫༜⫰媨\ud8b2\ud9bc㉊귕婀ᗰ嶡醰㴜䴧십畽\uddf1ﮨ㸊쀧隦煪翌水懌홢䈀Ι鉷汜◣䅸멉纔別ꨃ⇓앐蔠\ud94dภ「﹂姰䖈쏔骻᜼㒵᪂⬃\ud877븙뿣졆扝∣낎䰪婀뮓۬堸觎Ⴭ伄⟂䝖몡琑樍뤟㛺摮⿲ଅ䰩东打ͼ츪곳ᎍ梠᪂ᇳ㑡ᔧ\u0013瑒䊞┪邊찙䢛䅫聼垂朵⮵赦朽ं䂮愈ପ꽪縢䡵⹒⒔ՙ陈췊믎ₗꎾ챺฀ꩣ蔡菂曣꽌잡폏₣杖ǝ䋠ᶲ鰀〫ቌ£ƶ吮쐃ᔖ쀲냠⸬䍓Ġ伓䔒\udb31蛲郧⾬\udc49勇Ң论꩎載焤媂檛僃躑㖃싋Ẏꀏ氖邑찛ᔖᘀ鍎≠ʽŚ暔劶冤蒨勺켘运Ů젃怎挝塄燄泳᪦떗ↅ\ud906Ɏ舿쾮돌墑䀌郣ꊷ킠䠥仨싌\udccd愨谕┸℈ঢ痑킸텍耸譞ⰴ裤ꄄਹ擝섖厞蛛귆迩倿鈅❾趝薈蒃䀑펫깰讈鐢봳腈쿠뎎胂旈≖ୋ⫰粧옕瓅꜠㨠茦ށ꒞ŵ苝訣߸ඇ┫钮°υཔ蠀꧊㗅蜚ꚜ支䣩Ṩ셛镀⠭銸瀘ਈ튩텋풨셚軫ꩰ搣劅鴫⏵壥࣬ᇁ훢㞣滍몴૛뭮\udad8妟䳊둡杞᡾ﬔﮀ焼噦櫥곞㽸ⷤ๜傯픞ࠝ뱞襻赫嬪庮笢鞞꨺易\ud89f㳞鄇㤀ꇻ蟨줢搕큠꛾ﻇ誼텆\uda79\ud8cf㱢淰䯋遪툅ۼႣ닍㬤嫥裻沠蓢ኅ바餼䡵䀍쐺ኸ☘쭡娜ᔭꇔ좫ශF₡⚠䔺榋ẑ魢ᤜ摌舓쮙᭬䌀ꛄ뚉꾋ᒭ﬎\udac3㎹﷑遃籰검祁স⏱옆黆혾ㄨ՞鱌䶚諧ଯﱁ瓄Ā鈂琎ᒊ缸쁊銰᮱蜁瀗剩䥑ᡔ鞚㕉隂峩둜辰謓ᕤ㴉邴꠻긁聬䓈㦀꧀Ղ栯䑑艽콇弼偓鰃撢耽˕࿢ㅫ\udfc0ਏᮁ蠔˴懮༸ⴇ厞脕쀂䇶蘴᪠軀ꠇ岊⣉肃鳣ꖎ銰Ǎ㘛õꋕˈ͐籁딋倇⠣訨Ǌ᮸ﶘ犃ꠘ쀜ꈡහⰀ蠀ﴁ\udacd⠦胄ƺ墨ꟳ冭…낇꽔伔ᒠ김庶䨋낔ꍒ艍霠ᮂ㶒醙წ荍ࢌ㱌쾯ℎ袄Þ땆荄蜓鰏\ud9a6吏舁뛺匿볁딊椦ꀢꌣࣽ⸄艡䣌⠆饄ꆒ䤂༘墠ꤏ됲끖钫䒕⍁蚳丞㐱ꢓ䎚襪㖨㳁媂栚顀䉦⧚︡﫣钺䣰ĎΨꠛ⨀਋樉ꂴ⃶뱎ㅺ彦ࠗ昊壩혲ೈ᱈\uda43蝛ꐾ遢䁉ங㆐㇢餄ꐊ遪䌈聛뱐鸀정邸ꄻآ⸰驵䢄䰬袦ꊓϤǠ殳ᴀ몚蠮澠Jຈ䥂耡ꁥ囙뭼㾈⹁笀ĺ衾숨蠜ઈ幯좋렖蠺⅑Ҡ㹠﯂茎ఱ썃ඍⱈ㟀␈郚洙̤㺛ੂᦱ搉魱䀥ઢࠀ噮袂刄썈豌ᲈ쳃錀ᰲ裰埅뻖ރ䜋钅䀢舚葨ㄐ駁⨡ࠇ÷鎠殘骮⡐␊拓胋ĸͰ╀丈렊샭겚ĳܞಡꀁ쨵栉艀譐ቒᲢꖁ쨔탉ℿ֘∨⋂⊎Ⱔ냛芏̲⧫塬熺됺킴쵭δỐ݁ᴂ琙퀗䁗赴ⷐ㩹㴂낅숪䡒㥰闃國尃ℷ˜᭰᷁眃\udc0b僭䉵ൔ℀歬눈䀚퀛䉤㊺꿛㄃찠㯧䉝਎\uddd0ཀ䎶脻ଈ⻛䖀⬎耄ၐ䏹뾄ᡨ㐢䚀쐣࣌䂰蛄㬈ｂ炍籡<⁥뿂ৰ僃鼇転棉ꁴ蚚٨妠๾梅ꌖ詚㥨嚅\udae0䊥㎔쥓㕌딳퓁㠓袍䎲蠪ᗜ鉬杂匙䱵છ덓ᵌ꺧ⶾ䨾묻눀ᴨ谰⬄쨬좬ꎲ跊㘨㄀ંሁ꠆脱맆쬛ﲃઁ帪䅕ٸḨ똵ą뱮⡻舴\udc41჈ꞁ匆櫽킕䆒䩝藐횣\ude0d쐼傑蝛렒ఀ섡ંꛦ遼渤胼ෛ⿂撍鈮䣹⋃뱒㕰攣㐹刲Ã䎸轒ㆈ䴠뒇2㮝⍴茬Ὀ諂﹡帰좣⍠ق㈻팡ް눒죏⸋뺲ⱨ求\udc8aḛȊ鍕ɒ憓㶡ꤹ 듮알똑哊䳯⋗뭮쿈Ｂʉ\udc28⡠䱂膺ꔴ\ud9ed䫗儤瀥欄咪↰㭃ꊃထ⢨ꍧ딑넄쨋㔏鮡灗螸㑐\udb4f洣듎탯蛭޴廑퐊\udbb5䩖菺텐⚁﮷㻠第ꎋȞ휨檢唁ể箌沚虪֨഍蛈\u001d즫ঊ霾꺮琌⢤꜊Ʀᦫﰅ㈈䖌촳䅈쑙㖨囯⨂ﻤ篸䎄躀⩠繂ᐏ衕車㵻坱\udefd溤軞홈\udc81瞰刉ꂥ쇃뉒㽻ᔢ뤍刈﬍⎏뫒Ͱᴡ璂㰬﬌ꀌ袾죈뚀꾱㈛蟫灾\udd08㯬욂⻖졛쳘䪥遁昋耘ᩀǻꐀ恰됮틠秭㞴쿬풊ﻯ절\u0002膤ࠨ患稇貧䈞ȶ밨贁⌲訢铀༊⺨ᡓ炨屪ᯛ뺁\uddb4餟恺뒹ᷩ蚁쨴뙳\ud9cb몲颵܆髃▻쮀ힰ凒螚Ế붡먝ⱴ䇅棞빁힇ǯ㊇㈛⢵뎴⌇坳ぼ웛ݐ窥懶\ud9ab괒䂉訍낡厄䗏뷐⁡ꡳ䰅낎勾椆㾘\uda20팋䜴倆ῄ菫覠귬顲雍ပ玌烧᎜匞많〝穓㝻嘝ᒏ໩䣐\u000f냡딢辸툔耓뇡콈ﻯ쾸㈒ﯾᾌ蚾픇猢葺눴棂訠ǻꙋꦨ윆繍뒬ཧའ疑뉳৤윮烌灰㹇鼢ﻱ䜟緾\udfc8變ꨃꀦ샅䴊⺰㓁冮⽕瓑驝锪⮨ሢ޻艢腞ܰaຂ㨘桎蔺೨玠三뇩ꢆꃇ멪ᱻ휞灱᰸嘽Բগ㓄\udf84꺬崚螸ꄁྀᄨក鴂砗鳐䠊෺쾻ᐜ㊇䧰篇ᳲ輅姇횠⁷㠼ᗚ⁨熒ᦇ㤢ꉹ懈Öỷ떉賂㌢凁✮ṏ뛡鸟튏툂ףּ⇸瘲⫻䄞♹뻎졡ᶬ脑쬧߯ຠ쉳㑼䨍涠Ꝣ笲叏򀋃ꊎ踺ⓨ펢캎䀘ꞵ⍼葑쥇䂡羾ਟ죄ꍨ耙벡ċ갪這劝ѵ漙媢珢몑핕᮶ἡ쮈訜㞳퇚ꐖ鳎絩\udce7皞덁廯蠺ỗ랡敖ꩬ槚৒䠩⌿਱ﶠ⽂봧賆쁯䖽ćꀂ㩻᧎잾磊Ǉ䦜풊Ữꡩ鰧먪ጠ袠ꊋꨴ໚ꉜྸ㙻㴄꺢갷Ꜳꍪ茊ʂః誅ố꠬ᶺ眡ﳇਞⱰ\udee7ᰬ琒዇릞瞰姏箘鷘繙핈碝풌➮ᾴ蝙\ud927珬\ud9f2הּ龶皅\udbec짜棗첯㊔봀Ϊ롽\udc38쵾슧诓⽊봴ល펏쩠ዧ蔟뾺准ᷓ1ᥠ곁⬈큕瓟蝁↊ᕆ溤沆ꏠඊқꥭ䦺ḙ霐幙纽㖗\udbd1ﹴ\udec8⟾⎂糼㊇䚜㯥球뺣Ἂ⿚踘䪈ꨦꢂⓡ䕪⿔〧癮Ų闺未ỮઘѰ繦纱㠍잾뫅越㼁颠榘␯ר䮧㐨꫁㈌码킝〜餂ְ豜멺쇫ᮺ璐眙쨗ᶝᱱ藗⣾䆦純ⷧĠ煷滸埬諥碨늢ꪋꨬ嗯糼岢瞒Ⅷ얟ॽ觽蝢幖礥퉞㜋◊ᜊ嵒站ѿ䧴䟝鴲熲ᚗ턟ྏᾥ衙焠್물㽡叅老יּ尪⾕ﻗ䕞樬ဝ霫鰹纹磊Ⴀꪎ㲈\uda8f䏂茀ᕐ뫂ꬎꬒꡖ锫੊弁❀䰉뉜弜෹쵈뾞豺㜆렘䭫议㗲ۡᮂ渄麨翬═盀걳䷚윿鱬秮搟ⅰ\ud9ea᜛緼㜨鸍藓ꟑ畱ﯛ⨁갑摊ꆖ๎슂品╅ꨊꢼ\udcc4൑湜꤅䪘೑䈾磍ⳝ췱렒冭獮\udf17좟痐鞶ṝ稥탻㝝辵◍朲庒瓵퍧⽜ѻ䧪霌鵆萮ﯯ䑲霍ᣂ艶虬໨ᕁ퀿柪玮η蛡㭴跄Ɜ齊瓥쐨쫁飁ᖮИꉚ讬⥶ᴃ되씇䄙鷸哎艣똖嗨嬭爅屲⟧윀鲳按세⏧ᡋ유ᬏ秛ஷ李蜪ɕ秪ᚇ苜廛띹鱘痭\udf7b㻞ྸ➷弒筙졷鋟㵲\ud9c4眪屯봝驟읳눯ǉ∌䫁徤픕龠횵ﮣ݇耽셉䏝৅绒좮\udd17犍棝ﲁ몘盻膛஬ᖂᥐꊂ갵뎢蕔⬀ᠹᴊ欲뀞ӕ즠듂尉ȟ馈ꄌ踷₁̐渀牫䐎苭ܵ⻐ム態䰪篣岫电ힻ咢쵹ⷼힴ᱗踞啝᩿Նꎷ䊁炌ㆌ甩飁挕谶㋷誓ℇ黬屻Ừ럓彬縭ﱧײַ䭻䇫垊\udee0㏐餍๥ꨃ쟴崖䩝鞜곂ࠕ悉䒎刹䜀蜠㭭樧睍涂珝／玂鲩ȭ탩⎻玽﨧㘝姁嵖砝줧㏯齶ᷥ徽燙ᩝ익ᇣխ晚\udedcⰑ뜖ܤ鈮͟먣즌ሾ壍挭賥舗燀⒧殝胻⧕偃〆癔ė좠뽏巃ꃨꃍࣴ㇦\udaa1껍ḷ蠂\udf57뻅෭콱뗘坐麇讓ᓽ⏝賙屴☬⧐㴋픂呪碃࢙뷓紽巌症띨鴖熉脼噴睷崇烵\ud9f7彴ꗛ朱㵇痵뇝鏣숳ℴಘ㦀Ḃ馄懶鉵邤씍쳏崋쳷킒쾵쥷跄沋숀珐溰각坃됴ຳ죐ᥠ囃၍ℓ迶洁盞썗﵀⨹㭇诊⧊엑鉋瑩큗䈝௹븀몣葉ᰌ⠚慠ﲣ﬏䡝ꣵⷵܲ\ude72蒵︩諜⣺랔⍕睌ᨘԌퟢ鹭簳̊쳽킯䊋㰌❺⣇낐ⱄ넩⦫Ꭼ䦱ۀᎁ拱嗫迖\udd6d羁֔謓ⱍꯉ歛ည3崾垾뷯供\udd30絕\ud96e띂᫇详Î鲰ﻁ\ud8b7뒡쵺ꗷ⽲\udeb4䶣嘋䰽༈ꄪᤆₐ곀쎈냰茞惨㐨櫁梆廩蜂幻矣쥧≝ӿ⟇㶄ｙ紐鄾島좱㻜鄞뉽ᇔ⸲ꠥ㭘췰哅쀐聴Ƥ癫⬓䦃꯴ማﱝᴅ楱탃爛Ŭⵏᴞ敄畕璮惬钊⠄瀋ử樮呮偹䏪랔専淚퀿铺븯璕쁝놲毈粮变㧥ữ޽ỿ췃꼽㷞睍훷\ud9bf泾痞켸齝硳텯⟟ݾᏙ澔鵄핯㜽癷珝潽鸶댤회␖꣭⚑\udef3ꊇ뱔Ȼ㊞湹໿頲ꆕ˽⩻뫀⩳㬊逓煫ҩ유⩂얇몡ꞙ鵔橊枯䫝ㅹ燫༺㶝பन檠脄䟾탃炾੊炌䝕╀廊ӄꀈ煴㿨纾쏠澴ᶪ蟐૗ኼ潷쏃㜆悗걦ᦾ晡ک春螠ɬﯣ컏︾陽ﯟ랿뽖牛\udc97\ude1f雽䧨ᾄ}琘ᱏ㽜㳰\udbce좃ꁱ䊱娓ꂢᘶ᪔϶綧톘줙昡龸絊瘻쒢ਮ㞺쎄䌻ᇕࢠ技낍㑓Ț鲺↫ﺍ췚§膾ۇﲟዟ鉵쏲枧苰캏숳වꧣ\ud98aꇨ聯ᗈ铁抌鯩䍁ⱞ픪㠐븏耳ྜ翲ઽ䋞뻰痢뉘控᧵昂坪海瑡璘ꭝ녲ﯝ꾣Ủ䧷ⓨ쬃册ꊧሀ윱쀼⽸闹埉崚ퟧ곴㏄栻絽쾷䝾χ⼡彚∹䕲㞏\udbdeॻ鯅ퟻ㳾퇏ﾾ鳸߼霎纽礝췷㖽\udf70鏧鼕狞仪豓එ샎ﴑ筼﷈矿\udc1f罅﹓︟ᔜ衍琴ອ鯂豸⋤\udf84蜩锶⣨ꅜ詊縩瓭堦줂ᜳ徲욏즜莺ᯇ\udbdf蛢蘝馰邾班吱琜胅䘡\udd42렓\udd05遥멓ৣჟ訾놻钶簭\udedf⽬簫颃\udf04簃\ude6fﯜᳺ࿟徸礏ﶟ쁼囻࿈䟰ￄ\udb27卲虎ꌝ铈䩸⟖掸沟㟎⸎뼝﷟р⓽苻⧒⡇胅䘪ᵄ溾鬁砦吹ꃎ윽⸄\ude5f⬛Ⓐ뼮烞휿⨿﫸꟟㾋幥썗썻㨽飄І颷䊗戄ẜ䵿\udd07쁴쐗䄎慠⎔␑괆櫚ꡪ︊佼ߺ\udf2e뾝㶯睼潻栗圑‌䛏챈➽巶篛筪뼌콚㟀᪑ꐅꤎꑺ通䊳폯欿㫳⯄样ᆪ䚿\uda92Լ猠Ⱥ瀫뺿珺ꏯ㽜빨₿⨀鸎㲬墬ʰچ້メ翷琜䬵퀳ꀘ\udce5틢芈챻醦꬗㎾鄻ﷱ췪濈ᾥ齃峁ﭛ\udedfꎟ䫞칽ꭸ䇵귫\ud9cf젦\ude90せ碔䎿캡ೠᝯ㒎⯽픡鿲\udfe9翑쀸罘븄粉믆ࢲ⦰Æ힉諸鬆ꘕ偋簀뭝쟍뗐叀琁늺ﲄ抋႖҂걄萚ꪏ璽腀层攁䝁各넢ﯠ砀嘭孪滏벥砟쳀式㾾캺৬耸➱ŧ㲡怒ই짟븀葾껽ﺹ鱤欮ﳌ줱䒔ツᅃ瞐ጐ魀䉂崁줉順ꍵ铭Ḃ蜒ﱆ撿⬥赸蜂⋤╂螁쒱͖ᐁ梀ힸ胜廗﷤筺쏭ꙃⷢ舄旻縖씅䰕瞕ꔱ倥ᅱ䂔䎚衫ጿ镐缰윘쫸狴ꯨ뗈⡍㻛糺톦菇调ᷠᩲ扸ꓰꋁ죲ﵠ￀뾅弥㻼ﲴ䏲ắ\udd83鵟愾⫀쎰돷❪嶆\ud81e鰇籢ꆡ䁍읩䣪ꘪ䚾횡跸‌﷠齋縶絏뫛⫻뗏㡾\ude02巻훳擢迅舍墊裐ଡިۉ챠渼籸匂觠鏃\udf07ဢꞦ嚿顠䋏ꛚܖ҂㡄毄䞀꣓跇萊찂㠐ၱ롣ﶸ뤺ዷ똼熁ゃৠ찋➎Ꟊힵ胆綜磢᪫阨珀텅늹맀塄븙愬陝ᣫࢹ뭕皫๿ꗟᖾ쯜滺刍闯젹笠ꂴჂ苖᏶攤ᣫ퍯릀鬁❜㽻\ud808돤H佢\ude6f͋禸෰폀柗征︇ﵵƋ嬋耓⸜졠Ĩς閹褮ਛꊠ얄䊃嘓갤䐖係ᐾ$傡僱䁢菕୑࣪ꍍ䙾⮨켺驴뛧갃逅肘ƃ㳘﫟풃鋀쨎⬃ᚸ鑆᠛埓莔꡼uॵ䧵獮ᮯᗈ瀎뚁Ć嘄젔⼏倞놻拶응䊈฼㹅ఐ⎰ᴺ箷⿤㌞ဵ偨ꊭနᇓ떋ழᓨᒿ婠㱡햀⅔앎ꨘ悥Ṭ㲳Щᑟ홛鋗㖠橽㤇ꕲꨏ詖궶罦䅅̗ஸឨ㳏빯୾ꠂ그鳱럦栮\udf85ꃬƎﶭީ疴ᴇ퇻譈㌈핱倲쓂璉ꔉ訢聫졻懶쓬ᠻް庀Áꗜ﹀팄Ꚅ䨄셶솨멥䗼쏆孄⭄䘀㬤ᱣỪн끿氮셃녻۝ᖨ㺛ꗴ奸\udd0d㰐㻂綂﬎褱魸⺢\udd16ޮৌᦸ➗ꩠ擀閸吋囬谗⾴๶䃫յƺ˽႒걘㕠䃔ࠂ髁ꨐ稱꽡麝桯懞잢᳻ްጐ렁똃瞸ᨍ根쁽ŀ綟Ѹ໸ᗠ㷰総㭁远䋳屇▋뼞鰳䣏ƴ릩஢᣻ፈ毬滞䀽英怑准뾡강恱慩荙䍔僘⺨畘␐暀遂ჯ䗟븥Ɍ߯ᱸ⥣韟㐰ᩡ倻ḡﱂ椓ቄ끐ƀ逎䈷쓟菀ﴡֽ곺蓵㐗柃邯腠籾ՙઃ㇡ඈ䆈ꃐ攃ㅤ䢍㫗頁耨滠䧃觾☪ᐄ萉ఐ굝乒㴁㮧꜓堮傞㈽Ӄл捃ཅ썘ᗈ◁⊁匇∙꠬쁆僋ǜ㲎꧲蛥พ싨秐깐靂溆⭶䨛⠢䁼ꂈ퀅\ud80a融ం䩔␉㘏⹮ᬂ篹氋෡꣈搅砎䂘꧱䇪職촊๝㓄ව㑬⸀渆ꨅ氕ꈼ\udc3e腏ﴎ㪝ࡠ㌘巐ꮡ⌃ꢅ绁ﶊ껟ᱚ⅊믏ዣ짨婐﮾\uda83䨄묆尕쟓莚恒Ġ쉳흨ᄨ拶몤嬄؜∌⡱ั鳘螕᳿쪯葰巁饂嵹ᩲ먎砇栟缈꺝槱蛾사耇ไ褰鴡몂帏㟢࿖삀㺏芚蘩煼ᕨ㗏뎿࿁鵂㽣渧눟煉졶츧耸ƴ릫ద᦬⠎܀榡늜脉悅䠦⃪怦쀦ಃѦ垃Ꙝ䜨΁䂺\udac3렀㘫봗報ᑯ苋઻裩읇묰킨핀ᒆ㽆艄㈖끧샙䄛‐⑬蕈Ḩ䲮\uddfc䇡䘘忒塠샗ﺚ紤֠㚠ᒠ홁\ud8bc垸ᴍ〞뇒澊郸낶ꄧ๵苕ᔸ亰궞竂췻϶研氾ꡉ냆ꄔ鶚蝄ᥤ⁝鿀쿁紱皱锣襈䜠┠℠䋭戧ੵ芜ⷖྰ췎໹輳ឰᖁ訒㠪彙偙絢쇔䆖讪䎹វΠ鮼䏣际᲋稂渤ꀳ邴ꆐ甀ࣹ\udbcaࣤ㇈䀢Ꜣ肋鲊 箥を脷ﵾ藗ࠒሀᔽ냜牶轀ᐓ鸆簅⌈壟슕ढ虖๊匔؎竡拃暴\udc15헗灵ら﹯뵵藩ຼᡬ㣐砿߁⯂⹸嬈눖硍낇Ⴕ卝Ѧ웖ᖍ᩼却咠度ꑷ︓Ȣ爜ࣙ졜Ư蘅෥Ɋଽ밨㚁檝쒲㏲ꕋϊ螖呌呪ꃙሕŸࣰ䧐\ud801檽鷇뮂\ude0d밇砮↬䚦ఔ॔㻠纠踑ூ롄렏砚밼\ud879邍⎾뭙৞ሟᠵ뾤⣰䠀䭐둴줨ﺆ⦚䜻ᆍ䗩쉱᧞ไ澐趮﹃湰琋찥뀋ꀪ탕㫪郅ɭ첨␇஠⥽朅ꬆ靖䇟㾻ႄ컴≹禡薨ۿ쓐ᣠ譠┑ꏂ㥁\uda0a黗ᮕ䘾ˏ䇱䦫׆ឯꩻ⍤㓁殄녶刔翅⑓硇ᇭ䑪ࠞᰭ솽菐ᲃૺ鸄踊᜛澅㰪碙饩윮ӏڨ㳀觀ෂ㜅㜊\udc1fՇ䀧䢐\u0011셵뢍ꁉ䗧᷍馌埀櫀䶹㏵┫됊ꞑ摯个ꃦ䔊Ⴗᣤ甼㎑ೱ⹅ㇵ僡帖鬏ᇰ̯׏౰ᡛ\ud8d8䐿卡脣쎻꼍쀞ߝꡡᄨ턖텔¦视ዼὠኀ鐀뉲蔚爧逹죆硐ၢƨ袅r㘬৐᧘໙樹ᵕ㥉逭吉㝒࢏έਓຜ㄄槯ᒡᲃ顇鈌轭闕\ud989車⑛銑Ⅎ柘✇꜇໤㊡饻搈鰥傩ﶠ㨪犑艴Ṕ⍍䄞患塺\udc88阖谿龩읖䈢렗揂䪡傉᪨謲᪣ᤅ樉㰞䰭遟炽셳耏΍앺࿜㴨欈駡ආ㈛柔㮧샼儮糔뤈載᭬㗨嘌㾴⽨\ud891䅄謇ꠄ桇ꢕ兄䠦Ϊ覀໊∇鵂簞ඁ혊頇貱悙偞荵좊ሃ꿰谤ᣡ掍悝踼怈ᆗ뱻䐹菭᳇Úꃨ鍔ꮈ⼆켊䀘栩쁚ã↮ʟԄ襪၊ⶨ穨躡⒢龸끂赍ﮔ襑롬¿뫶詣耺ⶎ೨쫑嚔갓Ợ吮ᠨ첪აࢆ솺脂˽၈ᥠ単ᮨꕄ⿱锚闄㑏魱䂻蜬珟㣨䩠뭞汼瑺。Ⲍज渡퀪悷䅕膚눬變ᔔវ榈역썄ذ렃⨖푽Ｆ釢쉚䙱स⯄⚿ⓘ疰㝒㴂涂\udb18႞㠱ꃕ巺䜾ǔጚ〟韯䗑颢鞇抍࿃瑪梷㸙ꍷ䝾࿞៸⣸怐뽨⁃棄㛀挚\udb1d똠ཋ~䍇秤袨ᐂⅰਈ餂鬁ꘁ訝栱䣕⁪᱀쎏⌱蟺⊘笠쀱犣⢄譲픑頵ꀐါࠩᠦǣ閂স퇡횂⪅簇琑くɻ兤揮䖴蠕评⎏ꛀꭐଢ喆훃瀏嬞豊ㅊ掓ѩᓆḜℸ扰ꓡ猐厂꜃丟ꠜ퇳쌌蜮豍ᦀ⵸原愱훃䓆㳴崅ጉ挬ѧ䑒\u001d쐨俙쬬儸ተ擡ᕥ匉娭吰豈灧䅞મ斮㵘㝭᧞メㅁ婕㨅氍ⱓ₥踶\udcba쓥跫᥎ᾬ濂涑홣쯙꽰\ud911㟜圲廁샩蓜趡᪌㴋茈됰酢⚸昈⸤࡝ㄝ쉑䋭ɕபᐂ!ណ퓀㓈钍೤記渋悌䆫ꀸ퍈ݝƺ፴在둱嬨轵ܜ氜ᱤ㣆탬錕諣ᣰ⃈勨믁ᕣ䲇꺉䴗耨鑽놪썴렯萈ᐻીጮ턝⮡莍꺏崅᱌㣊턠慎偮Ņ«ᗰⵏᕐ蓜儠컃ⷅ⭁⾫䐫恐祬씝ླᏴ⾈瑘텡③醊嫩䰙䜫ꀧ胠ᅾ刜죶塰僦ᔠ텄늡ࠈ哧몉傌퀵ꁪ䂁㨆跮ᜨ㉔孰숞鼜ᦻꋢ쬃阏Ⱄ푅慺媸躃᎟쌸奀ꥱ罂框쮌묓䇙㎡퀞⇌苪濫苊蕆\ud8d8ᨘ⏀\udd78랈䢢ꨈ渼礪뀒僩뷆਷숌䬈륡玁ू包ꭣ淞\udc76塜냹恝왕ث൦ݬ灨蠃룅掍根硒梪넸ɪ쓚஫ᒏ텴Ֆ揜\ud859䞇耘︻둾칅욗谫๞⒬⃘\uda60ܤ⛣꫅ꘉ䴗堻坌ꢮ懟䚑등贄轘⃟沮҉ꯂಡ⑋㈅≎ࠕ䍑䟎讯᭔◠弘鸑췣喌✝머鑽墧萎ア玥\u0012油Ḉᘴ⍘僝矅ሠ㼖䢘ﱓJ톘ꄻ䝶탊豬࢔ᪧ⦜蛀ᷱ씉쀤\udb95艎飫⊣䛧ᔖ㟜䲸뙞追ᮆ㪋찒같䈱倪ꆎ舉蓕࿦་顶䣡颡ꅀᴅ怉캊\ud810⡮㰔䂎௨Ċ㇡Ὸﷱ寡࿇鈤ꑉ昨㑥뢷ᅛ緲蔡▘઄鰠ᾀ䰤\ud849㕇鶏脪⼿㊯䆞䙸섊‱ꔴ㑐殱웣廬ᤍ氆ᐆ\udc44涢训ۭꑆ☬疸鞀夅蠋㰘ر탱न䣐鍈䫂䑈䥬羨꙽ꪄ⬓踡ꡭ凷䘿踧᧞㷺ᳲ奔⟔큂编㤈済탲䀮ጤ➡←鑈労瑸枠䲀ළ怏跐빚샅䌦蔠Ʌ⨄젱ᥣ껡찃뮀\udc60ࡊり외譅Ⴚ㺼嵐웱ﱣ舤臵漐︬⑎넘ࣸʣᆏ찐瘿䡁袢㑍밌턽갥棲芇䅘ɫǍ̊ॼ叨혀䛉꼐댏ꠘ砞鴗蒫Ē䓠仌ᨖ㼂因૝餄㌏凞倸候渿㊬Ů膢藀謶⽎᷐愘餍榘꬇锏䗚둡ᣡ廲썚⁓՞՞⹐揧峈댓쀢梚घ룁⃣薆삍豙阶⏖磘筡\uddc7ꖊḑᨋ嘺Ⓢຘ銾쭢䡍赑㬼垸視栣薏処ᘴ㶆ล焧ন䁇ͮ丁ၗ珀┑翹⊃묂룎膪밸웸仱᜚•嘨鯱镢ో࢔ㄩﱧ碨\ud87b썿؟ࠂᰖٌ洸퓠塵⍣䛂쒛⠁㘥棁ɔ쇇鍆ದ苴Ἓ鉔䍠铐꣓ऋ职㘿肔豸凭쎬秮ۮὡ‌瀸臐䡠僁ꆀ쌅蘇ఞᡝ炄惱✭轀郦╀㰕础鉃ꂐ讎ᐈ砀䵊ᰱ倝ϳ੬ᒕѤ峔氉殃䣄㉊뢖툰\ud89f幖ዬ┠跛ᦞ㱿벨蛶㗢ﰦ䩎윝⤤졹ꂹ䦯芭螷踘駞㺙ꋵ帲労츰㭂䕌ĕဿ束䦨懐쉡蛃ஆἌ∷沑튽牅∈꣬箂讞ꠙ\ud8f2ꂅ䚅䜼൸谝芬䑐숰ກ䧵웨⮙ィ鈃⑎丌遆ג淐Ř镁늸쐄ꁏ✞耖鑮탴घᇃ裐ό㐼⏤騄⾓춚〣总鐽䃅溵鈥⚕衬鵾⦲嫨邉띆⩈袖짎⼂䀷걩胱ᮃ䁖≮ۼᐷ俉合鼦퀥粚ꀆ弄थ祿抪炯\u0001혬↬ㆊ瀉躀아먄Ѕ퉮삚幩荩⒮৑ヨ㱟㕐轀횁䳠䔋착膎Ѷ긯聸樓殁ܲ䜏㮑֒肥誆먛琱䩂钦ᇻ拐⑝ᡫ쵯궈ퟰ㿃羄醇︕瀘擯हÇ軩Ⲳ璨잡┃⁅㋣缁︞ꐾ铟頀⊁俖ḅ↼眈꠩曂悦뙋䴟Աᾚ䜨鄐b䗄趟䱀鑲ഀ撑㩓Ქ羂攵쩥棱ⳗ鴹䔀鱥씒ݲ䍠懘磈嬔砘钥쀆酞뱽잠观ᖠ䰨䄠∜ӹ껀쌒ﴔ\uda23∔Ⴧࠋῦә㴤칞뉒祁껁劖㟊鉷梯兿ꏿ䐁调ጒ᠌ᘱ䚝乐ૃㆉ설果챑꧞愀섁豱鷊稨鸱\udd13벦꺍턿쩈颎즦屗態䜋ǁ຀ُ䜀夼牻ⵉﺊ딢橆퓊퇓ᆞ肛甩៎㈰僈瑐䃔娻葃섒淕ᐆ쓊䧕鎩♋賀鹕⇬澮宠킡畋䃧￥쾜䬣䵈灦ㄟꆕ鈥ܽᢐ牢ᆴ䉡몤ఎ뢚ė灤⒧ꆒꎗ謁䛄讉഍ᄤቈꔕ줡錎鐔K顪钚觽㱄♻褪黇컬笔냞랉阉㒐롐졗いꆶ興៖ɰ顃豔眨杀꒤傘ḱ殦坝셛区♟豞Ꮡ♒常뼩雂ʦ䇲咖釔肩­ⓤϛ祐৲᱀⌒ᘤ᱈碐ण卍⒃ꀋ≈ᡎ颂ϡ䌛؀ٶᤤ拨襂ᜊ駌ꈛꎥ裤퉭ꕓ两胭◒俇㠉檽ᖣ⭅嚎괓娌쐺:탵ꌞ酮⧨慟౮광⍄덊뮅測쓜쥲⓲蚲賲┯胄ኈ抡ᲠḀ酋㘰ች᝷⡛앎偧෸彰ᤤ䬉ួ虺嚂괍娆됭栩퍵ꆲ䕖酾⛰很闑ĢҌ\udd19배⩯胢ǒ臔ꪔ썭視ႁ㷜ᆀꨣ᭹음ẘ鴤穪璋槧糧☆௹ਕʍ觠᧘鎂벸弒儆詢ꠘ倧䀑䌈엾Ḉᚲড়亘ࠁ蟢迃㼞驆铢膻⎎엍ഀ譖쉺昸폓燇㙉횐∭뉑㢠ꦸ﷝אָⒻꄈ噠྿槈葓燻ﺔ㼇丿ī䐌贋褆̪㝞െ뫁춃坷儨ࢀ\ud839ꗣ䵩ᐅ⇟ኸ鉐괐ԧ㰇몏ᐃ퀯㠯퇶苨䣔捅\ude10⇠䟨ᮼㆁ镏餗鴨橢퓏ꗿ䬟脿\n租࿩퇱握阢侂鼍㸄浕뛌튔攁譀ૌҢڇ桉먲⟀㆚鼝㸦簎槷ጪҨخ裓䤪֤쟨邼감ꉀꗬ廏吃ꁬ\uddae艢ꗆ婰묌辰靀喧둏㼝̪穂梠覲鈐撄詁鸑┆仈㿈띀鈻枰\ude28ꨋl鵬柨칏裣∶ꕨ⍨賉坴레鿒㠁ꠕጲꇮꅼ@b⍀፤쓒䨆鍋҉䤚鈭⑺䢌醙⊲䔿ᮤ⌜䵐꒙剧歌㪛괸듆\ude46펂炛䭭㎷薴茲椡퉆鴊㌥鈳눛텖솞腨蓖ȡᚘⴌ봱쒡\udcba㨌ꈓ왢͖⧲㎹ꑽ뒡൘ቤ홑㈚鲤졣ฎ잜퐩ᣕ툵ᣩܭ㜂䲔ꔉꇬ⼂脐ꖊ鈞첑饌邎斲䗩鬪㓆栴靉\ud8a0鳆奏삞ɀ䁬顛ተ⛠䘨⣓댔펔娳炙쥊옔ꔧᡒ윌妎ሿ✧艋㶁㤬᳒㢧ឲ㚇評艢市厉\udb17䀘耘푊咭焩ཁ熤嶈嚔ᯉ殽ⳬ愪댙旝ஸ雅㞿렘꫉癢欧쓉⬑訷橿袜关튄옌俖邅㜟鈔鐩⽑滁㇥⾢梚⩿휢夜님ᆒ쪐跀餪䣚㌘⍨㊢⊆콫갅甊퓆尠敌鵒㷪⠗Վ村䞣轄麍㴖稼釸벋ґ뙖ԫ代駐᧾ꉒᴃ包픤䨗咕倧㎬ꅁ餋⋢繤顙䭝자ൊ켝謱橘᝘\ud963킹즞蜽ᚖ⅟䠎變躁詊ꨖ԰확椾危䐬챁鞭₀斬\udb21⿱ϓ鎈㋥丸쮷냚焱뉇ꊶ좞蔽ζ版ဉࢠ稊둇䔂Ლ☉Аₙ傁\ud937燍গ๺ᵂ⦘ẓ쬧ڈ▖嘇찟頀끁恂솅肋ܰ㣏뺬ꦙ︒₤軏\uda96㬲큄駓댏䎿ٻ໣迲㰩旤棉ठ藲綟ⰰ塐냡愢쌚䥅تѭ༙ᥐ郠ᭇ፳佥崊項끭僸ǵ茗녴鞬ჰⶄ魮꿙ྒྷ㻊䎖וּ๨䑤䦛∋ꖳ䠍ᆝ㍊䨈혡ਓꅦ⭎뢘␙笐耽Ҧಯ탨ߘ뱐ŝ跄\udb00쇌⌀嘓ⴹᤐ폦䝥烽ত魉ᣀ崤煮\uda2bꠍ闡꜠ଖ鲝㦡郴콱ᷛ㣰ॄ寙홒癆Ɗ膝㌳葲䲦㏇枤첝鏠⛈堒ڈ戄霋ণ촘퍔\ud994㝃㥚䣫獩켔䮧㛋賤콱染悄布ᔎ㲅ሆᰲ䢑荑ꙥ䈼౥\ude68䐀珢䆦ڜ崺䩃ꢚ\ud9af腋諾쇑⋠㻠优暭멧幉촅爁㞋퀤꠻╋\ud868贵訕앎圴赾\ud95d䰓頤끂聯갖尥\u000b慷켗ᖲ㳜圜蹁丒﫤堢끃悈湽艚墅툜쫲鱫⁌牨킉灒ⵥ擌硌딑ꂂ넪짌挵苜艓㿫鳜膹譲跌괛脌㬽瓍惮泩浪腨໨⳺䀁圠抣鸂䰖\udc20鐉㆜ᱏ[Ƽ顫མᤷᏀ⑜ꭄ茊\ud99b䉡輜ࡧ䃃냷䳌ᑗ㋢䵬ꨓ熄揄㘯븢밀킁ꌗݼ韝⛴ℼ\udfa8⓳ƣ̓渜鐽圐팳虰眞䣀ન㦄퀱ᢂم煉獥༩同퀉롍劎耨✭馫㢌秄햳ﯯ嬼湊Ⓛঙ퉊֭쾬醷♺䦬성Ӣᔥ废脌᤮쀟㡋⤦Ⅎ쒋Ґണ锼㓳ﺡ폌랝᜾쮌彵ㄜꉄ↚눶䕝ါ豐푁히溁얄鰜崄䈀걝\ud9c3匤捈삛갱ৡʌ܀爓૧쭋ꬻᐃ܍妯㌙葽돶郟쑭ऄᄈ簅\udbb8쎄㰆訒頼•Ḗ솠炜⚊⌕ឺ愤\ud962到䟋醍ἧड弓両짻數裲鐻⍚廔\ud9e9㫲盦⽏힕⮙퓔麗厮ꛝ䶧፟㰾沌⣹ⰵ찃╊\ud9c4砂⬆ᱲᆰ㶿ਾ貌ᆦጮіⵐ䝀\ud910닋\udb18㔱뙋㳶㦵Ᏸ⎯萰派ᙼ㳸ⴀ䯠埃夙㸒﹜ꆳ쪨ሡ࠶嘨Ⲩ쪠༃奄쎗計\ud91d⽪ꀡ좴䁡䀇抺銶䲼麩㖲鋛ᙏऽ잏⓳쀶珿䓙似᷻㚼扌ꜹ댲峧쳊Ξ๾\udcc8釣饂ꗋ܊邒⨪版쟹㉠꿤뿎弆汷圕棏䂵腔晅r䧵鑆㢰ᡑ嬰膆ꨆ픢呉ﳎ⹘돲䰳蠲辬␌䫸ⳣ\udfc8諮질츔苓㢲૝ǥ좛雇⏜䜜ณ渆怫겙홖벭뤭ꛕ褺魎㓀Њ䰠嶉ી\ud9e1棫ဂ溛✉׆熤ᖙ숍䥧ଢ樨ფ䃓彇Ủ䯡츻栒⼹琎淋聿ோ⏓ꥶ₡䍢癉唅⠈搴潉偃ガ操͌陪쳄撼뽱틲쀫鞚Ố艋꣮\ud9b7䁩苈௏໕ᎪڜẨᏈ⠀ൂ᪋Ἣ掮䋒剃鋜䫊ᶐꌄ懠Ẃ䳼ڹ略磮䷎뀾뺭紱ꗨ䌺ப䟁∂陠\udc42僚Ὴ큔뇅蹡\ud8c3즀ᄪᕵ䆨埕ạ䎲緹妼\ud844ﻈ힔悮ٴᒷ㤋퍂䐏좉ᷥᦐᰟࣜ\udee9䎢⪂톆\r⎚싪薽僪ᘍ䎰ग़㜛ꘘ㱥፺戍씋儁퀴砤﹟闩爐zԛ㈡㙢╜禈଑ᘢ鬊墁㸩\udf7c䤛㷴ᘎ짚鰻㮾皼끓ﯥ从⁔圴\ud872梎熺逯Ȼਛ됢\udcc4黎ᑫ숩ⱆ墄゚悋鄥Ꙇथޕ㯣ꖂనઝ䫧崆訢낱⋘䕴讋ሢ⯕襧㈃誴䔙䟲瘖闷閐鼻螸\udc78גꒀԹ䖕ᓰζୠﬣ젧ኃছ張堎桥怘㠎胵އ᪌䂀␄⠈☡ꀣ老肞퐠ᦞ鏐ᚲ츙ꭒⶢ颦䝈ᴖ急ᶍ\udb3d厣\ud930ㆨ⍓줮逞ㅖ曼ಳ鹅㇩闓ᔶ衣悿珦蒅爖ᯊ᷊᝗ᕨﰅ晇귰Բᰌ拵夾ሇ摷죄嗟㍮彄舅꜊㉥⽌ᾞ࠙뒖启耭Դ펣插蛲ᜟ趢ꒀꠉ紖㨬涉娠耂ҵ怼操胛ց⇨̿庮繥ﴹ诲ꛪ₣䅇뢣瀆⁍씛ഷ᙮ቀ慠왒两蠬㾖₹䙊룫话葉⾛蜨볆犰棱좣헦ᠬ쑕墵칍抶㈍쓎蟞⒯═㿈혌㟓컃擬碭煤\udc4d얮䦷᝔즇̊᱔ᵄ浐딽\udca2蛋ꘂ徉鞄蜨⻲ꃙᎿ촕૥쌊ⴛ柀峹祂驉㡀霺멮鱉㧜匮腵䡔屗₡伨故⧳哥૳嗠ㄈ戈쐱蠓Ⴆ⃌䎘茵㷇蘎੠ᆢ겥ꀫ뎐缡뙡冓㊰ᘹ쾍ᮀ랢叢︑萋찗Ⳏ‚댬聆첎\uded4̛稱⸘許᫁ꬒ댑铆齋匟㤢ᐅ띒剡ꌏ㪅쐼᫱∨ᢡ꺀핊ꕇ撒Ѻ鋦╚䬦⃩⮘舏⪠纰ფЀ쬁抇騚傪\ud816颐ぐ싋̗낸୼⫁ᔪ⠅礋뒋혂ꢫɾ抔䗝ꉕ恽蚥膫ᶇ㚬ー㉡鄗虈⮔킢ㅂ곍ḃᄒ陃䧑૘တ⩾址虡믌圴ᶛ璕惾恹憃죮䨩⾉喘梋쬕瑈籜悺녌鋚씞玷蛛ఈ䓈ದ᡼፠ヱ熸砆垂〚ﶚ劵墙䭰࣪솓˵⍑딌르缲탍쎐ᱣꀊࣩ舒ཾ雜㠾縩⛙쭊㊖櫆쩛꬝䅲볘죛悛䌶腭૚୤ㆹᑂ霗쨭䒱噈牜禅舾\udb42虫醃辫뚢\udd38콁㍤쪄ဧ㴃뤥㐩෕艸으ϝ㘬䊴垥웑䶢抄祝\uda2aˮꗂሖᗪ쬿ၫ⊱氌릙且븬즖\udc19퐄蓫툐냍芧Ꮍⴣꆴ㞥磋춡捂臭넸鈊넚Å࣓೏\ude97銰Æ싣땃ᬀᖂ垑ᅊⲘ₰䍠臁ᗭ㲂쀈⭙ᠢﻧ噓ꚓ奷ѩ鋺铀칳锤뼁烒贈⸔蕋ઘЂ⩢䢧姄͵闬䟖嫁კ朄済ⳣ톳쐔晞ފ⡀䗴岨摊쳯Ὠ଒噹ﶃ㠻女\ud926⨞઎ѩ奚ⅰ䖒䓅䃁㜛꼨π梠괨㔞輵灦㳙禉ˮ໭驢⛨ㄲ왩ꥃ᜗㴪挀㞙琪퀮⢷䃮菝ޔ꓊樢詥﬋嘬ᩝⒾ積닳薶숇㠃㙐蚼蒵۞༄詄丂乲ႂ먍琎ꉖꅷ䊞豷鲍\ud9de憒륎需햂瓁⿃⨟瀪წ䅟钤̝⯳ⷛ䮟ষ础佋壤ꯎ鮞㐒쬷䊯⣮姤뵛ꈨ橠缜⼃쐮砜䬟弋䗼Ძюᥣ옩䭂髙\udf05哺턮㟚\udc68к怌\udc8f䄾腽ࣿ巴⟨濐뾠᱂耂塐䋈얚㲪膕⾻Ꭳ욦紗䆑↨ᅂ蕆洔꧅ላ쀸နለᄺࣝ⫛ꋔ蟐彁悪ﴃ﨏ᓣꂎ冫隫죤᪷㞩盔ﺥ﷊踔ᵎ籞欿ᅛ鴧階熞儹섻騊簪㽀ࢭ셒豟ꜻ䧇顸쩇a齴၈ᖒ㴄䥂籰켗椁툓ꐚ좮針⇩拴芛ォ煲ﲅ觳⁃邫禒ꀏ丝っꁊ葸셄脛亴ࣨẰᏀ诘啃ᝆ⽤琄洱弇ᗳ੒閈꡾堤꥞已뛹ᴓ➤ࢗ肶饂誽祊⬇褔䝬Ħ昀豴솓搃䣯椑툳ꑗᕽ懜唰⣓⭴ჰ⭇㐰檜韥ᦓ縛倹ꆦ⡩姳焠䘴깱勩\"ᮊ콈凒ༀ垇⡟撂⤶免ࢱ䧢鈥◜嶣ⶸ憬椙㊋蒕\ude2c䲰ꕱ싢閻獊呄謡왱褦᳤ۢツ䔂紃߅ො⤝聈ꓑ䥖噘摼蠸ꓡъ칼㑼皗셓ꡈ氘₦序攍拭Ֆˣ㎡媢隩⫀ひ磆턀餮쥙ꭘ偵ࡕ艴ઈ웯⭔∼ᑊ뇥儯ࢄ푥ॏ⩞咬굶暲ꂤ᪯䳈\ud991猣혇倘눗怖ℴ鋃ᓤ⨪墨꠼矡㣅ﱒၺ뙢搇䲟Ğぼї刜䡜ḷЁ䪨䩾뇂\udb84榄씌訲૚憅팠䓒꼔݊ꂲ〉驂匨뙕괨ꕵ닅ᖞ爮ᖈ褈셼苴ᥴ彌罀෣좊첁ꪯ㈖ꪢ젺ꮖ⚞Ô挪ઍᕆ䚀䯢ᾇ晱箕⭚ꞩ⤑뒷䆻䔡슚䪇ᴎ☜永롰䱤ḫ署銩힐ᓇ뵝硞Ҕ᫪⌺㡪鐸콠ꍕ懁쎂沝ॉꀭ၉儘.ꅃᵕ⛨້ఱሩ㩥㨅‌鈵〕⁐⩈埳异꒲掏⦹″䢫嚓㌠ꕥ늣啃쩍喍ⷝᦼ᧻臨佅罵ﾁ᪷㕮픅ꨞ熭厍퐪㤟औ஽煃뼎㰇㴚ᐙ튮ᕙ衧Ⴕޜ䩡萬㋢烀熪蒔⚭౗䒮푮⪒ᰯ霼誙숄ᶣꗌ괽﫸磈\udd45뱁꥙惈ฉ⊛豚餕೵峢ׄ垪﯐\udeaf㎓ؤ䥞슱◫猎ᓓ⸹屪꒥榪쳑Ā▢兆鐦䢺蔘顨⇿崍쁣ꜽ匆ꥱᰚꠀ魋䥈봃聄븨搮끼빖䨃朗뛼⅑㋳꿨쮥낫氤嗨댓䨶鑝⣺兕脙䄲裐ꨚ䦠榈琼꽤纋嘉戸鐫昆駙\uda53ڡԔन⪌藋ꉥ靉簁툥푲ꪊ䆁讳\ud940蓍宕͊ᚔᴨ뢌ಣ覭⊧륊᪃蔃䫤嘁쳃婲묍䤨쮅ꅓ走\udc2c䏯炥ྣ潁㗖橄헙긲费╌么茥矦ᴇ锉厒催Ǉ酫ՠΚᡆିფ筗穊辇⚜㸕밃耶Ǜ욍躝❁垤栁꺃暠굅뱢떥毊흣䏕匢냥烪谵ꎪ냗躩ᢗ瀟䈹⁼餦Ƙ섔켬⩓キ於歸骘쫗䙆趉혚ᡋ▄崣ކ鹅⒂⻼釁ᕂ\udf2e塐蚽驑઎喀쮸秸괏᜜륭䋘艠⛠ꪀ牚ﴷᮮ烌蘯臂⁲ⱗ芶喢鶒傰櫡隷ꮊ긋屉㔺㵂䫷鮨먇઴熸轤䙆ꄫ䯕〣䅅倬䣴훵䲦ࡊꎡ嬪꫹ਊ绗嗅ꮀັ긳屟㳇ጶ垘쨙豸ጔ㩊벵묋㣇㦫횰핏媳好殄䒌䵠옝᧺២鿅㸘琩鸀ɕ圏将례誦ඊዠᥐᎠꞜ䠠蚧䈖櫞ᐏ䅋耔汃儥䟛僷\udb2bꅂ抄쬠쨐吥硍傂晲᪃ԇ⨍嚎촵鮯㏍罚좉懐堂ࢥ\udac1\u000f︰ज풻ァ뭫꯷议벡ᰘ͵챙ܖ醏՘ꑌ큔뺏⍠♚䯝酞؝䰈䊁㶫琕挬硎ꄞ뫯畕ঘ뉂껇冏㸾槚番蠧හ浐萨첮퀵悜殮愈ᑩ껶㪄㴚뵮ກ㤂噍臭꼲㜹蔏뉑ꄋ씇ਯϜҼ⥸㋰㱕绊獒溿啤銦痲⨼헢⫳刱⾭㷀Ƹ㪅溁Ʉᙅㄆ赮㽶꺗覒䈀ᤌᣓ樹䫓⏢複谡뀈갦솾ੀ骹鹮㆚펉帪돕豘槡႒ᖝ̺ཎ툜む㧭⪖唯⠠码趧䋤ꗹ䬅ᖷ꣇䇞굽撼෵닰ꎤኮ設亮㵶圠쑉ㅥↆ₌䪛ᨱ㤼퀀藓⼕⅜咧㵤ݧ酷䃦ꆪ蕖ઞ쓡ਤࢬ怊趒瓃靉ಳ꘣큗醽嵤㥵쫭彞냨捺ꐵ瓫ߖ疫㝐ܢ\udd5f粳蕧⬳䓄ↅ༆郬ῐ欪懙蛗⻉\ud904먪ې쓡褣ᅠ沭ᣥޠ镆槞址⾎藬\ud83e끵ꁤ釶芾4㖘♜摑丒倴蘧䃖ꆮ誈栐碈玒ꕇ躏᭮㯐ᾥ尛뉕甩깚̾塃븣삵沋噠贋贄聯衪㎠箨獀䯴쭐蕛树ᬃ쁖ࣨ㛾怫ꢹ巺韕啽둁쓈὞袿荰﫳疽ᒈ梟姞㑢磄ꂂ뇸䈍쟪鲗挛蚔碛褼㙣셺銉тਨ凅餌벺얆靟㊹⹐၈〘붥銓궀Უㆣ刼眍괛ఙ确㬒瘕刍䢳놀瀮웖崝ᅣ忠斍㎱ခ걩텁횼\ud971䛁ඥᫌា侒崝ẙሒ㟒䬨ᾨ簃把䴎䀵שּׂ赓끖㗬澝輄ᣒ枌⪌艁눅ಅ䯦䤙厗㸖踌㶗␒莱冮뚘䏪萕渳⪤琱㛮䆴혼꡷⢍㑗礌쟥叺⏢毠㸂簅ᩫ똓䝓ʫ츑㓘標꣔桶ꗔ䙤矈龑뼢﹇ﲈԗቨK앻⋮혞ǉ傓㱉咤젩✚焕鱭籖劳儕쁾㊒슮辚ନ㲈驍徐缠羀擑ᄛ➆ṛ쯏ꕋ걠Ģ邎䆨鑓䣥⬇㳭ꨊ\ud831騩֪ꦔ흉빓䀔䕍\udc45葮콡㜋๮弇嫗쮬钫Ϡ宪婙ݲ扐⑬ᝓ䡀궙麪ᙶ竢ﻜ꫱腣ۆΌ᜘Ѐ㱠ঃ鰉耘勋⧗⟈䠠\ud9ca꥚抸讵惋Ს웶㷍Ⱃ–ꂱ恣쟢闕⾴Ͱ⿈쬞鹣꿫끨䁙䦴녻糩ᕇ᪇咏꽳寖ꫝ嬺컉ꥡ呲\ude07ᭈ쪩萲㣲ᯃ㚱蕂┙뮌⼘縰艠㐴匀 ⭅蜤꫾ǆ嶞茗뙣夎Პ맀怛飃蹯按옊獜曁ス檐㙄╄他ࢯनࣀ܁넒㝛솰ꍫ曆즼魌ᘬ쮒娇㚡㱎哰੥黃ꩠ˒⢔㜋취覯㕢⇭讈貆枌䣥푽䬆퓱\ud922従갬僎틍肑낰\udfe1뱅䶘뫥縛૸䢷犊박商肐ⵗ鬱ዞ梂횣ᴽ揪螉뺸늦鴂裍忘\ud80c㡴跐䦏㋎⿢鳽⬹枌넎궫࠶ఈ푢뗚㙑䈎ƻꋷ䋀࿝ࡳ┬맀໸॔㖬⺚馰ﾊ낶媻ꃷ䏮耽ආ珪鼕騽䋣侚⨗格 ﹰ᳅䊗攈婊嬾捀፮銫儆까笨␛땧Ლ甜鬩锔歬퉑꾓篦龛䧅컏틩丨쮍㢤黂嫚⊉潒턥ꁺᤌꫡ⛜怤ꍍ䛗苻聃鈫শǳ侐吢劄忣숦鴌쵂떈䇙婡ᇥ桄䡕뛓戚降한虡ꆃ顝ফ땠暪\ud93a婳핝ٹᾟ⏵橤괵잘謣䔔㖁莑耟ŔƹҾŦᘵ횝榲雍莪弴ܣ⊇䄍릝հ፴᝜䀝バﾮ͡ꄒ葁喩ᄎὥ䶥㱢헅좎଻쒔♔ふ쥽畂ᬃ펀诃਻보贫ꢯ퓡湘嶷\udafe՝揸ጀ쿢픖蜉\udcaf煷狑╼ᮟ㓲澚훹녫侖쌑䬑銵织ꨂ숽ꀘѧ탙㥽樿艿࿫䗼桰픲ᩧ᪊꺄ꚡ⭴漌倲퍛䕓૦ጔ֢筍㱡埅ᰉ锃ਗ฽偖獾⟢階ቤ늎悁㬤ƚ눵ٯ뽚蝹〢벆宎웎Ⲁ뒓捚蟰䊲捭积╘ቅ䡥䢷ხ⚞褒胱ᥚ侀Ḻऀ荞뢕孶쒚\udb0fᅕ樻嶫⑛䇚鸍퍚ݗ髝袲᭬鋨浯誢⓵ඈ鿔™僐醡⫛㜓᭨훟뢐䲮憬|룮䦊ᱻ輪杨蕘逜锈ꉅ䉜研뛼ധ樅떵欫顜꺯轀ὢ䃁⊇箕㎒앧Å傌ƍ㞮۝㽔㔘ꯨ\udc30ρᆄ⌄䘘谇춶\udaf2呉⣲\udaf9ꖲ瞖腍ᄣ瞠ꓰ몞鏚쀍퓇〹㵫뛰쟡譒覻剄鎭녳쁺ퟳ໏좻䑫䑔⇄ᆫ몢苖М㣨Ḩõ偸쳜ᦡ焓炮䌍쓧챻譄㢖ⓥ↝뚀惠ᖅ⌸䎾퀳䄱雬ꡍ呅ꕈ僠㥈痚➶㝭ᆍ뜊㩙豌롪밼ⅸ䇰葙ῂ⁄籈ℑ潕撮뛘熶歸㛇浝\udaa1듷涶᥆鴅⅊≬ኡ䗅춁떐\uda67葯ࢾႠ盳Ɓ턈᪦府㓞ᩥ砄㏶ﰦ욲ఉ繰ꔱ凉\ud80d牕Յꘓ䘈悪䢺陯捔፹㬯쩠螫ؼՔᖳ⽀煊쥉甙Ȭ່݉ᴁᇈ眄䔈衝㮶䎾ᯉ鋚\udd17\ude00簐ࡅ净\ud842ꢺ楔낛쀁붨榔ໂ쇇䅰\ud911뀕變ᒻ捍熸瑼죨쨒騾䚐浏骐矾좆\uda83맛税젖㬬ꁔ鈱랙恃ᶃ傘ग़ⷺ嗐梢㎱缳䘎磩䟎ຯᤐ⁡૮膣⨓ॸ돻拈\udef0ꍰ豵ꓨ洊掴∞좵偕䃺ƪ諵詬還ᄈ成␡䡄ۖ亱ݽ뛤ᴦଢ璍⨠壌녆ꦀ愒讘隲醙憚䜎鴂ᆺ皈䁠䟓뗨♎돭\udc43ᜠᲑ삌﨤뼉큪縳䄲᪳ӊῴᡆ할쭧ᬁ騅 㔘鳕恥슢㋲蓨Ỿ빔㪄鍤볚व儭ﳉ䘵በ㲫邯臟띰沁ኳꮧ炄疝␢拱ⓗꎺ뭇舨颵ᅢ捵聉蒓Ԧ㦎\udf0d훚檷ꕰԛ쒨杻皇涣㫒枌훸꾻秔뒞坒螷迌绬讧\udc2a⺸領뮒挔홵밇鿈꒨\udaa0꣑抆뒖韝⩝嫤릁쀲휈ุ앓ꕘ挮梻Ⓝ旕ꖠᥚ盢︧致듑湆ਗ੧㚈叭잙‹먉䄷ꍒ뽳쁩鎼웪荕२몕洔稨豑颢녇抅줙豾૷궖㪾ʪ౶믅沎삝箁鹇줏輔䷀豈萤얞鬿䜗䚥롫哎⭊ဍ䮋㜜㵢퓭슏塭由䅢蛅Ί❬≝\udc9b쉴ꃫ◜㲴䍷骡䵷ᅅ㓄ܔ퀐啦㲈౑퍷\udaea췘㘬⑇⠭ᴰᤣ㏻颖ꁔ琎拶开䓏㛕䦴㰗ꀯ퉏ぞ憼샹茀ጰ஢믙꓊퉖孩엙掱ꭿღ귐஽矁吅톂ㄙ䁣呐ᠼ좦僉\uda05爍⭂⠽偨쬄쇗犪Ț誻殖\udee5ꛫ踴䓨ⷖ㪻덵﭂塧ꇅ鉁敲䂌萫†䮹徂Ṣ軯ڎ㮻稤ീ풓磱鈂ۼ㈸ᇺ\udd50嘫೦櫃瀔瓱ꖏ瘝\ud8f3ཛᣮ䁻㌀裰熊뜙옫豷ᣑႼ惸셮환ꙫ烎볝꒺㻨甿뭍⺱藍\uda27챇ꏆᤞ靥琢섎輍攍蝟⺆\ud8d0ዊ苊칚⸧퀔䂂馠凒㓀ᲊ涑옑ặᡜ箼憢ꑒ\ud910뛣띞攵ጊ\f닕줴钠顀뇇㨰ꅹ샍힋晦螑⾀핶降샐讠䥵ᢨ峑䐌℘䝤૱ೂƼ㠮顚㉖灨㬘뮶㥐뼋港脝㓃쪕ꑦ庰动ე锈앁൉꘱쒫㶇\udbe5僙볆峸펱㦺･戭ꏒ犼絵뫥鵘㬔덁䅭ꅍ螱崡仅ੋ島ℇ珒愋콅萛톑쇠矆㊘ưݬᡑ酺⊀슀⌽쨴葅ᵵ笌⌘䓳\ude61ዂ⭺鮈ᯨ뤠⤍︰ꑑ䠔䎛\udbc9ᾒ₤施๫萗ꥍ瑔㫛\udd1d\udbef痑僇ꕦ獯疙ᐂ咗泉ྎ랻鈦\udec5뵂遅≅귣\udaa9똈䠻䟨秬ム꤅ꧫꮣᐕ졈셳儺憂쳏荏枮굚댴滫跕脭兼‣ꨪ嚩Ǿ嶴ᰂ爺젽횂ꞷ瞘ﴕ찫ӝ쁦ヅ䈪譢䇄讉⦈׊枡⦃梐冬\ud958仼뵃䬻㔕\udff5\udc09㙨뼹绐묢׌ⴙ쾢齛Ⅺ綼䣩䩱\udd65᠑仐䲸뗜蕇柣鐰뚧䪇泓蒗皪⯦틕믗奮䌵ꃋ傁๣骉튩ꠈ饃馠熙圽൨㊺릨楓헗잨ꉄ⾪齏ቚ綦클⅃틥볆搇⡐恣寕䋁匆ꘙ↦顭〈换픉뽻橶鲍䫒㭖㐈䛆䁅건㰞㬈ࢠ\udee5ᄯ骨Վꀐ칤䎓绘횿\udf7bрﴚ怉ꂇ;ꬨ燘볶ꯁ狶毋獔↬ꍝ抑ꎘ슭ᗯ᳽̜⍍⇱⻊݃⦆⿞ꘘ㽎類堬䥭ꪹ陯ꥨ瘐\ud809歁磋쯱๊權끴㗫ㅦ揌썍蒳զᙐ烽橒쀵䛄猧㌟ꊆﺮËㄥ㗪쎯횆꣥棺뙽諶펉緐준逻䁷倔膔욿挳ჿ䋌䷽査败Ꞌ⷇㴝ࡼᕦ㗑ㆋꎥ迌郈㵐ኺ\ud9a5ō䳫ᢶㅶ芃봕鋛蚃뀕膡쵟戾ꤵ ꕧ탶桥‟\ud82e䒒袺炎ꡃ鏳⑈⎐ǀ鈈癈﹵䘨䀺ꬸ녆盪㇂裲膊ₔ䠵멑̀ᇖ覛暤ꅪ孛ꎰ檮쬨渥툳떟䬺껍靺ᐴ釃㛄댨㜅瀯倚元焔什殿咢Ử\udc07贤뛨偋ꜗ貆ꥥ뢎瓦腻飃\ude54し㠪怛堎訢캁쁻䃌ꉎᵍ娵\udaf8м籾셀퓁膕莨閴ᶚ퀜ꄢ坸Ⱑᛌ㼔ꀧそ矋䂺狅쬏阀갮胂낌꜕氤鼐箖૪⒃花刍❬䗐켥酵鑏耲샔搨坔☾욚ꥫ搳ꦓਂ䘛悐愅囩꿱\udf2e㬔ۮ逍∆戌⃯\uddb7㝋㻁ߙẎ蕁ᣝ듒ꗈ㦡Ḁ⴪婕쬑⃫腤荂뀑³誱鉭첰㰨㑐딼䍒⹃芣紺䁆缠֙받霞蔽๺ዴኦᯐ瞡ꝶ\ud9cd䀵퉃嚨ﵞ먂畱䩗។䙨Ѱ̞禳嫧梇콦訙㥐죮\uda69쬚ণ졇\ude82㻟䏨Ꮠ઱⸍庅縉脣骐鵌ﮨ᪶卿릿兮缾⨪➔蹶鹞㧎祖諳莰蘯䏂ᦸ㧰ꓔ筇㢰䲁ꩶꨏ疶뀘꡵࡟ꁩ钗ꩩ듾䨴ᶒᵰ病悇휏䠹琟഑﨩ٔ혁붮❜繃뵱赁ਜ嗐綹坵쓽恶稰䝬兏኉됪㄄๾슁閁\ud8f0㨉ầ꾉큥Ⴢシ觨Ⱨ핇ꉀ촞꤃雪옌堮즑캳鰞畿诹훣㴨澌股륃ͱ败蝦襐卑⭬ዔ샗觮舡溾큀ᇺ㦞譄蕽︺팅벖ंሔ␘䡰逑™䅄豨កﮏ傸䒠샄忭獞蚺ｨ쇛ﴜ﨔靝볚䴀꓃ꄢ쉇蒈褙ሪ␇맏胈␻蕑鸇顶ྐྵ簊웆䜪鎑몏뒠膇菮﨑擖ᮬ㪘熰왡蕃퇻懴るꡭ允ࢹꆬ쇨련␙ᾩ텳漇⒕奐체ص巩삺J勪喋醗⊮䀼䆹ᔃ㛤㮃ﱊḍ怟⩖ᯏ吱Ѣ䀹鹿唀掞梪십ཁ햂뀄ầ坌绫襜㊌풺ᾘ癅慡軍얆넌呫䣮檢䑕ꫩᆶꪲ䜐ࣀ꒹ղ㙢௃꼎묈잼޿䣞懇餲ꌾխ폿탌䛤꼸삢⸂Ʞ裖ƻ쨩⍫鄯൮䇦\udc76㞔ᇕ䛍呣뢡Ձઆᔂ⨔吘ꢤ쉰㑊ᰇ鑋콘ὁ쬝鞋₎㎬靋뛁䵗ૼ퐡岇퇡灚︣耩Ҏሺ옓❮ࣥ纻ާ禮ᅌፘᲺ浐讉鰺ꃱ햗㮜얹覦ڌ뿽跄ꭊࢳ朏㨈퀗烁终ᄴ蠉Ἂ辤稪ⱔ⎑곱\ud9e1졂㊈줇鸟㱁갺\udad0ʷ癖ୖ\udc50\ud932芥㠆搇嘎ᆈ⪥吠뢢廢势⠢聦횑ꜱ倻㙈뼺㨏ㆌⶡ睄ᆁ菘ભྡྷᤝ嬄瑩楡誸撣ꨂ⣖ﴉွᠺ冸ﱯꆳ샧肔箞⼼繸搲ア遈柨谵⾏賫쐒⤗₄ⶱ锞伂桉捆珄䨽㑥⣜䇟飿ネ惻葶ೄ蔀鸊䃚᲌쏮謱烎ǽ\ud988\uda6d聘ꑦ혝鬔ǐᥐムឱᱚ쨝嫳䌨蜭ഌᱼ冈玨쓎쇹ፊ꘍㨡頷㒾惭㢟顿ㅵƝᨅ襴琖⃢舀需䐠\udf4cꚏϜꜫ緰ꃧꎘꨡↄ◒搇突ף䝄ꌝ㨸ଂⰤꆎ穇ཱྀ᪢ᖘ馱⭢盄묐窊랭푣섖쐊塹蹶⛬䛜얉㮾\ud923ⵆ뤵蘱푶탉懱荍慰휒⠣吵ࢍ攢툵峇䖍遅ⱽ⨖䒯屸쫪逎៩\uda5d烜㶝᷈Ĉ㘈౤₻⣕㇢\ud9fb䊬癳䵰㇅➠꺜᳭\udb15故㇧ꜙ䵼ᣝ㢏퇎腾儶멂ᴁ텅ҵ뗆뾁섎︃ﰧṼ˔깡䲱譃소༬蘴걮ࣝﻬ養㦗醮蜲춴໙ᾄቐἋ燸✝뾉툙㣶♔鄾ᗰᕸ⹪ζ占쀺銖뱄⡀쐡쳭藝櫧왟㠰懺褔瑭뿻\udd07᎙\ud8ce퀐໲ﯚ顂ᮤ靔瞪痐溃㱆钴⷇긴鱱︳燗笋䌳ড়ᱚ⒴楨儘凮泛鱾壾燅揂᪋轵ᤏ臕ନ⇾㛄鵉꼐뮩랹桗욥ꃋ䎖苵⏿鞜Ȁ઱醔㚍藩줤颠薤꒰陲ᭌ휟㾛瀑뚑㝢饥ぴ죑씰婘늸ҩ膴䉑늴ꈡ૨㘦龾\udaa1⡏唁㌞㲉쭕媂茷䜴磝许闈⌇Ằ帥連聎弘隆ɶှ䆠ᦷ括⟘䁞࣡ূᕈ鱊鼂둀᫔瞴᭳㺅揌赵ᥖ㈑֛⫖赕꺃\udd05浪≧愾搉ᎇ঎ၿ蚩麋\ude54ᇠ垂여覴뺊យᕴ邀嶔퇲ഈᦎ嫊ꛇ䘈ﺕᭂ顦。ছ倩챨㭨숵胴赳Ƅ㚀銹㓁꺇雧ቱⓂ躍śࣄ优頸䔢瓡㒑ɢ宅᱂ጌ☄䰛쌤쪙Ᶎ꼅\uda3a⏁ṉꂘ蔧澖᧖쉘䚂췄ᅲ蚴蔳艡䠐E雠唃琘䘄熥솙ᮣ赋৞㫂扣䶶넃茆龌㟭㣝\udda1饌㇤黔뭇탋뿆㋠粓성庂蓃ꤳ稥䠅퀿⃨芭舘赜\uddb1嗠뚆쒕ꢼᷲ－茁⸊尌령瀊쬫蕗ଢ皭笤\ude25⡖灲ꮖ愫碎Ѝ푺샆ែؑ葙֕᯴꛾䃇㕵ꡣᤵ馹胶䦳䵓緅섵㬮Ṝ⊸瞓闻⛦⛪雗①䍙\udec2뷊쟭ఎ蚞짱隔蚂摀芤屦‏\ud9cdᓤ롩炘Ꝟ䴫腗൓⹺ᐨ疠摆釵ﺥ쮵隬倝ම闗꽙観ዌ໌㶘证๣ൄ睛臘ꔁ㭓ƪ콕㲥✳䪀㰃閚䂂ဘꘌ䁰혅퀡頼怨ಐ䊠㞺蚀팉鐃솣탴況Х⩠ꦃ顇バೝÀ㢢琧娡锓䖆푏䌝ﾭ똗ﵟ믟轡褪筦Ꭹﶘ犧銧襢ꮒ䄗買섯⹛쐲ꎚᨘ汘ᢨ譣瞏ꂚד贔ᨸ㑈桠ơꊱ藙菧꒡畐掠⼲뱍ꨪ՞욡\udf37놇䁦቎阥ัᶫꔗꂌꑑᐚ勵⨟鞝吆塸醏絉뮦䰿ᶙ㽟먈﹍䬦⸕ᯏ槅㛛㰝鱟领賸ᒴ狓烐㐴쇮ꬒ΢ꡘọ㈯撂榶ނ⍰ᰂࡕ즻בּ荀\udd35ഛ瓬㑋ࠚ笕䑁✬얱嘉㵲⍈⟈䔎衭꣏ꦘ⍾꘩瘏쭶팑⾨籄송폚ᐷ脦➁喙ग␸ﲢ훎䳥\udb29휂ᰂ礡讐劥뷊먎萦륷䃕䄛玺㖂湰휐뎡蠇᠍⮐ిꭰス偠쎌穃࿩匌㹟莶⥚⫐ꥑ\ude97帾਱굫킄㍐䡠銓曽や郭簁嗻특歒뾷脃葹⒫炌ዋ艘諳䂚ܛ绵ꃇᾎ亚뿒ٵ覲匔䡼迳韏ꂴ呜蔍쩦ᒑꦞ剉Ꙭ騱꒖脇ϑ䅯Ⴖ㓛갃뼁ඵ듽䏍뀻晵䳒鈍㎪䥷뚳ḍᘼ无﷑핓↼㋷ꯩ퇥䰀戃伨帏\uda4d䲮ꎦּ䨣㤆麂쐐앃抇傑搆굤݆ṹꞶ呂☶ऀ鯊ଉ堄㘴ꍇ⬱妘Ӭ腪찁鬆㜲橴싉됝뎧涆㘫譌\ud8a9䝣␈火㥖稁൙鿝ύ䧻氽ꈆލ쒍串ቶ膆൒Ɋᤅ唯厠簾對⪘䔴綣ꑒǯϱ誠ඖ튘ꔽ넄瓅멱㌖䞬㖂儛띱㻽쁿珘쒎骖\udd9f킱凙옃莻덡ⶁ嬆똃氖\ud836\ud8bb慒赵స破濉闁ݧ৊픲栛셩⤻挤㰣ߪ⪐ഗꞌボ᭠嵝ᬇ䄢\u0019銢읊ꫡ펄ꛯ矦팠擌࠹繽ꃦ׳莐鷇㘲\ud855끋ࢁ콘ℇ㒩괌챜谳鮜企粃㬋咊玲ꎱ䍁⹌鋽ᢍ뼙싽䳦ǎ뎜\udb0e칧氞\ud838臤Ʀ샍聀俬\ude6c䤵냦肤蜦礘퀇띻҇䀎鉡풍潖暛쉸쑖เ鸱㧳큶਺㨹㘚맴\ud899낵콫썱㛌粤\udf86총岂绹ᴻ銵꣞燹錋媢盵鬓᪩⃸翠媓Ᾱ㮝䶂峎氼\ud899㯌喕ᣊ脢聗墨၍힦閁띰\uddd1땯⡈倕ʡ䝂覅ᬊ⸔᷽陸煍첊幥ਞ鄊偰ꁊ⫤ᩲ音ṡ\ud963ꡪଌᦞ鴸뉶\ud946ຒ\udd22髿ꮖ쥛꩓䰟䛳ア랝슌锿玉Ღ퇅呜ňᮁӘ❗溍륦鈄农ퟖ蒺︊櫟꘵춆靽ꔔ׀Վᢩꂶ版ꘆꩧ魰ۈ獆볊쵿쇿蟿ᝈ낄 읠鵴ޜ\ude6aࣿ秮덡첒迫㛼ֱ烙捦묗뾝ﾏ；ﳰȽ▪挈車瘶ڹꡦ㆗໤ᩡ節먃ɹ퀌ᲆ뇆๑駿ྌ蟹쐋耉逬箟붜㩥㭣釽㗙蹐ꢛ譺℘啐⤘ꢽꦂ纁蠫吜멦톿養ƪ࿧뿴ힾ쩠쳚C沁\ud90b눆둞좨夗樎䆯㙣⏄偹ڧᾣ࣊㠐䨂뾗鱼洗œʝޓ鮨灺방［ꖅ얚䩞홯䳥ﻮ떾Ꚍ쿺飁\ud884狕咈魕눣䠤傽\ud905䋿摁젬﨤곂᧦捌ᡠ﹧ᆲ苜ꃂ뻌붪茦맙ဢ\udf64㔋兠늴Ȣ쀄࢕≰䓓厝畻麶\udddb⨸¬桽鑦뗴䢣悰ఱꀸ껝㢨ꆛ疭ߜ̎௭떝䱐੃شⅯ㓋獵ꆤ餥㛼捄쫖ꝁ㨦㚴税\udad0ꆿ蠂謱Ɓጔ壐䦓갰숨涠괜暂ꄊ颸쮈賺軔샔㯾艰钱瀑⫅ꊋ옠䨮（큊怶艝Ӻऌጘ⁕ゖ恖⏐眨繤猔傊鷧몔靱⧝祓\ud8a8耭錘瑤춅앙쫽쮗ᶈ뫕⑽৷綣ᙉ瓚᭰똆糥懜趘븠㴆됌뤝悔㝍яᙴᆡ數뿅кୡ뗓韧⽬礓쨻㶦끌Ẃ懢爎鬫쒒╠\ude2d潓ᴟ\uda0d℗A큆䜎褝͂퇼齳덓걻Ḇᢽ윳쓗ຕ\udd2aꜺ൜舠驩◣댆ꖛ赍偨\ud949咵឴๚廮偸㢃ḷ嗪栌픓ᢗ钎틯鱡靪熣魽ꄊ導詤豒\ud874ࣨ讜ࢎ緯ǣҼ荸滄\udda6Ⅲ萶आૈ\udaec㥴쒱婓\udfd7㨈ꗏ䬡톽⹊嶱ᆾ୼໸㷰魱࿃ᾅ㼁늪擶燝㌓Ꞝ⾶栟㏖氂ﵘﳰꐊᶗ쒌誘鎵\ud966斗根阏섟虌ɾ۴甯⥚䱫䕇샳ᤙ逦吘씦荾\ud8e9ꭀ㑊ᮭ鮱\ude6d㨼ꈱ䔖ᮈ䓎뜪ᅕ᳋⩅ 卬풭⯥綧끎螲ᛜ鉯멺韷쇦壬뺧붘휡썰鸩ፄ茉騹㑗ጌ碑ⴇ鳫㰁琼튑햗鯊崾漡볛쬄킉ꈾ嬦腍୧徥릳﷉鶅隶ꞧ㹴倯䃷偡싆⺠첳싍䉎ປ贎ᖒ栐坜䴌府딉栈픙뤝飪쯻돋2Зꍦ脯㫥턢脊巗鳰ᛱ㔵ꅐ敀勇笽攞⽶圝䓈ㇵሚ☴䩨萃⃴䋋ᙳ軇폲ᤉ支筤擫홃抬搽̕թ䙈毠䵝懙䗢褗〶්Ꞡ埢겎ન橫䳉辶尮ᦚ濜晢塹̀\udc94๢慐ㄍ\udd40ㄫࣈ⒭騣䈻㙢㾁Ἳ\ud957뛾揆顐㗖鹓媠䂁㉛뜰砗泄᪑⭺褃⎉头俥绤繨⁠샀䆂范؂놀テ꺁蜃आᨌⰘ௅硖麅葬㨀殤㤵倣㙑ᠤ劤઼騣揙㕐曁匧鄙慄䕱僞ຶ穝䚢岐㈰琌\udda5퇥錁잗๲鹖㧖祤ꯀ懊꿥媪뜆۴楶െ✈蹶䈒淝⹱㝭ු‚ݭய㋩⃗痒利ꊆ뤏㦃皂⒉鉉␌桤邔須\ud806⅋嗥谓ꀀ瑺㨅冔⨞껀緥䆅ࡋ鿿㺝贰睓؇\uda0d党ퟞᄘ❅ꗀ㏁쵾尭\udf04玟妙鹽Ų곏׈窽ଉꂗꯒ䥒㭁娊녑켔㼁᠃煠艥絈쇊\uda2b䐷\udcd4䷃⪀舰ʎ隻ᐮКꄤ轖쒓ፚ鉃⒀䵩^⣔怄ꄉ䖀訥ᕩ⿘ᤫ衪頯䖚爾킮諕䃳卨憩걉䬶β䛨ᬰ댭ሲⶀ蜣핻㙁绱ꯖ蜦껚姼맞⟍痂䡼Ḗꇶᚷ씌嫰鑉毢凧ꫪ篌횡Ꟗꗘ砕ᦐ拚઩ᡣᆞ⢎휄ꌻ嬒脥ዎ癚鰫碧額㧫蠻좞ⰿ搒姡戢쎫㾋ᄺ퐬ᡘ꧗蝫Ꝙ咱젮嫭䖀鴯腽琣鷀㵘㿽迿ᚩ憇\udca3柌֒炒쑢뼮⥙冲✛姯㋦ꠂ\udd95請ꀖ寴鎌頵㒾ᣬ특茗ᒖ镧幎묋ഺ撩”쐭괟萌ǐ㕖彺䯢㎸᝶탹ꌝ棬泔ꌽ翭䫍ㆂﴎ혐 甹㢭⨆쇷ꦗ㛖άㇵ\udeb0ﵡۀ᝜̝玷串끤໭㷰W莈\ud8f7ဵ䪑뢬훧൨櫵ᖺວ⢑긾楆뇹箺젅焌෡ܿ쾌Რ븡累괟廫ɽ盺훺ł쮺쥮ꃕ崕ཙ諐䭙粒곻顱⍬엕虹ꦀᚤ\udd5d\udfdd䪢졷速ℾ䅼輺Ŕ◖녁옭鲪锒⚈㷹쌇౅׼췛壟埅蘾誦䡝꼿絸齳⽦涎ᝋⷷ骁뺍纏䦙윑䭵辘귛ﾦྒྷ෫좷釯№䝡뻐ၬ倐㩠༺í樳⨮㝕촜៲칪\ude91磆쬍댛辑鼢빃\udeb9┞⨢呤ꣃ샒ꌞ益誔拗絔췫ꈇ음\ud95bⲰꑬ杆㗢酔迁孭栭焀뗐\ud9b1艬ꕃহ锛⨑ᓣꂐስ㮗෵尛➀紏Ԅ킠못ᬂ䢲䴱苔姢ޟĉ캵᩸˘؏㵐ꄪ虷❣꧆𞁈餎臷㤿黇彯ꂿ၍꒨路튢ᓝ尊〿渡\udc63뢧焛썎艏訤糆剛倅꨷꣟ⲽ͹⛻赀艪㙣᪆抮Ờθ䝱⋩鷇妹看≲⫡祸莬滫Ʒ퐏떁䫪種︧槸潜餷榨⽶ꦁ衄爈ͺ牕ѥꕔㆡ鰈玗猗鰉艚값騾⛨䯜㳋韘岄㢣繆\ud98c휷陭\udcdb妱眀듅履㢪烱適싓茹৺샎ꋋ땗殗鑜뇝त雒栲定瀵鉒\udbd3謓瀼\udcb1\udb2bܷ㑬巩㌱蒚셶л꠭노ꆐѬৎ碖쪜晛奯槂纱ꆴ灵缸냼鏠篲Ꮐ⡏鳑舥醜⣤܆嘃兠ﳌ䲣뛾䱽냨ᙣᏓꔴ幅品Ћ嬀껪쓊헲益᝭肣舮ᑜ㱆녰\uda2a죲찱Ȋ╼ꖤ䭂ޡ⑺\udf0b蒐ሮ㑜彛癯狘䦹\udda1⶧⯬鶐Ꮴ䔯ꅜᗡᵤᫀ郝燻蛚᭶鲟귌鷐㠴좼櫳蟜ￃ葧㋡⨔㖂螺蛽අᬔ嘳퓠᭗壥఻㝀꠮⦼稖磦ᶛ吞蔁慒詩邪嬲딘랔ᱱ줨핑檡Ẁ檄픍︴떝㏈혺쳲\udc49뒛犜펕꭫橆㉮֪툽鍶盝吅\udb5d邗漚䬐閑剂蛑쒡怦䜁⛚µ烐㗩숡䚏濎\udd53ࢻ斪ቕ郛瞆腬⟭ℰᑪ汤䛞倏䂭⦮᠏垊๬獀솆ꃺ煔歫ᵗ覢돜⚼\uda79耡၂烨踹喀핁ꩀ᭨꾾뗇늵ꞕ⺙孭堰⢓祵슁䮲ꙉ抐䷣쳐䢹␈奥䥰ರℹꚣ偢㡋됶ᶐ葸矂ဴ\udb57針憝儩揫䥍㥞벉Ꚁ䂴恭ꇂ憼ฐ㌎킝롶숓☁窙ᬸᶬ﩯艈춈␮»\udbe0뼁༶똵儦ꉏ䗎褎ꥑ碦逋Ὀ㛪㻎\ud86a䜻峭맚液浽꣍ꖇ⯮ᙉ䕦跳鮚㋌큜셽๷梒隆扌쒄ɪ恈饗‰杹뷰埞䖝鈈뽲䷍鬇ዉꞥ䀗읿횛Ꞡ焰且@ኄ혈욀饜㓃ᤞ·狰ූ붖圱泄\udb6e᰸㖘࢏ᯨ矑幪琎纊ﴂ倶ڷ挕猩芐庫벝駎쁙\udcc2ꇦ年㈾蕦⨦묏䞩芵\udabc倂뮼칱딛巗祮⤚㦲걪靈ﳁ㰶佇䚾譽Ỻ㽝韨濐ᷥ玚瞓ն厎㇈ퟃܝɟᚬइ聬꼒伂穭ᥙ剧껕\uddc7睮\uda55巵梖弤笠佂旂੏嘔⤟\udb59䘷뭲蜈诫ꄤ혽먎ꦪ㸂鲽๠쭿燘鯼슮덁ꏍ굠ꨍ찴痌⾞쪹苖삉➱鰋밆枺찍꫋鄓֊岬Ṋ将☎㩻閗㞡閇뀔脞졒㉫㞖㷜\udce5‗ᣯ嵎熞ㅨ杵粯㓄橫隧Ე栉⽿줼㶿よ썭蕔融ᗴ债\udb30捰钼Ⓒ镕₋筹쎷녴莞휋ⅷㄭ䆙ٛ聬᥾ﳰ枸ҷ뾟۞텼Ề욒\ud8b1榩鯂㭳䳴ㅋ벅͗䠣汁শ竖肂킛差༦ﳫᛍㆺᮅ圧Ⲿ鵡縎ﵑ誧痟⃐⬁襩䑲补䢪⃔䀝⣑Н朇簑ꅱㆦ㐍昒螧ꑉ㬳᠍\udd0f畃थԳ豫肙ꟕ嗷娔匂ᴴ㝉䐲蠕მ䃯둌週烠蔳뒶〗淛\ud9bb띣盅㦻䏛뜔铝閳➷덽헻픑ퟯ푄梂ޱꂠ衷䀮膪瀣㌒뷴佞踵멱䀖폡嘄㲵堈硵怚섵腫ಏ泆垽郳ﭶ둭㥞ꜻเ彘㦢戀㪫͖ᐁ暰쬒坑퐣唏ሩ蝠泩놰ꁚ㬅ഊ覿⨼璄䉻駮쀮嘉崹웄嘁ୗ䃨미쾰敊邳嗲䈝ĵ鉁㵗让ŀ㗞▒멬쎠㸀罾谁箓ⷃ宆얇渁\udc13렍꡵杆芷ͮᅁ杰垒⡤㖮聶赶ǲ淏춉\udd32僠Ŏ荬ਜ烄酪݂져큰ꃽ븒菧灤㌠삂᫊蚩죽瓄⸁핀๴铘Დ꓌竼又霡齰㫓晌튵퐠ཧ弃洁㻈\ud837格盐ꣂ肋↓矗\udbaa䶿맙骣쿦Ů行둍梖턂턇䑎襈抆䥥嶡焽덿㮠裃껅અ䁱ᐕ졖ૠ▲㜊敮잁눕ꚷӏ䬝\udfb9瓭蛂蝹冊ΎԨ狨鎖쀅컫፯Ί鎹玲䘊褬뢻Ⴣ≎⽑ᅶ鐷⊢䏤鐾瑎˿ꗙ东聕䏵爹킩횧뮦貾㮫鯸짟琁趫꼭Ⴇ膶﬍왛芫൮㟁䶸謐ꝴ껟ƶ뭡㛱⧙㮓ᙌ칶惼嗎말\ud968幵ﾋ\udd0dⷅ䃉뼷쎭렋ᜂ껠\udc85ͤ椔歮膳ㅒ뺈捞폔摻鑌﵈蚆ᵒླྀ炈ሣ趸⢏૭璍쓚䷜㞴兜傔삥梽ꪶ॥ꘔ♃島ņࢗ賛괾䝯譃죢ൠ䟩滓໭鏱ꊀ땞נ诀㺤ኆ市박砚昒菪⋱앚㿌鞵䥑ꠦ柪픎⮱吢⠄禕氽᢯ື甞룛耗星ȼ쐸쇝㴳ܖ໓뭘㳎홑Շ\ud868锟垄裥\ude56캱筏혚漣\udd58̌✉蛇ᬃ䔃呣볤ݟ쳉몽Ὴ㴯௨㾣￻ꁱ샢\udec7ᐇ얆งḙᄪ퓚鶝\udd68禮\ud98c騇똺᨞ꯠ澪锜퓅像膞荧년誘౔ᗲ쿹暬먞琚꣏଴瑘ᰈ㠅辠섬綛뉎짞둋曗緯䵘鵗慅ﮡ擇ꌿ멘⯌礇ႱⳢ䵇鎶쪐⍩桁֝熚\ud801乕柇䠐漏狡㴧锄급尔ɿๆ쁪睐폖ꑵ歁Ӏꕎ㳋萾됅촪ꀩ芰Ϭ癝⮯竝钋ሻ곥뛚㡼針뢏踘䬾㬫蔰堶퍫ׇ춮샜꣘ᇷ䞮蘀霡㡼硗ഉ呇䜏呱⢍킫吨餥側ﴕ䎬䵻屧欭畈\ud91b標ᓏ⏶은㸃牦梁煖퐣뀜ᩀ孝첂训᫜艵䰉﵍퀬ꢸ舟뜂檑螐⬪▷㐞契ꀌ樫聍各擄춛䜳ྤ磨䚘㓛岝㍮춰ࠠ䧯鱡✁灟Ɖ㰜嵂㘚愷຋\udfef₫ㅑ腬უ䄲쀜隞凉쇳萤ￎ⢓ㄷ췭俁龆᝞縥‥氐黯밉װ⎔ហ␖⑤ꉆ₺⟍మ鰉\udeda笕䅙\udf22嬿笞佃\uda89ᗊￛ雛\udb1d밂厹鿗ꀰ秹棁훭쿍帄㷸惎ٿ뽸Ɡ裸麵㹟誆瀱뽩ꚗ潬೧臢戸ﵭꁧ䆾ࢫ䌬ൌ᯶햣鄃婼ề㶁笆\ud81f납䝡嚈ꦒ状⩯顾䞰콠꺦ᴼﬄ蚄ᶏ挞鲄杓῔囥\ud889璐꤀鐽䃅泏䖠롹ׁ䟖穰䴢駽넖氡즓ꤻ擧천㨽ஷͼ๢Τ᯴Ὕ㿚睴﷬ϓꊜ灭ػ樂㌉㱛䳞荗㟢鄣ሻ窨㆑鰐僠✉툋\u000fўࡔ㦝홒滵眆钋쫁ྲྀ᫘衹ӡ臯䎢笱䂩儥䓽巛ꍬ〻櫁쒰က⁔앍轨⒱恱훰⎦狠醙ﮂ伄\ude09゜\udeeaὖㅮ᧔ㆿ筡矼ԩ\ud9cc萐㕎贻｜㖜㌻灌쳧姊鰇릡煫吀矀禈⶧ꛤ쀃憜\udf46髇笛i\ud8c8覗葯भ恼⋸䣩۸Დ腧寇才돝枳轡⓰돵崠|䳉귚뙪줋䬿䣠ቃ㗆聁੖⇃甭醣썉ꪹ䁐ᡎ缒焹츽᳎䨆呞⸙攣꧆趮ꜧὌ孚\udba2獫枠鶭魐⋂蜾䒉朩꟧틵膚델鱥\ud9c6찹૫ᜠ痌ᕖ㳢㠶톔鎽콞ᇔ㌎砼칣鬰썡䛃炐俍㘖氼\ud849㔳雃硼烫掩矡ԡ핒ⶻ韉ꘃ옘舉삨謐佺ꕱᬁ뫝ꃾ\udda3餻䶞⌸䆻乹Ǌෆ玻컆쀟㦛ܶᒆ帳㔃錥蝥␉ᦑ饚袠ဲܙ娺ꠈ碂㤻⛛ﴎ䈝ࠚﯩ⪾頌말៻켦숟㲁罱碂䍂Ƽ夒苤촬㝩䫥䎕X狼믏⛕૦ᖳ▨쌫ꎕꅏ㴇鸸ᑱ耦⡗玜輧㴬铡⪅ᨗ촉됧殿﹫৲觯篶噧䳳\udf08ጁᓉᯏྞ榱ᙣఇ旐ꆪ䗣䉚ᜭ࠘嶐칏ኟꄫ埥怎䪡঺쎃䁵ꈠ遹偕኶嗧ᓋ躇煴じ睰黡뷂ﮇḘ㰤ϩ䯃Ꙡ鿵뙺羶攖핟剒纻䎷ṡ퓦映쥣惗뎤סּⓦ낄㰙嫐晭ĝ㡟\ud9b4罢拥鏥ᗎ输믎ꍴ熝훁힋띰첁籜ﮃ\udf50◺솬㇚诡䋠䞁逑牣ꬥ◼\udf01ą㰎❦湔\udf6f឵⺽쏔렉琞ᢼ㒈ᤐ눡乥좏鄐ꈌ覲譜컼㔷㯛뒓渁鈁欲⬌忝剜䀺旺䑌裙ဖ尔䒠许뷐⢌꓇ꣻ깉⏤Ⴗ貈僚怵㏽赓ᦺޡ㩉퍞ꤑ蹝첹좇鄜婨韴혩㼮뙁뚟醛句ꧬЄ懊㳨诟す끽ꀀ쾾ꖨ拻岿\udc52⒤幘㊐⩂和닪뇑ﲯ빬쁢ꂔᤀෛ埨풀㐰箨堖炸팅꣩╙ᒳ惺섲ᖖ4㠃癰땐⃋碌崸⒑ᗆ潄ꐩ䢸꿥↙‥砲绽Ԯᒸ䙹浬ﻞ쯍餇⿑Ⅲ뤕穾鼕ⲉᜀ텀⊀ᣟ\udc65ᐵ퀕ࠪ䓡趱叛눑綒杖么岑뤠꼘◰鋻䴙䘢댝ؠ覆㓡᳽簗ધ䔕掺ᔞ獱퀸㭦辺ᳫ㱤ﾕﵹ㚯\udabc嚠阺쯂霖丕弅쮐乇^췊옡䗭ࠀ片댎㗫鈄퟾恆軋\ud954흄先꓉䭃襃ნ〲䈶ꈥ쀮ଖ⠩듢촚⾉퍘㒄ᤉ盂쎣㛋邇䀾䈙欖\uda52⼯἞䂢蠟ধ袻吿琁뛙渝滼ᚱ坧늅뗴粳登翹櫁虗딷럝䨔猯殬萃껲ᆲ♍眪\udff3좉曏铯Ћ厶ံ\ud9d1꾲ሎ묤࠶㱂鎺絬픹ᴨ評絾᜗뗠橬샅莋㵡鉘ᒰ楠餴䌾䢵젳ㅯዷ緟⼗䀒܃编਍咰⁁똡葮㰅䪘曋瓾珟ጾ躭ሺꈪꦿꍁ疠\udf84텂城龻䃾嫙瓳ㄟ쾬곊밿륺ﳣ￧㓦速⃘朵ෛ㞉憰\udec1뫈飴b㡨쇋瓼ﳈ፯㬆㇖ꡁ“址\udc55쑋膉麛⩜ᬀᥱ蛤㯘䵒酢㠘꡹ⴤᰛ㦜箄억뙎葎ꥡ䈽ﱗ캬角尭㟈ࡴ\ude65쁮胷ヨଊ梡歅㰊笲퉎뢛⏷欑䙊ᣓ粗᭍臭眷ᔺ؟媁걲⋪襌藘鞴溮帢莨䃯蝢筏橣諶̛嗉촺貭軄桒냅銣䝆蠈欚㷱깛뚎첟ꉚ덿蓭⎟㪦䳑숂룛쒭犷ᣑ葢⵺疭˦悮情禕Ë酄怸嵔✉轱堠ꇣ啯׃쇈ᅝ滊\udf0c₫禍ᬚ㍉褔⫼⊳诐꘏琌铟잢펩貐䊳韑琸먇똖쮮푉钽顡⹆蝗퍂킟悪숧茙륶ጴᙨ핯ꘜ쌼㙿园䗟痋殟윕ȳꂨ௼晌ք㙰検榣붿ꚅ㑏薎뛪뗔瓩辍퇊㡠掠ያⱻⒹ킕ᴳᐻ㚅ូ⛞\uddd3䓻磍झ젦⤳㲡䚬\udfa9ٺ鞴㶭黺㏞⚤Ɉ偄꜌庨燤䤯讠䄫䌍긻\ud8d4᜞々請忢장裋౪䬬冸弮껟쥱웾퇱돮㟊鈇꿵刞묰繩棵ዮ糩䮹瀊쬏⨆蛈◐Ძꈽޡ푨伩ퟻ笃⊃撆㷎뺃ⰽ矌뀍\udccb붞橵눻뫦祀鑂₞\udc61\udb20麕栩爺롄鯞呸౹칝闔⁡儷\udd06畴쩮腗䃊쳠⏀䁀袁ंࠬ챃㴎蒓册堆篂鑙ታ鏮婠䰇毟靜⻜㜉ᐶ퀹璢糪ႝƖ巛嫠嵗粻﫜喡櫮笼⸮껴㏩윓圬\udd03뻄㥑ꚣ㵄䌈彥屢雇卌郶䳂হ执븠䙞䲲턂ᰃ뭴㚋韕⻚⠄\ude00侄恠\ud985컭ﻢ햗὚섣烓뢀쐷裺ꆊ꾢䞿篔퇢㏄垈䂋숞芽桜琒멠腚ᔀ事⇄㠲盽⑂ࣗộ␇ࢰ汎訤Ʋ㗃麥뜽䮥廕붆砎썩䶤꪿믓焃﷣ﯯ昰̤襌ḇ鯄샙\ud8dc㡔䁎聆춪ꌺ뀂뻢舭睨薊禖ℜሸⲪ꣡퇂掆윋踝駽솨獿뙀ȍ畅ᇣꃡ뗃჋龤冴᫖z奔ʐ흜껞వᾝ略渦﬛䛎ꚯ妸仨혳䀑鄈ⲕ䃚잢ʹ㗧\ude1c∸摰밞㇁掁윂腺ⵐ\udb8a軈拁ⶋ鸵㩧樂瑸ߡ鎶굵䱬垃嫄⟃㶎禰ໃ삇轷䇏䃠권䜔踹᱊㣔煡옑\udede㆚ꔍ\udc01ꖮ燻掯阻ꪺ⇤땬㱲픂넫坘릭動⣓䠚苵춫烝൳ጥ㕋㯍༵潌鱠綜績䧕ﮣ徸길ﻮ벱ﮁᰄ輤烈슣軀Ἀ샛\ud9ed顧칧㐍ꢉؑޥޓ惴媫ꁲ⾢熃廾䑱䘿⑸飱届흡ᑢ⢾ꁑ䊢诶锗島໯棙ἶ宠웕溘㸄偬檜穘๱෨ﯭ쑼⹤娒➹\ud8cd춙熣痑옑ꆻ蚢鶠\uda6a嚜鸆ḳ脈銙䒭偦訝잕r嫭팛횅戯樥摼徵썊ꡩ❪ꭞ㲜索臱엇톁惰⇣ﾣꢖḬ푑름皵ṇΘ压皓ُヱ᠃㉸ஶ曽쭅鮗濔左\udb18驳搐种ച뤿퉾螄짷\ud895疉䉍脴㡊\udb76晷ꗀ㾽艀쵛㍯尵듮ⷴ倐圓뜴礋㩃뙇悗臐㊅ㅒ仰ဦ믌\ud809\udbf1Ⰸꂆ\uda6e㐇疄嬈ᰣ㡁၇헂櫅ᷞ黬ₐ菴࿢뒓诗䫮㖼淫№팙廜ᶕ稈瓕葵䛂ᡧ蜈鸉﴾롄喸퀀৳▬ꡈ첞⑥巸唰ガꎓƌ魯盌䈑帟駿ﯘ֙瀚ⶃ⡎\udab9⏽䷐⣾ក漢碘若ཽ儙믶␜䰸鑱㎚ৄ厈\udfdd옢壁㧤焵⁩켷Ⴇ᎑妌諾ﺇ蔍櫇鈬혱䢤赂蛱콃袗㶎↜皉씵衐괽ൣᨿ뫖牮껊ᗙ랳鄿㲏嵘ビ쨇萷덒낅誇╺㍵㶊鏇⠶⬉䂍ꘔ̊ᡮ⚈쮙\ude4aద洘죖󭷙湞垨鈄ퟥ䐪豕ዣᥔન\uda66ꍞ䪾⟒Ꞔ텉㯠倊ꈼӂ突Ცֆ⠼⚞⣯嶉䋹뮵፪㒣㉧ཁ浢해ົ軮顰ಯ΃技鞙᫣珮螼❢鿐趤\udff3冤滚慺ꋶ舄Ɇ饌渭ꍂ쉟ቼꮟⵄɣ괐莅\udd05펏煾ㄎꈤ쒽絓Ꭶ┉褓琂㤳९읭텺㌟蛃뙎꺫蟱䝳㈚茚甛͓쎯秛鋳臨螺뜝Ằ㱏뻘瑈꽳ﰢϏ쑪ꤔ☡㋲颍ㄹ塐颙㯼㼢ꯥ퐹鏙\udf01㚙욯臚릀盅䈦ឈ㕆弓ၠ┲㛳㉡絡즇錀꘭솱⌄麄빠粬북䳺Ꮲ蜡㧃璓쀋ꀁ꼃⧻ﴆ2慕ު醫恞퀯쾧郱뇣Ħ后줵京੍㥑ꍺ鉪曈뷽땟욿擄髿錚毗뚕ⲽ㣻涞\udef4杕鑈퇽ﺦ福軐恱板チ߉\ud9cbꑋ甘ꢔᰥ率뼚襀裴侁茋؋䁜᣸き삻̞ရၯб㌓∟靳띧䏻埞幗朏젞\udb4b듮醞ßっ䍸韊෨슱ᤧ耀㮱婚ᾗ樨䁰잠Ç䚴僴몰돫涁䞾㲐溁쐻\udf96䖰䓁☛ࢽ泃ꄮ汔괯蔔區\udee0뤺텔椺㏄ꕈ꼐\ude21♤럋쓹ᄱℍ踭Ｃ\udf4c팷栞\uda3cν૱헵ᯂ蛮ꆐ曢␍ై邱氉㒷뤌닟喿쭾墑꣓옠좌㢺ጃ杆แ午檵桠蹐￞驹콚咼뫩糳ꃢꁪ㯴寨둸᫊Ⴭ푐\uda6b龬城䕶뻃藳ᥜ☯ƪ补ῒ⁤㠄瞩䌣虇ꟑ僬栠헕࿲䄉촇\udefe댮ᨖ쳅䪅如쎪ꨀ砢吩轘뵀쏬㯮醝d⃈맞쌠䙄ޕ綱侮ﯳ㞣㹴祉눟ࡊ㢂㚌ฑ좢은혩ꜝ㏤䡙\ude7b벆䏮摹ꜻ咁豑ᱧ௔묙ᇆ艈㲀㪵쥏훉፛錎∽箃阄ﶅ蘛ఎ᣺澹麺餃こꂻ㻷잿뼚㮱跥轶㞫\udf18房篐䳽ᾡ谨丹⦟삻‽⺵ꥒ뀣叟㚕৻伇둩ﲕ쿿Ľㅑ峁쌌蝬ऒ灭ᒔ促灛Ẫ笳ᇵﮇ謽贏੻䁼㽾憁Ͻ蘪豢쐯셟膿ݾǼ◤柰⎮殟ࡻ鐛䗨凼벣ꁭ鹔꠺࢖曨֤푕\ude4a䂃䊇\uda0c\udae4᝭놋惝碲ꀧ몐롦꫰㬩⿃待뼏縇〷྇摭帍벣竨ﾁᘧ汈඗篶ꯥ퇾쏠쟗ྦྷ잦㳳風₇뮔ǣ坛꘡鲛\uda02쎇睜旸韡ᅒ隢읅蟐጖㋸᱘蜠萾\ude1c虶⣷軥揁ᾠ콡昫塣ㇶ쵍䠮짋艺\udc1f⅘裓场啬掐껮污鞢뷈穣\ud857謟ꇠ헟䰞ẵ껱楲ㇰ齷Ԣ絢솉ꭻ匑䦒絕๠搱苵뮗ꃯ臄⽾Ꮯ튋೺яꢟ\ud8b1枒쓼멖椡故屙㣾씏踟Ꮷ⩑ꤷ楛鑤곺歆돤㸧ㄈ齵뿽블ﰗ濻쪱鲙䍪䛖ᓈ쉡㚷ι쾀⧖缜ﳹ쵓⎅满鸲↩耎珠ᢈ卭૒投僆꘷劸믏睋曽薁镎鋜坎ꎿ칶ꁚ်䵊葮떊Ṏ䬟罵斀身뱀捳ᘺ镨ᑰ⢐冠ꋁ䑔ଛ蕥ﰎ흝뭃爇ꑞ◶Ԕ韌ᐕᐔ뻶쾫痞桎䦷㑐䴯웬\udd38샂⡋鷰봏ע歹൪竻풫럋셟\uda3d哼㛳叧䛰ꛇ輓澡ᡥਊ㌯련簁ꩧ⮪箐뇬ン᫥怕∃昪著舸ʧ஫ೝ裂醄ᘁ䘊谍ᠺ「愢淨䗎鄋扏ꖎ娗卦㦊蹙Ỽ⽎頦肊ꯃ淲⌇軁췹\uda12넼듞捼ꉥ侱㸧뵶䭻켌⾲妰ኼ㘭㬥\udafb⌈瀳꿺〧튯㾢㴀舧薁捤ᢨ쥽揻䊄纘郀칭믦牢ࢷዟ\udda3掣을譁攇谊瑥號椮㿫㨔悔￯ຖ㩜嶜ᖺ㨟澙ꀃ뺓ꌎפֿ胷㕍剔䱐쟪࿖桨궳왔붲Ր⟵舓⷇䅝ࡷ凟胳꼻⊲鏱鷶ᔖ鿎봕\udb6f듖゠╂뀪玼፱먆얮樕輁ˌ\udbf7幎먴\uda20ᡸ⊄䞅輁ÿ埴࿺\udfe5羘כֿ禍ﳁ屢꬇键뎺螁߲㰼῟췕㉞痕牨냳ꇕ뫫鑼맳鴇菑罦ྷ掾㜼衶엂믺욀셏テﱨ㤣龷Ȋẫ紖\udc39氒ｑ曛鐟舿ᇠ입ﳓ謾㱈莉䎶≚⚀䋈脁ਂఄ㠈מ襝ﻼꋦǦ쯣߄੫⽄讉\udf59秙版딿怑㓿䁅肋퀃䍘濟뚧ꂙ⸞痃釺곘짐嘕瑭䨔䜺ę㝑㠐ࢶ缠⏙陸ﯳ셇ﾔꬆ푓썚ྭ႟牓䁺툔㸚䌯䨟䇣\udca2奞ꕛ뤟爢칢䒿롏⎺挝ﱷꑻ츓铟ા➽⫻톶⦵埳쟴⎅罨⌕屮虗♎郔﹊皕뎈䫚찵닯艝岚擋ែᰝ≄텟쏈ꕾं鹃곽嗚各訬缢쳂劉璧蹣\udbb9ﴙ㍸림㙚 ꄜஞ腂㞪웪⩠뇃䂹杁캇鴀먑琒퀪ﴨ麸꯸栁똤냁⠸㰼䁔膯\udbdd￥裷ᄁ勨伛暾섍ঙ䴊㯩ຨ䎖븵陗橖麰唠鉓좮࠹倹鹭鞜ͻꤺ愜鲀꼋뭅쓞㈜ࡶ튬옔隻⽂㺙╸ᯥ瘽\udc1fぢ使ꇾ뷸ฯ稁⁭裮䪟䜾褓爜㻠〱藼䘡៼紜忭ⱇ\udffd꛵쵭ﳎ\uddaaₐ笕쒅ܢ้遨悚琚ध폯楗⺵浞匿﬋瞯㊾僼峽﻽㯰\ud981婝⺝䤩谯ᢿ돨倮\udc7f㡸蔎砊믿≙럱므뢛詄筄㔵嵐㔆钅䈬걍쉚넭扙耺\u001b኿绷㓓泫\ud85f゗弃뇼㍤濃榕畜劰虸욣槓ㄏ䔿驗銿杊韅Ő駝聟椓ﱘ晏ｘ蝂㉯꧟땿\udf8eራ썒䢺⯹⋘꾤樓ￃ杯ﲀ䔿썢⨝볾ﰭ陿跁髼–삖ࣨ쩤৕\ud8bc磻䫈햑欣홄沋閉Ⱥ羊讋绁ﵪ\udd4f䳾硜鄝檦䑝ꪘ㸕邫⃖䎬胙ᡮ⇿ꄀ寮ⱅ敂ꆑ贡撣쨪┦팦뮇ꮢ쒅聬蹨퍈췥氀砄ꡍ`銤㈇訅㫆ⲡ帆갍ꞩǌᘥ廠✮鏠\udd2d뿦￧뿩￤\ud904翭럀꼃꜃朂꼎䬈윊䬈⼁ぅ䀜꼊꼇䀑꼅\udb2f।邩\udaec쟥濣鑧埄晏갅蠣츦枪큩诡帋巧䑨⸪ﴢﴅ藢췫耕쐯픦㕩翥楩リ࣢魥㺧隊람窌䬀⃆撆쀔꼃䀖꼏䀛폫⧂秅ꮣ⾩ωᲣ蠧訇쎢휥琌幥꬈眪딎딉딍딂萋쏨낥೬췩槤堦宇嫬\udaae┮貣ਁᖋ앦슧傉ጤ渫뫬䛂ꇣ盨鼦ꨈ㣧\udd25딅쁋딈\udc8fⴌ奠跥ﳢᗦ蟭콩헬䀥ᬂꌋɍ㐅䰊\udc4d⤂狄폩倔딃逖딃ꅇ倐큌玭ᠧퟎ蠢㢧㔏됍槩畩긫呂쒫넏넇焂焆焁婃뢢헧읬ᴡ攇넀焏〚焎焏㜏啡巂庮ꧏ\udb6c䠨砍吃옄鼪긣땤Ⅵ蠩磠컪꿮崢ﯡ᫬蝦聣쫦䫩濡⟥æꀚ赩퓣翭첤ꫧ臧瞣\udbc3〙뀖騀뀓뀟㼢,ꨎ蕡逪順物訅쀪߯訍維\uda2f팈㌌㌊㌍突㌅㌇㧥ᬅ禎蠒㌀梅蠙㌇撌臡ⷠ⏬퍣㫭輢괆ꄪ쨋ꩮ氉Ǆ庯ꄡๅꢩ䆫龯৯ǋ郮\udf2a瀨䮩͡닥냣ᩤﾬᩩﮦﾣﮧ팏蠖ↈ䠖㌍蠕㇭怜㛩氏皫韆】刢鶴堬᧊䏊㗏牫줈瘌瘊瘎瘉瘍瘆覇瘉嚄䋡཯쀗곩埡㯭埣\udfee蟮ﱠ胨荧乢胢ៀ瘄瘂瘆瘁瘅瘃瘈ɧ烩맃쏊耐મᄍ㘤櫧땦ﰦ噌탣뉁뇬熏蛢淁蔄䰂砌탠젫쨤젉ኡ坧撪䩃韤괥㭣䏡濣䜧栘᠙栒᠕镨\uda0c\uda0a\uda0e\uda09\uda0d򒐀귭\udfe0\udfe2걫衯㕮ꊨ䡩㧄\ud812\uda06\uda01\uda05\uda03\uda04퀚ꠑ凇㥯ዠ⨠訏⨈秈Ⴉứ悊샮ꨋᯄ沄\udb63淀\uda04媌\ud81a㠖\ud811㠝ﭬ\udf2aᢪ⇢锯稠脩팇ꅄ㘢堮䩉ฉ橩䄯⳧湦堐숧썩堖⻬묊묎묉묍묍、ㄎ퇧㻪\ud81e睥熯Ἁ彃悁똋됂䕫࿨﷉詍퐋묉吁ꆤ琇ꆦ⴦披ᘈ薬␬璧稣甆⸬ဝ鴬‛濢꿬㕮㤊⏬媡⊌鯊ᜋ陦ྥ쾎橯಩雯舣圤廆ª곩놢묌萑묊萓묏蠜䉍퀂파禎팁ࠉ팍棃팁鵤팉␚팃␗␝팎鴅\ud81aꋨ⭡⠜ﾭ⠝ﮡﾡ␕␖팁팅팃팅֯萝쉪諸\uda25븨ࢣꥨ氏⪨ਬ੤侥磤ᪧ迬쟣䐜ͪ퟇ᢢ㚋⍯⨃䫢褊갌郦됊턃匥䶭廃ꢩҠꀕ쎥譭謬膧\udb49셃窇얊Ꮺ剭균䧬俩䊢槂ቨ苭఩㽧匢锎쐜⠊琊揂쐠롪ꀖ珢Г﷥ꐓ\ud812晤냡↪냭↡냧↭냨鐕鐗믨ꈊ媩悊輮䑬廅쾎条䈢ꨊ诬熇젗╢䩍䜡ꀮ퐟ऊ鐟煭₋₏₈ꂌꂂ잆ꂁ鐑峫큤♣됕쉇됔ꂍ䰈琝昈ᢠ\udd29攭玥㯇㠦됎ﺭḊ貦컡躣ฎỮ텢੭ᮡ貮⟢쿪鏦峪駏君濧귯濬퐞К퐝襬眧襦眨䥫⠕₃₉琐ꂍ琒ꂇ₈㇥㠑ਅ⨂갍ꦮ砇퀦츧꜈欏왭嗨먃睄ขฆกฅฃญ䭮ꐛ燥달䂥ଃ혬懪혡੎懩혠ฃ䰒錇䰙ญฉ폦寤ᣭ訍䈪澪뿡姢Ử䙧椦Ⴉ颧䊡帇䣢\f\udd25爌禄鯅⌎든誮ҏ툫憫༌琇ᯥ䠛慫䕠婪똠ⰜคⰞ辂Ⱈ찝ⓠ됛㔢儅fꯍ甋甏甈В뛥\udc09묍찋齩䠓ᳯ䃩民꿡耋찡评佨꽤\udba6ၠ꧌ꚬ覨쀂撨ᗦ웧濩㯦О倔淨漥⮀멪훨է睠贀ᰒ⭠ᰛ愁萗࿣㐯⨈輭䔢ؤᲢﴈ﨣㬉霌氀測䟁璥鞣琁䰄წ뿉쀈ऌऌ㝢ᇦ랪㰓ऄऌ각ﴂ찘獦찗臬꒥塨\udbceअ䚆㰘밙㰜밒ंĦ澥憢퇄ໍ㳡軭瀩步팤ꜥ吋➮䆫쒭듫瑡ዮ쯤ꀗⷆ띮嵥쨫黇⺃Ή拮㜂\udd24鼬⯥騃￈\uddee䳤ꐧ渪☎☉☍☋☃ ꑋ꟩콫䙡ꩯ㫭ત理✦琏玥ᠧ䰍쯩矨㷮靤슦죮ዠ墧픮꿢䧥㟂☄퀇ȕ☃☇☌舑䜪愦밗쭫翬ꊭ\ude27领趉\udfa0㸣\udfa2㸫ȑ☂수舟☉뷮Ⱍ벦뮄訏僮蕨息Յ䰈氆恥氊䯇럆✁✌؍✁흇✀꜌翠쭥䠫ꈔ踏ꈓ✄戗犯藣큨ԭ䒩轧䙣♮㻯哦ᆠ\udeea갃␢\udeea度ⴡ\udee5ᲧՅ氃ﲡୡ␩२藩ﰐ廡舚웥ꇫ鰚Еఐ尓叭梡蘅鈏ꄉ벇䀏㻪戊厃曭\udd07ꈕ✅戟✇犢Ĭ脯䶩௄욥䵪좪\ud8eb㐕ᷠ槀⚮攉攍攋攏攈怌⻧鋨跪倓埭ఝ뭫ߋ뭠ᚩꑪ蟈툕攃攇攎㌆툔䛧訅⇋ϊ䑧ꧧ뎧齭倥쉬ᵪ㈜툑㈐㑏觧㮯迮䰎퉮ᰜ\ud9e5䒯黏䐚됂꾯䄢琊ퟅ퀩澬\uddc4⇂益졣쮢戧꜅嶢⏏々̃̇̀茏瀌茂戜乡翠퐕埤퐚찒柩䮢뉬睩跬㶬ϡ̃뒇茌茌椦쓤秏갠\uda23⾥ꬁ若䯋䊠㋠Ɬ겋̂訐鐗Სῧწ䄍Ḉ䁮ࢦꏥ⢣ḩ管⊍韃吗깮᫠婤爜尢槊׀笎踉笆笄퓉笇䴤蟣鰑గ鰐鈗燤횎逎腍뼄馄\uda0e㜆ꗈ笊⨖୎⨑笎\udc12烨䁫抡ǂϏ胡討ጤ간쯎介䛧ﲭﭠ 䇢럥៫攪㨬⨔笆⨞笉⨖쯭聭쟉㈢ꛡꙇ舢樠ਈꈉウ堀ấᆆ䤄⠊躡ሟ좍㭦缨脌脊脎脉脍脉┠ꩡ쯫ᱮ嵥ꨈꨊ尮¯耉\udee4沏Ⅼ쀃ᰥ쾍舧䀘눪騒脏㚉騜੥礥꣪밂襤⠞뭩웥맯᧬䀥握䂫揬鈤\uda1e騑脄첅騑娬標많评計鯁訂ᓭ訒뇭욠ꂏՁ蔅ެხ䠘퍫ᇭ⬁⬅⬃⬆␏⬈ꬄ찘蚥緧忡ꐧ『攀稝⬋⬂稔髭\uda14ࣩ맧᧪◡ど㒮껣㒩껤豨ﷃ稞⬉⬏稜稟ᲈꬆ託㴆吕䚄㉢Ầ粡ಪ哯碮琊감球氃\udb28琏牅텭«ぢ슠ᘧᠭ쨓쨏⎪ﯩ鞧눣ᔆ蘀⚭┌싇─ꔉ鹬ꔊꔊ꣮￀逝湤⼬䣩䴆죩龠⯊瀔梩鬪䙡砆民ᰟꡪ⣥௬ਗ㮭숒\udce6⠘철㈞鍤㈕◭鍭䘛┏┇ꌏ䘒ꔄ뺦᠙嫩ਇ僥䟅쑩锭娠ؗḦ넧僪訌ᵬꘛ䘖ꘔꔁꘛ成켢⟆됅Ꟈ昀ဓ聧ꄬ梪凊短\ud865澤솠➥쾁砅ꄦ訁黊逝解ʦ琩堓䜢撊⦩ą\uda1a਒ਞ밙ਘ㼩˯웦賤阖㈁魥ꘝ秧ભҏ␭끫힡샂逩ੋ왁蕡넩㠨뛭먗峪옯Շ갌╢쳃㺁좇좈欈⢎鱠ᘬ\udaac㷭阙콫阛숞٢ꁢ෎ෆꁯ좈㘝좋좉㘞仂尤Ⲭ旌䛎\udba7⾣脎꬀⻠☝権ซ恮똕좌㘝또⢍若㩦러심媠ᣊᜂ착⹮▃氁⊅琄ᡯ詊槀꧀핤䘞짯韡㐍⠋劀ᬂ㢌䂀균䐥ณดᬂᬆ䠕귧뽮ఞ珧⨑ਗ㘛\uddae☦꤭ṭ☬Эꤢ踓ถ踘ᬈ踕鄪ꐍ䗍蠪\ud8e4賂觥韁杣揆쎤\udc1dﭪ舚ꩤ砅爗忈ข厫됌散⺪䩆ꗭഢꨄ곦斮⩥鋡ᰁ䀜麎蠃쀉ᒄ잉፪굡๭䐖爟〣ዮ嵢䨍咪찍Ⴋ琌箈萡￀鸥尬Ў䆡듥瀢鷡譨ꋮ㯭﷣㘓숛\ud8a3ꀓ㺯ꀟ㺤怙ꘘ긖긑긝椭凁䰋넭崤賄ע팭ꧫ⟉郀⍪蘚㱬ဝतࠂḑ긝⣧师䄌䄊䄎䄄貅䄉阋䄇噠䄄䄂䄆䄁䄆帓䄃뺀☑䠥☓☖动㨓揥柤鎨帓帒帙䄍䄋䄎⺭녧䯁訁ェே࠘뫪ꈞ먖⼤弪䣠䧭\udb24砍秎ﰝ聪쟣䠓ﰟ嗅虠弧℄\udbac噤⏉ȁ⇁༧矧鸋ℏℇ䙂ꄉ븎ꄉꄄ轥䯤乢詧\udd21縐ꄄꄍ縖ꄁꄅꄃꄂ酬飨ꕫ쀙鿮馢巠鯠鏥᤭헇몋뤭\udb40핧꧌躢砅쮫脁聯\udd65阞燫㘕炥㎣㎭㎯䲎封倄뎠駧ℊ︜ꄊꄋ縕︙偨퍍샥\ud86fክ驦흊׋蠆⊆猁猅猃猇猄᧭솤爛쳡脑ꀟ⫭竬ﮩ왈ﾧꐚﾠ搞ᩢ猍섙ᚋ섛猃㙣∞索؏됁ʤ븣쩦锦吆믊릥迨좨ڪ갘窦灏꾬澤༩⽍ᯀ얤枩誂䨇砍⎣鿩ꏃᔎ띪蛥ᬄꄟ裃섔쀍猆ꄟ牧一츏透适츆츄瘉츀奢뀜鏯긟旧ⷃ䒪䘟ᙣ䨔氍쇋ᐤᰂ条雩樌ﶡ跄ӣ㝡㜅䈘쟡岦ᨫ碬福⫫᧢◡倞䩬碃ފᡊ砌\udd81蓏ࡈ쩯丈츎ᄚ츎츍ᄘ㘥楌-矪韏씣锪靡霡୭倫릢ᄙ턜츍턕ᄕ츀쒡ᄌ撍ᄎ梇ᄀ鄄鄌琕薯ᛯᄚ쿧䇊찄긯턕狢؋跊螭\udb42庨䥍尨ꐨ邠蒪ꐇﻇ凫젞䐘럤ꇏ෥툒倗⯫툘鈗埯밙罦꒬넕ᄃᄎ넑ꂄ鄇ﾫ忍뤥㎃삥뱂퇉ሀᘕꈏ僨쑮ᄉᄊ넛ᄂ踁넔ꠈꨦ첋宄㈉넗涫褘ᮀ䤞䤕㘞ℝ翪⠕ꀘ냢淫퐦淥٦Ҏ䤟褚䤐儋㑡ᖌ쐒퇉ᷡ틫筮⎥別蘖呫脍ꕣ苬ဖᆤ쿭愢ቤ鋪廁ᠪ됨Ⱖ୧秠휤☞爓ॢ䘗쫭\udb2c핬겧딉ﱏ싎촌甅僊．甌⨛ማ⨟ሐ丕脑莩쬃、躅銁똂㜋ꁍ景脏딊椔甂甉椟鈄秭谙ਏ徊菏χ㯇鄦琎⎡옊頑廪쟧仭ტ栃좮컧촦쐞롬辫컬⌂ᷡ새诌ㆯ텬儐骤\udd23甎椚甅椘仢䏋釫▫렮褎⩌椊椎椉植椄ያᄖ琝䨕倭删꧆氀⸠蒦൭퀑몇⏬.頗訌휧诣ᘟᯪ킥䝧觬ယ\ude10줜勦劫塯洪\ud915ඎ\ud912₉\ud910不Ȕ됮Ī氀᛭拣㬈鳯Ḡ㞨쑬㌄椋뤖椏뤕椈礟昞挩䜦挃븫넂䙎怄좀ᜇȅ爨䝬಩⪯䈛⯃䢇蘿좀ԟ좆蒪砐鞦短吅ׁ옛閭갏䠘擠ካ琉੃젞ሞ麣렦☝䯡☙壢뤙ꀖ뤞犢嚯ᦂ簎︧㦆植︩䎯ԗ䢃ԘԟԞң鎥⭌薭韍몣쨦ྫ㺄〦淇㥧⍩ႃ\uda28₄฀ೊ₎₉ﬧ꟦多儘럢ᐪᆭ琎抣忉\ud8e7樭ⲩ함㈢㈢臉ᥡ⿆ท䰎띤┐₄₋┗箏└ꀟ䤕䔖髥欫偃欦蔯欩蔧揧삅┓攒₇攑₂鳢ᡬ㗌訂੨쿎릫癭쭍Ǫ찃毠嬏Պ蠂嬆嬁嬋ᘍ嬍鑪糥倨姣捤ᡩ䰊欈㗇䚢蘨␄盪␦Ǭ꿎࡫瀜㕯鸩逘䤫嬄锜嬊嬂円锕嬄☆鐧ォ䔙ℒ껡ﾩṩ☡ꤢ簭ꤨ嬌锜픞嬉嬊䐉య㛯츤㘫䌡杮韧㳯ꗪ턇가牍਌痭踛\uddc6촁촅촂넃甬㭃\udd8cᡉꟍ쉬鮦椙촊䌇딛초甚㬀爚峨취귇\ud91b䉠愫뎪줯쁎斥䉮呪ڧ䉫｡币員럦ﳮ쉤鯩儘껪﨓儘少ﱠ됍ﱡ໡悅໠ɫ໣딙甓촀生촄ᤑꄟ࿤저쉪䔩闤븡帄㟢氅琏נ臦呫我䀓꼇㨏꼈漉퐃耂漄ਖ⡬쟮鸑䴗꼇抍䴜漉涀楥\udce6\ude18줓ඣꀗ㺨怘뺦촕䴔漋䴙涊㾧⳥붡\ud863녫앢逫鐠ꬋ㿯턑䘓릤\ud9e0渔綠엨ఓ聦됍ꄯ갊ᶊ긩퇎▊砋ퟂ᪃ꄣ鄢ℊ琖ﰙ邏礢砆ꯊ㔎㔎䘉\ud908 㔊ྠ딆铨䔘ഛ£琇ᢡ秃氄ꨍ娔ꨅ杧븟Ф䉏憣딕跏쐒ἂ㔎㔋㔏㔏庇甖琝픕竫픘\udbc0怉骃悃䖊䁃㪄腂꼀ゆ釄鴖㔉鴒ꏁꨆ⤘\uddcf䊦驢دਏᲠ訅騃ᡭ嗀㈡О潮弉弍开耋式찀\udf0b藫ﯢ栉鼬箤ሒ\ud984ㅏ詌䩁㜎ꚡ꣇䰅ᆃ䰍餤ఔﯩ唐ꂦ式ꊌ㴚㴟式嘆䐘᧪ഔ跦揭獠Ὧ퓥茨㓪Ὥ錤純㴓弇式㑎紑ꆫ꜂卣ퟌ訋皢둣⬅쩯鳣붥礫▣ᔆꯅᤃᤇ餄餂餅혋꟧눭῀旫넜చ¯썮仇몍컭耖⨩別㎃뺨欌㘩ᰥ㎏餝黂炀徫㰘⫫̛ᤏᤈ餌餀滬茚珫踘퐑☗촘첣먍㐂䮈鼋ᅋႇ쮆量䌟̔쌔茖餃稭铫圪ᰣ텦꧊秅籠諸ﴮጬ䣭꽥㋢턆ᖡ턅턍଍쁩썬즬쟭鴕웭맡駥밙뤚ꫢἎ퀪턎턉턆ꌛ턉䡭됎롪稆ᐨ욠䶬쇤갎됢臉뫭ℋ䌖ᄉꌓ挓ꌓ턊촌侭핬鿢鄕僦합霋ꩄㅂ樯寫猪欁῭e㯉ꮧ逨琄䘓騒贆뼂㕉☈휃뼇뼇껍ध錑뼈匝뼅⬂匘겫ꨂ괏謩⇦൮時矪球ⷯ詉뙦挂唡୫癯∝ꤙ괜ꄢ\udc24뤙級℘촒⠒℗屧ථ屨趥屢趪圎匐匕뼌匐ꘄ쀭㨑㘬躤龜\udc6eᡧ녫揎琅ካ삪央睢ꌆꌁꌅꌃꌇꌎ夈挀ℑ鿭鐚研꭪큢꿄脤భ૭쯤ഭꄐ㎆ꨄ㍤䨄㌐鄓釫쨝鰛椗踟椙脞\ude1b\uddadਘϮ뉯ਝ猞ꌉꌍꌎ暀挂츭븖合఩蠢갎訌ጭ齁뿡젏좄砇凨럢즨횥紌講猖講ꌏꌈ犅\udae4ゆょ؏鸅ろ뜉欎ⓨЛ䤘柬픒挔혎\udcebㅧꉭ\udce8녦쬞ら쬝ゃ쬚鹮㳠瀩悉忌韍㯃✢঩Ẩ␌డ䁦ᰞ럤ĕ뱤Ꭾ嵯좠\ud827崨㵊鯄০瀜箋鲣봋跄穣ꢠ徥藯ゆ愎쬑ゅ쬓や\ud802⏌䌊䌎▁䌅䌃䌈䫩鴟洑픝憠ꞧ䌈ᬝ䌊펈隄挗\uda1e﨔㼤잦뉥跣鏅ᬐᬓ䀉䌋ᬓ餉ࠗ黀齫揇ொ꧎팘瘐弦渟䄯ᔒ븙പ쟧쯈欛逢沈ﴀ\udaa4覤봗琂ꐏ轧㔇訁㱣蹨嬪ۥ\udaeb؃츇츉㨍橌⸇ഏ䴟仭锜୯㱣腭죨큉氇㠩㈫ﴔ쎠ퟀ淄球騅錖퍨祤ﲧ下츂㬘⸃뢂⸀럤槁䰀䪥紖脐⬝뤚䩠턝䩬턗䩦턐鷏묜㬜က⸆㬒⸈빩ᰄ矩黄賆愡韇跊Ӧ㠨砃⸜꬈̄䬂䬆䬁䬋됍䬂짯⸘䓃餔ꩧ착郢戮됏ﻂ몏ડ죪ᐕꄤ褓ᆪ휠༭唕ᙦ㌜\ude13귮쌖ਙ쌛총䔞㒧叡껨豭껧﨓ܜ䬊䬎䬈ᒈ蜓䬌锢⇌⸭逯ꈀ㱤訆ㅈ诈琊薮夑遥윗ܛ윙䬄蜟煪踁炃ꩍ炋炃讅ᜉ㬚촣䈞峯ᳯᳬ젠鬖福儒⬕ꉣㅢㅯꉣ\udce1꜕炀획ꜟ炅鄨欀绩瀈쀀\uda20秀䠦\ud8e5뱂Ђ\ud841煮炉ᲀ炁荃꜑ﴏ峠ꉦᰝ鳤ቮ妬蹫鳪በ峮퀩ቢଗ넘朕峩峧霙ꩫ儠㬗沄鸂鸆鸄뫉鸉㤃鸂䤙蛪㜈鸎怌鸊鸎鸁圝鸅\udfed紓툖紛\ud819蟪蟣惥鷏團휖圑鸅鸃鸈㘠呡蔍扯뎪󺏁韁츬໏Ղ妢쒆ᆣ﨤夀牂슡ퟎࢡ殦鿈퍀Ꙇ儯倠゠ꬓʨ赪䔘︒ꇎ㜂芩ႁ拓撆撋ꦉ撀➣撆釩蘭ᜣ쀞⊧䜜倛⯪蟥ꨘ냥쾡ᝡ景騭ᝣ晬撀撅撁ꒋ撌넩둥促訄ﳬ욫䎫卭逥젔Ⅸﰜ䗠朥༚撎撂撋撇ଚǠ렇淁ᒮ⭌씫跇⨂쿅ᆂ춡蔉貧ၠ欄欂欆欈ൃ欄옜媨逪᯦䁥揃됇黍ਉǊ堥萪㗂쫠䬔䘚ឮ띪朑ഓ叫౨㵭羽윔퀜ꬍ켜欌슇켑欅欁ꆩ䇩ụ䚁䁣ᐯ唥ᐣ䷁㜅䉣⪡烙儑ᐞ䕢ଇ꼛켞欀⼞㚌ฯ滊騎騉騍騋騅껄娂娆娉竈Ꮷ⠤㛂㛈꠆㛂栅㛋鉅㛀琁瘍床ﶍ挈뛌깫컍䈎Ⰱ浦⻃밉⻍⻈簁ఇ⻈∊ꀈ껇ᐌ껇ↀ咄和り咎咂䮃咁뛌㛄鰍퀇Ἕ翁㛄鼓㛊鼟㛁鼝脥\udaca뚃㚌﨏㚁᠄뚎✆稐蓦鸙篈㼙鼌㼞脊㼙셎㼟쬕翣笓㌛鴓눉စ䊅篠版戎\udd0d䘀练㼛㚂㼘뚈뼟훬ᤐൡ䘕訞ᐬ尢뇬䨌폊ᜄ\ud8ee㲋鲠蔓៩粤〢觮ꄥ贖餭킯భ耙ᡣ䰍ਇꄤ䘗棬ꔖ笝鲦槏䪌⚍섍㾏鄍꣏媍촜⠒髬挟\uda1f䪈݇䂅쬎ꬋ鉇℀쀈缗肑肕耄樕嘞裠餢Ћ꩏줙缓\udd67갉㍨砓\udd17砈딯뚂肞肕䂓꬞പသ鼠䘠棯鬩闡綧ክ綢䄋ꅭ蔇ꨍ힃僦ถ完䦭딖⦉ᆇ톄 ㆎ꣈䠄쒊ㆇ㧣톈悜悔ㆆ悟庆蟧椓阙ଛ氬ᆃ虊頋䀍☌ 㲌絋봣눉悘悟悜ㆆ蠍뎠폅⭆同瀪韍ḉ갆櫀ᛢ䨋귏䉩緬ပ\u001d쟇ꩠ蕃థ逩䆢測恨󗡫씟詁ᰋ真⨅霜చ瀭㠂간譪㇅缉㺍㺋㺅呌쳫⠎ȡ濪꼚⧮朕줇영ᴌ抇ኇ㲈焣㗡뼞㺈킕㴌킟㺆킖\udc6fᯆ瀠믈吝⼔菆隠꧄적퍨挮ᄄ蘠ₖゕ㺁゗㺊킘뺁茛ꬖ通絛깥舜\udc15反값刪孡렁㝩핤仂ᔛ쨆嬥黅櫢杋殅窈ം옆遡㌞肓\uda1d儕킙ങ鮃젯ಅஈ万릋ɇ낍荣눇⬃ဇ殃✇嘜ᤛ✩ᠧ锣갏䄭訋ᑉ郍ﭨ龍袒袐袜࢟倢Ў짭ᑁ퇄砏꧇琎韩\udb6f䑬頜崆쎢ตꈄ䘜憠뽨爙▪Ď퟊㇊퐍䚅禄摃甭䖋䖃焆肑࢞͢ഖ࢓叡礆悂㌂霊℆郃ꅊ⢞䖇⢕䖏蚈ꢟ尗䂟賥䟏텦滥凋巌jت纩儧匟৫㈢य鸬된㏄梛⢙䖀ꢖ\udb84ꢝ嬖歮㐠핢몁\udd21䛆ᷬǢ낔‮䑀뻄뚡琅ጡሑ偣ꂕ혓緩ႉ첍첊첌릀\udd04Ⲍꢘࣥ儖ꢕ珪퐙焎┉׍㶉Ā䠅ළ颓ꅃ颟첏颙戈㢢蘟쌬旈쀆蕭쉥ᶮᥩ⬡⹩咦訆众넗갏耓광씬ġꙊ琁䯃뛣甆䯌ঢ傐鸯똕ァԒ\ud893첋颐Ⲁ増⪢갎䩎傝ຆກ舊儁갬躁㼒朞휙휔༜䂯뚅䖃椄譈ẏ栈拯䪂碛ຂ与碘躌躊簐㖩霧쩡蜩䟈䥊泥쯨\udaa9糃됤構ꨁ꣌怣⤞蜕ጚ⨇䛠菌탂௪⭁ᠣ颢㵌氃Ⅶฟ兤䪨총㼓碐躉碚࣋ﰫ㴄䎂隃Ԉⱈ 䎍圚㩯悓⨕ଔ쌜윒䨫㴌쯀䕀ꄇ욂伈律经䒐兂䎌쒞䎉䎂Ģ醧崅蠥忆ǅ它쮡攠蘦좂㫬☘ꬣ鎡ᴡ구뤤ᯨ뤦燂꺪⾣㐀꬞됀⠢딑㫨횩⒜䎄쒖䎊쒐ꂏ煦沃硉沄ↅ뤎兇沍ઉ툐쒘윛笛㌐ꆮ墛혃邁젍墘숕㴅ස沈圏沄ᒚᤒ좫㛧ꆬᓥ覡訉䯁\ud863䷬꿁ꘅᆀ좑뱤䔟얡鶦ꢢ傝힉묚黃蒯簥ꡯ샭ꄯꅢ좮瀥儠竬钗沈ᒟ沃謣䑥쵧쬘ꔝ솪\udeaf︁鐍榊ᤇ榌Ί伃끇ꜝ᫩㒕榉ꦃ㒑㒘笝備︛ꂑଚ퇦ᒑ脜쌘㼯睃긄脄꺏夁鈘먀绌뒝㒛榎뒐끌넭癫堣䡪\ud86b䌣訑⏮׫䗊듣삃츟⸢ጥ爑京Ӥ譣⿏燎ꚡ팯좁健ဗ벯줓쬏隩똂ⶆ訍怎踅\uda05ⶈ㘂ᒕ쒑쌔璛쒗笛朄㢌홈캂逇昊㔀萑춆貖ⶉ貙ⶍⶍ匧ꐂ迠똤賈㟥ῢ驫༅悈⤥㽢ဝ㴚鳤샇㔠갡묠ꨅ同愢\udeee⎬᪥䪆Ỡ騕咕려⏅傐ꈆ䯊팗뒗ᐜ⒨流貟蠊ⶁ貑ⶍ貕闍㒏ﬂ㒊겄뒌뭤♢沓㒎沕ﱨ뒊⢁┄栁淎蔑隯ퟄ㦋꜃쟫媥퐆ݡꙆ㳧皮斨ѧ雭ﰘ土︐븞⠫䄥픛碐༟碑밞٬냁犌\ude05訍辏ገ爇뉠逅෋沖沗㒀沓稦瀒춡锍ꨀۈ믁꧍ﰦ핡椠ᘡ紓䜗쫦讋ᎄ⌀鎄颜鎉椐璟貑ℓ鴜⬒瀊铅\ud982䐄ँ쵂퉄蘍䌀绁ᎊ\udc94鎋㘁\udc9d匣뉊鯆뼣\udba1됍碈퍇㳢\udba8逝覦좉쨏햠圐⫠杌\udc9fᎍ򑢗㲚鎀ꋩ朦璢㒞邑\udd2a뫡\ud8ec鋫뤨뤩笥逯䏅吘䥉ꮢ쯌咚Ა撚ￌ癥䘪㇏膆쒂㄂줈쭍︓읯仩䊣끭ꭠ섥鬯䄭ꢤ븚琀嗥⛭΁쎫봗瀐﹡攙篊ʘ䆁ʒ䆍ʙ៮题ا눯鸨⠕笒뼓촑ᒞ뼖⦏ځ騀前爄摏궎㢏璖䊀䆎ʜ䆅ʖ䆀꣊ᐪ㠤븥軡聨䴟ᯌ픤儗傕粃抇㲆톀㗢胋䘊ꢢ᲍큁ᬯ詀牋묮弫咪⤒瀛撔斠ㄆ㣢踕⯪夝솩킚墔阈툋猉툄悍왊溇朂倈缘ꊐꊜꊟ㼬氈鯂氁ᓮ輐誨쿅ῆ눛헄☈劉犄ꊘꊔኞ偫項⢙ᘋ縋 䘁霃깢颛ባﰒ\udd2e秇ધ귆봝ꡪ陥䏃뉆ᮈ䗎픛郭겓銝銟劓삈ꐔ鷏钊㗮ⲅ\udf41齈윉嘑銙劐ᖁ霁ꆡ鑮⼬旌믌츗疪瀘䜬邒杩䄡梊ጞ✮ߡ겝闏Ⲋꀈ것꤂겆겆踉겉锓謨擫쨁ڬ犚犜겄犑겊邞㌜俤藪\ud9ee嵬〉䩋흉䴁氀⤢別霭拨㖣৪觮洕笄Е燤뼔⬝肑貊増ᒚเ钗墟Ɇ犜것ĉ鎤\uda61徍閪慧娦⹥訆噆࡬哫ᛨ犗펎䚂⮄쑋薉怀䠅⮈䫢酢蘬䧡濡稙ἒㅧᲙఐ䨣訍踊갃⊀ꬎ꜊춁ꙉ㲗䪘ീ쪑⮌쪒贉ɧ劜뤩孤嬑䌕砂廈ᘡ咓๡ሟ갎ଖꢦ傫崂꺢꧁帀桪텥퐍큂㟤ǌꛠ鴔⮂謋⪖⮈쪙⮍⮂ʜꢁ놉؇놈댈熇뒑爛㱭萘⇉ឮ퀩쾂ᒡ쾉闌弥䛍ᑆꩯ訄䘟ᯈ䊜㏂놆놂ᘀ᪔熉촒ꢒ靖◮ꢑ㷦㺁ꂏ풍홋璝骟놈᪗렍豪唟쌮벝诮뗬⌆瘓脊\uddc9팊\udbc7ҝ傛眘䖢꟬廒䪀讃쮁䪈谡踏뉈蟥䰎䫬黌琅낚ࢮ춫ᖩ綨銪顋꧌Ἥ㢕ި镣괔藨గሓ쒔윔䲝쪎쬚鐉넊ጅ㴏缅⸈编㪖䪉㪗꧃䪆送扫媮昧儅⾮锣뉏쨤颚\ud986Ơ쪊䪁㪙䪍䪃㪑珞쀐\udc95཮鎍⥉\udf1fꦈ錂頀ꐞ넗战㎫쪟踓଒璑ሧꒁ鹭紁玍ᬏ䕉\udf4c\ud88f瞠蚙鎄蚓鎊蚟鎂诅ᘛ儌젙ᠫ﫧ఫ謖ଣ頞팚ą䱮줧䯨횥䚕鎌蚛鎆蚞鴋꒛䏬ꛩឦ졨ᗄ㭫陬䛫⬯⢝ป삆\udc80ӯ⠍\udc8d缃괁볇㧭礎尃ꚕ\udc80堏ꚗ\udc8c㢜ఔ‥爕ꄫￆ㝫ꓣ\ud967➥ᒫጜ覠䗀ᣏ鏡窧튒퐟❮㦍弍⸁砅퍌䐍퉅෍ꚑ\udc8bꚞ暛\udc8fℂ힥⟄琅別在秄鶴又穣찥ꘪ繤闀함襤\ude16䔔鏣듪芄ꊂꊎ徇\udb04欇ඍꊍ碙瓬㏅서ꊊꊎ嚙ꊅ嚜ᢐኪ偠㎁\ud8e9켯뢒纥ᥭ힋ᘅ䵨輦氀Ⅾ妦묝䜐嚛蕡겛篠砅띯䜝㘐䲞窙ᒔ劂적อ부ࢄ왏瞧嚚嚖ꊁꊉ嚖椈㢤㚞욙ᡢꬔ퇎隋ᕢǭ黅櫥薃薇薃ḅ\udbc4\udaac䖉덪ﰝ蚗䊓ઐ슖뼜⬙ꢗ✁捋ꢓ邀梐绍薀ꎄ䖊樓넬氀\udde3ī앯䟈फ儌–뛠Ი०Ʈຘ쪟薂䖀壘갛㿫䡦梠⪬误偯㐭쮤⸙⇭ꄨ㉥⿮傔ﯨన푨黥뵥쒪鲤돭㊋㊎ꦄ왅億늂늄ႎ鱭퀪쟈횭瀉캟㊃캜늋缏캐ꋣ툙瑩㄃炌ꐁ缏ဇ伀ꂆ 﫭ᇂ⺕攅캐늋캙⺛條벥\ud8ed꧈⁈氏䄬韃뒭\udb42ꪟ뎠㞤淂䄥暔ﯣ鳥爚堯若쾉撨那⍨⤮ᬩจ擯崥 鮩䊗洝ꌧ傕麃麇麄傈庇ꔂ床ᬚ甆ꡢ컢횒Ⳬ崤揌䗍ꨋﵩ戯훃샣舕抓쐬퇠ₖẘ协麅ẜ庄콅덥铥ẕખ笓ઔ鬓킛弌\ud980梍㚌ྦ守编庛麁应広ẙᰙ샪ᐡ益撡锆졥䚋鼡鬤슡身ﰩ䆂鲊膇䆈륇⻄소᪘༤\uda65䐔倞쪗蚗쒟嘮꜄縋긅僌㛍䲅뼣鄅կꕌ뺛䆏᱆뺘솉钑贕쮥忉⴫虮邫䌥ġ淌李蘨벗몆⟥堔䊗纝䆂뺘ﺐ솇옅䨙茐캗鿡炕鰦ⲭﯤ㠢쌮偏䗊⭂䛏丞풫愭䘠不颅틊罁犐ꋮ㱣쌠民跍\udb44夀ᰍ䄤榠풠ฒ⸟唯喪튚眚炜駂퀬겑挤켧욮䒞骑ഀ䆒䆞幉ꪣ蚝ଜ璔纙\ude2a媗䕏媝笀ဃ媘䆖䆞丐溞紫雨鿄뗯钝ㄌ儩刕ᰁⲚ傜沝璄鼇璀熂ಙӧ韤ʝ럦\udb60䯄鸒渑氍퀙ꚨᲭ뼭⼓龣Ὴદ⼡俪大Ẕ庒墧釧抐\ude96℔\ude9d㌒\ude9e朙ᔄ悋䚊쉀뾍꣌⌄馃鲝憛璌憜耇丞툩팂뇠Ⱜ욮球锥巎팮᧍舣䛋恥璊䬃憟醙憒謩리갇傘二뼀걊亏윍ᬁ⥉뜒䝪㒔픦爒ᆡ\udc84䥊菏陡鑭쐥쉧介꜇斮盨焬ẕ㉨銓톜亏톞亄㆕亃⺕휒晧ᤂ堁꓁\ud80cꤌ蔈밈㇯䪋놗톖予㆙于㜞䄤\ud8e6ㅈ鐨玮ᠦ⹧航俣䛉䰚ᶆ嶋倁嶅긋⼏\ud987嶃⣭쟈Ხ弢淁렋ꗯ琍꽪⿁ᖎ琊諌ĭﯤ⢕眗ʝᆙ稘ᆣ▫뀤췩쒙ଓ\udc98⬗\udc9fગ㶀뾇齌섊괎嬌﬇㟫꯭ᇄঘ캂ঙ嶎ও嶊名뺠⟣贮萬팥锩萬㘨ǆᯬၬ黄᜙篎즞嶅증嶉঒窬ﺁր꧄璂》햅㙍ﺎ䆘횭ꦖﺆꦙﺉꦟ洞쪙鐜䦚ꇎ㤍畦ᆩ㐖ⳮ䪘銩黀䈦鰙⽊码⟌뻌骐欜鄜鷬熐斊옆톌අچ⋋疉伅嬈缒ﺂꦞﺎꦕﺆⰔ᠘ᐢꛣᤧ搘驤畁츦䤃ꂐ얢᪣ᷧ䒐鞍뎁\udb02ⱈꎂᒆ悉뺒쟠檞炝꧉싯蛆纩ฃ繪㈭攁ቭ੯Ⴄ仍ῠ㕩᫨流ꎃ⎄妟⎊妜ꎅ䱪尩ᷩ笗㚗䤛ઝ䦔鬚ꎀ⌋첀꾃ኂ팄貆摆誓눋\ud998妗⎂妜ᄆ妒씓ꆛЮ巋ᰢ薬䍧뷦杋謕狢䈤ઢڙ斏픇ꖈ咈鉶ōꦑ㆓嬯綤✥쨮ﺪ綪犈チ䁭⪪琏좎\udc12᧌᫫ᘀ◤⾢딣禓ꖏ禐斁㽭남挙↖窘슗黁봌촇퀁ć첊鐃￭ᇃ֗禕鈀輦斄墊ᅮ鯊䆯疭闧츧蠥ﰣ\ud92a둠琉䰗ᤏЄ㚉⌊㚆ᝁ㚌⡪짫顤갬Ɯ㏊얞얒㚆㠆㚍얚갛ꜩ䗇꜄锅슥⿃Ϭ좚ᠥﯭ퉦琂꼜薞ᒛઙ뼒봌鴅퀊അ怏㰋醃纟䪈㚇征얚▕얚ﲀ萜ᤝ턗ꈯ而櫮먜쎪䏫攄㢤禖㒗\udaef\ud98d\ud98fⲀ䒏\ud98d텀㤌㦍ꦟ隕眓濢窘ꖘ醙ട︎蔏刌⋍뀈瀏璗\ude85\ud983\ud982ᖐ㦎ᖟꝣ댕嫩ݩ悌鋨种ᠭ驩霨骜ׯ丟溟芝琎췫鰭伜覐窨怪괓\udbae┪徣젤曢ኦሞ֘燎ᖛ閜ᖗ\ud980喙门겠൭䰊㇅ꒊ싈㮄脅ᄠ芄芅貑䦐윐뚚薟ઓↃᔍ〆ㄪ❅秊崃岍ꆔʀ떗ʅ阊䴂떚鹯ꏁ쿇儌䶥再⺣਌㍧馥樭츚⇩䗁㛪㥊氍䖫忁苡戦먓⨄㈂Ё粯亗瀔⢙壧눬⸭ꏩ篇㖓ʈ떟ʅ疖㊉຅\udae5줇␉각躎ஂ苆Ἃ躅粁妛鲑ሤ먍弍┎䢎琎蛨缚躋趙躀䶓躇躊ᅡ\udb11淋㺊楬韂緮䗁猡✪텭᥯撝ⓢ酯情岩妐겜ꄧ嬝䆦쐕찫䄙\uda27뛯巈孉誂箮滫䍪꿎⟯澭趖躇趕躈䶗躀锑䆅曆䴑弨뼆唈֎蛡妑⣬砍딥\ud907涞醯礪涞岁颓廡૯Ｏ쨡Ḩ큊빫\ud9e4䏉⪫㆗\udba8㞩팀ꂊ欋忭쪕鐙☕ꖙ떓ꖔ鬕\ud905爈᪇會蘆༁䊂堁栏璚涓驪黎涔⬏䶜喗⧏룮㖨뤃퍪韂訇娥凊艫\u0019梠㚅嚆宇\u000b嚂㄀츈회횁蚚䤔࢐媜墔媔獵ꖝ뼔斗뼚斘缗뢌\udd9a\udd9f嚁\udd98虯暧裧稤됦視䑦蕢괏丑ᒯ馀ₑ㶝嚂\udd97嚎\udd94횉\udb0f啬ᠧྨ¡⬪實쎨쀎█ﶒ骒⣭ጘ怡莀⿫綂稂万욆⎆瘅⎌涢秊䒭ᑄ檛ﲚ횖갟Ⳣ㠮㈠⟬⠇匟ឫ핣긮먚醤\udba9郂갘ẙ딜琅켮翫ᶕ㌙肘鬞朓㦗䢋똇䔀릐꾆ꮁ⒗ﶜ⎈Ζ⎅긂Η睥袟簣据㛧㴌ﰤ㥩\uda62븪犊펭舩ᶘ딪ꎄ⎀Κ⎌Ι⎌杅㎄꤁ꣅꬆ樄쀀뎄뎁㴞겟府뼝醕㦞期窃ㄇ蒊괍₇㒂㒄㲟⎓㎄ꎟ㎈뎃　욛삮ᘓ锠ᛪ\uddc4\uda28ม訇ꂛ삔槃ണ㍄麘웯㤓嬣傑햫링\ud8e8鄕恫訝笣Ϣ戬몖儣귏됄掘ꎗ㎂ꎛ掜뎍闇鲀փ⠄岋逍뢋ⱁ흊鑨訢䫡ᰎ琀휭媧쁊ꐀ갩᎚焓옊젒ꐋ༇孥ꂙ峡ꩪ徧범Ǐ琠→鎐岏鎒岄厞岊䶗阞犧誅鄎⤍紂쉎騊麈歅෈㎗鎒ࠀ厚岁흆ነ폃䟅ꨏゕ崎鋦ᮉ誄ᐟ㐜㰐푄쩌놋猃掋햍栃ᴉ䯨횡햅玝햋玟햀➧ᯈᐁ⶟ﲛ䇇馥爖붗ᶬ牡륯馭팧ᇈ訉䴊楨\udaa4Ⅲ섥蚕㉮㎘丛氢ᖆ將예륏蚀ꂏ侅휂疜ᖉ玕햃玗햏玘㖁⛪䛆ꇀ므Ǉ\uda24㍫ɣ䯇ĥ䔯岑㚘䦝ᶑ颜ﲆꕁ芌㛍芃䤍鰅ꨉꊓƝඞ૭餢炄沋Ⲑ貨觪闆e冃繬㗌ꂚ砍ᒭ궘碗ڟ骔墖ട\udd9f튗⺚䌋倇떟슂إ贎䠌疐细芎쮕芈퀅쮗芃䓠馝ꘚ헇ꄠᬬ⎠閤뤢溞좘檑ᢙᰇ꽫嚖쮓誁쮖殛芃쮙̕杯鸜ﲇኆ\udc46摊᪃墎칫ẜယ蛣↏꾆ᮜ኉ᮖኂ᪗쮓唐焟廢昭ꄕ췦઩热琉䏎먕ꨏՍ撒⥢쟅ꎚ䎛\uda16朙ഖ⊅Ⰷ㘈栄䨇꼟ﲂᮐ鮔ኁᮚኇ댉믠쌬ǋꕬ隫儃嵦靡⢕\udd29首뢜㖆ꄈ薄茁၇衆薂\uda0a\udd99怦曠䧩阞㦟ᆖ䎗宓叨倀횈윅ꨌꥋ읎꾆ທ㮗ࢀ뮒薌뮑薊䟢炆컪♅锯ꆦ䳮\ud86e갉訍䱣砅躓箔薈뮚薎薊᎛掣鶴ﲤ‥澣斡鱩ᶨ第蹩犈८㖣粧芜㕬錒䈋溋儀☊劙⶝쨇工爞琅​ᕧ㛨琍ൡ糫厓险ꆢ᪥憮偅놞銓溁੃螗ć螒䌁落讘䨪ڍꄇ괎ฎ蛣\udd84Ѝ腉\ude25螑잟溅잙螕䌌锩▜䟌红ᡩ䜤輸\uddc2憗暔ꨊ琌榑駄Ȕ㈊㇂펆펉ԉ펇䔣펌蜑䞟벜ഖ餕쇂ﴎ鋮⼬揌续ꨄ⼮畉鬠韊쐯뒜Б떛\udc95肔鬘䚔갌䚞ꪋ⸋ࠉ㲕枑펃⤁枘뚅怚ﺓ怕ᡢᰨ뤉ᠪ헆Ǆ纬Ἧ렎Ⴊ퉣ښዪ옡ꔞ㜈딢枖欆枘鞝펌鞙䰓弌঄抂抉뜃栕\udc90ស㚔ឞ䎟宖克跊㦀ೈ❅⽤ꊄ힘抏힗贌넪犎⸜⌇儌磩톦㮛陠꬈자蕁ቧ撏쨞⸕戠䧨燎힟ꊌ힝㞟뚆힘햞鮕ᰞ㢙쇌逢꾣ǆ쿍녢쟄銠䈨螭ꆡ⊀逝†\udd9b绬㖅閉䡍惉喌⣃喃ʗ긒炛ᘕ䒮ⅤǠ霣繧嫡䰎䌪訆얤Ⅷ䰅爆鰛흃蘬೥渡䰏ࠗ輑ᨂᖊ喏喅喌칫喆㦛ᖘ璝힐箑㷢ᖈ녉኉ꔌ㺉᭮蛨ḑ䥀侞喈ྜྷ喃萏薛릞ψ㉯ꨭḔ⟈秊꧅恣골頫씙﶑쎄쮋쎊箇ꆀ⎆뮚㩯榯耉ᡭ퀒瀊张嬥繭ꈀ迩Ȅ雏⸕ග㕢㠣ም\udc98ផ䦜ទ䎘㤅䎟㦗䰇䎜릘쎝⾕쎂隃⾟쎁梟斕ສ좘瘘퇉喓쨣忁힧㢖༠ꮞ亠ꕯ갋辑ᗊꎌ⾖쎀⎉\udc0d阌ꘀ좂쀏槃騕妕ღটߨ탨큂韫䝨ᘫᐤ얧▖Ⳮ䎢믅ꠒ잞稟ꞔ⏌垟਌龓龟槍宑肛宖꼑㷠㲕㦅ꊋ沁匍椎㲜ĭᇄ龕\udf97龟꺜ᤝ鏪찯룮㌇네﨤褐耝Ά롣팡߫䪘．㖍쮋쮏쮎쁍嚔黨붏俌炙ₐⲗ칤ᬡ澢처☎찫ᖪ憧벬ᮧ䘮⴨춥ባ枒갂Ĕ쮀羙隄羔璀⮍ﭯ자⪟嘤⪗렂⪛톀彉ኂꚇ煆쨡㾗ﾕ쮀V᱄^쁆䌨焣亗넨櫫쎒팪䠪Ă砋ﰯꪈ檇‒檍⒄渁檌蜙㴓Γ㽫麯ᘝ仇༭ᮠ妣氃脁䗀䬕ꮩ퇈뾮ᬬ揎濣뮞侙䦙㦕澙ഛꎋ\ud80bⱏ촎泆Ⰶ⊋逈缜ඎ䁜檊檍䁒䤆郮좑\ud864㦋τ編⁈驤鼬ꩂވ銒ꁝ鬁䁞ꁞ檋펉欄ኯ栛뾚沋棌씄劂ᲃ抔䦕濬ꮕ늣᠛䊛뮟䊓ꎑ⁓叮㒈誛ᒔ咂誐琈钞誒െᲇ Ҫ¡퉧毧⺦驥咧捡砄\udaa9ጯ갊개諫忎༢䆭켧䆡鑠ꜭ䵧㔊㤜澜흭抛儤ᓂꢊᲁᲇ傞泇\uda80㪄㪂㪂討쀋黣펐ᴓ碒䎝\udf9a࢐㶘狎縎堊⠄ഃ㞎렆甏ꁛ\uda83똇큜㪈け犎끥氀㖩휍쁟跁츥汥憪螠礤㰞㌕ฎ쇣ꦓ큞끘㪉끚㪄ぞ瞜흠ᴝሕ펕瞘黊굣긢恜傑ޫ鏪骪⴫찪ꮯ隮꜆솋눅솃솇솇噭࡚᥋࡙솄ꕀ衐坡괚ଚ찇䈛鑫ꨂǁ욬䠪팟좉誀\udb68耟역귊⇋䳈臮֚_蚚슖纞슙纜崍纓슓ࡑ솏ࡗꒇ솈㢪䙢⎨䍥ׇ௅튬\uddc7ᘇ쯡㯅狧䰅䱩역訄ꮘ쮟랣ᆚ㇋㴉莋벂얂窍悈炍沗䡓↑⒞य͉\udc89섁☏騂゛Όꡝ莆ꡗ莉ꡘ㢤從됋娧㴌ࢯ锏ৢ뤫鐢玚热᧎䕣\ud990쵥莊ꡛ莁ꡐ䎂⶚옩쵢㒞⚑䜝㖧ᢤꡊ읠嬭㢚Ɂ觨퀉溛ᘉ琈꿂梪ឯ鸩켐푎Ύ夏얈▌▎෩篊퐍얃顗얉ᔏ顓帉颁昡샊ᘗ㘨鯏鲥᧊耔ৠ㖝倨퀀큝ꣃ龕ᶚ榘ロ뮜뤗ᶙ供\udf9eﱯꢒ뒗ꢒບ\udc46ຝ顛얇顙涀塝⌙贠蕋왈춪萭嶛퟉갍ḭᡔ쇢薫㊣殒ʘ＇겇즀⦌嬉看즂﨎쒕ⶢ⁗뺚窟ᖛꎘ閐즆䄄▄뮃餀ࠇ蘏璔硛즏즎ᜆ硜⦂度ꆫ좩뾙悃腮ᬨ앮꬀䬙ꬒ펕俉렔䊓硟⦁硘犋ᡠ鷥街넙䷄Ǧ됊什橦ağ쌡䛮ᶙ麚ꨊ耜崉Ƭ沜풊풏眀送풅풉ࠎ鱥䈡ྕ羑蜙쇋訌颂ꨇᕩ⤒\ud8e3옇㘣\ud853玨\ud857ᯎ삧㤞氓।渜큑ꀤ풀䑞풋ﱭ풇잔㡙澓힖ၜ鲚醖鲑醙鲝醟ꑒ품䠀쑔쑗뤉ࠄꗩ빫႖㸗녫䍧ႚ鯁蜋줠탢箥爂얔ꂊし堅ځẏ੍╮釦蘌曠₞ẅẋẀﯪ⇪ᱨ娑萨Ꜣ躗暗몀륦ᥤ䏏⚝歨窒颚ͯ覜캖ꑞずꢞꮛ㶚겂贊➈ꖋ洞蒩➘缒ᑙẃẉ秥殝嘓㸡⎬氃틧톭ꧣ㸨ࢧ⺍커鼦璯煥璁䠅憊㗣ऋ纏ꦚ풎␌㑝㑗ᬅ\u0014藡速ƙ쇄봛ￂ諧몄ʠ㍩儤鯂⸞ⳬ覯ࠋ匡寯ઓ宙けꮐ䢭ꑚ鲞醑鲕醝鲘摓㑙㑓㑙㠚鞙맂쿂⡕ꄃ삪팣됅꣦௮Ӡ켢⼨긝ಆ뒌焉뒆䄍뒎᠅徛렁闃䬫᜚萎'좔䈫톮呫꾞ġ䉮覔ኩ⪩樮ש\ud85aꩪ셬窛硗ᖟᶐ閕ꑒ醛瑞鲙醕鲓鲝౑뒃＇ౙր豛졖䌌蘪笩ᐩ污韈cᔆ폁箠䃢ﭯ⑚챛౛䤉챛뒄ᮜ슓ↀ錏↊猉Ȍꆇ﵅⨞豝⚦ᨮ貫韈큃鰢㍡ᧄᰦ隝ﮔ뚢骚砉ꖟ鑘媜跢熔纚슞纑슕纝슝ᇍ↋ↄ걘ꆊ걚ꆆ\ud894䥋鼫樝ꨌ욭闠ﶨ⤒몄ሕ娜\udfc0葞骔쀀걜磌걔ꆉ漆걑卵▮ﵢ᲌枝厁厍，䖔펇器厃厊ꀏ厃鱝匂ꮐ껣紖倗㼪នญ뢡ព䚝យ䚑鱛厄屝鱘펍匋胩誉ง㔉逯筯⡕䶬䅪恛뼩Თ㮯榥䰁呫䛪ㄎ퇏⾧\udfc0ꂅ쾀䅯죩廥ﾚѣ哠\udfe0爡䦥꺠蘊ᶅ\udd8f喇\udd8b⪆귨㶊瓠䖭兣\udd9aꮑ屘༖䶜讑怈갆堀ࠋᄀ宀䘉膍쾛綂䃈篊籛즎籐㶇醉鎫ﰘ谩悀쯋巇쩬崅悅간盬Ẫ黋亜㱦䌃뺡į闥앩郋訙༧雮⨃퍥⑟꒗츐阝⦛ﱝ\udd86籟\udd84ꄇ醁䊗莙겔뢧傑늈 ڃ鉏Ћ늏늅ଈ增屑휟鰕屑ር瀅ᢁ\udc87첍\ud988㲕兎㦈缘쉕늂쉖쉐犉䉨砪ᬧ蒤븨븤ᰁ锄봜䨂：琏詍⤞蒐᨝瞙둪놟仍꧋흌䨈뻄볯䛊瘟塜譣枒䁠純犉≜쉓늋혎쉜쬖⢒찏♠ꊒં嗀匋亂㕎暉⩨工㴕쑑䯆ᰭᡒ覡┭黅ׂ턁ާ푍樬\udfca딗ﮖ螜ͦ宎ೡ㉬鱒찋ၚ⁑澞⁙ꑑ㷢倄봈횉熉퀃瀏瞧阋઀቙ઌ቞ҩฅረ目䟃Ġ＜욚烦ᶋ䍠ₔ▉\ud987ઈቕઌ㔌枖⨀꧊踂㎉彎㎄喪㒞戡ᘜ榫訙颫\ud983୥冏ꏣ굨☊㦂䜣処眙Ζ뀣抛䱑侑ꑕ侞ﱣ属រ䚕ទ䚙㲝㉘㎇㉚뉕㙌疣쾛⧇馥ﰫ쨋㺁튡靯㸮▃왈ƭꪘ꒓ﰡ垞㉜㎅㎃䰟ㆆ푉㆏뉃܉영\ud910籛䰫뺚ᒖ⁜\ude90箚黆媐ꆕ媒ꆚ弆詑ʁ詓ㆍ詚㾥冎ᬬ刮骠\uda23Ī鯆둤Ⱚ侥鎑흡⋉聦鮜ͣ韄ﺠ銥粮먛쟅싣팕꘯츬牕✣氁뱑솥䊓䩑ㆇ䩝ㆅ詟஋ﰢ֊瀁興萉֍Ꜥ馌჈䞘쁘뗁봜搜ᷬ갇雥⌯ᕥୣऑ췭ￃ䆡쿍ꉘꮚ㒝겝㠏꩞ք橝֊橕粘러ฎ맮ꑜ剟牒걧ⶇ牊充쀁䵂툍猋│ꊆຝֈ橕ւ橘崅鄦〟햩㳬鿋튮뗥ᡦ㘠䠡ﺣ줥ܙ呂歷렄소炃悄贮力羜ඨ剕힗牒㡒걤鶕兆鶚ᔯ笁၁㊞婘礪婒曆婒⤂鯋䍨⹭ᨐꌐ诇쟀먒 擫恔䊐\uda5c旅婜禇婐㷡跈⩕\ud851㜆ಓ꧆ᨨ䒐弢⎧ꫣ찭訊恕ᒡ듣ᣫ\ud852琗䉟岢熌♇匇醊冏瞉츎絭ꡑ窗↞媑䩓䩟醄著醊臭冀袕袐鲭੆뚡젋쀡軥실ứ␦봆Ƣ者醌ٚ၆禍冇ꪐ쁞牘ꬦ斬묆渒Ꮰ্ꄗ舒⊯妘纮笝퉢蔝嚏抚ⶥ䬬傖ꎗ藨ꡖᶀꄂ讅暑ᶉᜄ⃍ꦜ펬驨\udce6ᩔ䩚ၗ\udf91뜇䦐㪏Ἄ늇ᚆꮋ搁⒞왑ᶅ왝ᶋ왙殟㶘馑ਊ츢℉쨗儂ᧀ\uda20쵡춒䷆좮弡邏\ud990ꙙ왕ᶃ왗ᶆᡝ哯枒켐蕂辘ず६ꄧ뀩嶦黁켑肘騃꤂쳁稈뭄梉쉝툗碓쉘ﱘ➑䜀꘎ꊅ홉掂羯ဍᶂ릐ᙔᙞᙑ푞裧漐鯁䰋ɛ摙ಭ樝ே抨デⲥފ蛠陜ᙖᙙ虔᎝⑚益譭ọ倩릣䎠릩瀀凯렇ꆜ᫮ᕡᱣ㮕ᖐ䦒캞曀ᐈ欌沕萇ಀ貄貄ꕁ뀖貏婛욒䢛뒒왔ಈ뙘貌貊뙟㜉穀뚗ᢏ䱖醘챟ꑘꆫ뙓䡄뙐癚貀筥钜ⴡ䘖䖨ᬪ가缑욧鲡꘏炞\ud84b⤙跄砀尬崊煪㺕 ⼜ᗏᑃ腤혗쁆䱓ጫ觧쫯ᆇ颉꾃粂\ude8e톊崅톎뙐켧䔧\udd1f詗貔剒♒剞ﱭ艹䩙媗練ꂚ蹒톁蹙攅蹘늑頓鲦ㅉ\ud86a萢䃭筧䆯쨨渭䆢虔톆蹚톉蹙톈晐Ꭰ蒡햩淎⸚ᜇ꜋꧁몏鬣斤㌃傒槂Ⴋ叩᫬蹒冄ḁⵈ葇冀톄꾝硜蒓៦믄짬棠⬎忯ꕢ傒℁蘬慩캎骝妘ᐕ\udf90呓汛쉚䩟↙乜ꆕ乖冂먃깕冇깛찃㤂閡綪ᐭ汮\udc6d✫樖痢䰃⇃봘횥깜ṙ再冋冎ṕጞᨯ詋㖛ﴤ㊄渍ᮆ㊍惊嬏믂厞㜁텪꩛嚔幓鬂幚㊎㊁幚㬌癔슟ﲊᴇ ᨏ\ude0cĎ䄄ు悌袔殟幜㊊幜\ude59㊂ģ됃ꂊ䜫秏考왉马䨀樧槦ꆂ榛穞䫠幯൦厯訃ꨥޠ점⻤ꌝ䵨ଝꡭ䑑솞ྒྷ⑓\ud85d䘣↍黁銅銂줋銃왏銈湒쉥ꊙ樁㠩ᶢ庠䷈퇏䑫꘢⇆ඝ椠ഗ虝쏏鑑ꏤ飯얖\ude5c⬐\udb9d렄\udb9c쳦锉ݮ\udb94殖銏繐จ﹗銊᠜ᤘ词ㄆ噔澨秌櫩䡧ꘝ톮砏埉᱑ᨋ繞銉⪀﹓銍腚䁜ꕇ䶏ઈ誌誈庍瘇噧阋ઊ셓픎셚誂\\♒ၒ乒걦剖剙剓ᇍ셒션셟ﲁ셓잩俎꧄묙각풤됯ᶨ隠䌩吞負橯ǈ蛩ꚦ蜖ྜ᎔雤傮ﶒᢖ횞팦궑켬ⷠ㰜ắ펑렉ᆨ䛣\uda97皛徑涥\udae8䊌䊊䊎䊉䊄䚫䊍ꦛŝ떕ꮓꮐ疚Ą疟㸄殗ꑇ䊂큈ᅓ䊅ퟤ嶕瀠ꛢ溛㢣ᐮ癮霭㯀\udb6d죣뼦膖ƫ礏酕䊌酚⹟⸮ᄍ괓聧칠휩妬蘭堡㜍䰆쐜藨廅갚廄愥㎃䌜豛咭䬒쬗䲀첄봌첄悗ᒎ첉ᙑᲓᙑ㎙騭ᒔ誕ၓ墛ၕᒝ ㅔ첂첆ㅓ氂Ī㖭쇋虧햯뻡牠秏鲥䴋噐ėꩫ你牎檖൫鄢䨁ᖍꙙ-핤켓᮪\udd62琏๙Ӧ劑Ვ㚔♨ㅝ㚌ㅞ녖첃氄씤鉖ج蹙ည츇ࡈᚌᚈ䔋㪞빙蚞䕧薩鉚ᆪ⇦蘦闠뵪퀡蔋訋ᆬ莝䰃푚瀨诊ﶓ兙输ꦓॐᚆग़ᚆ展ᙕㅟ⨛ᙟ嘡蚄आ᪀턇അ倌㢋\ude0b賡뼙䥘嗀॓䥓ᴇक़㘩켢薪㍯ɬ쿏뎡蜃䰎馐輯鍊꩘뢥䲎硚ხ㌝겒꥜ꥑ\uda05꥖ޒ骞槯枙紮\ud8e8고椢杭뫫ᨕ娜貦ⴧ覦롩풪ᅔ鬕떈㝩ฉꀉ톂㼅ኀ㜇熐꥚꥜楑픁톫俏鼨ﰤꈛᰞ萫㾣ꂕ⨂\ud8e5뒐俨尠顫뺉纄ഈ 嶇纇嘈ﺁㅟ뺛蚝↑窐ᦐ㤆悎Ⲏ㢉鴍酅癜ﺅ饝纋饛閏饙㓢ꅓ秣䏉欙蠮﫢苣騈䜦䱩ᰍ됉ﰡ梊纂嚭饓纇饐ﺇ悝釦烫轮ⷅ亣ŕ솖퍨麛鑯중డ疧渙⩤ማᣯ描訄⟌⬯䗊⻤䪅熄᪉᪎᪂ࠌ햅셙祜᪃祓꜁᪏神汛紕➜඀冎豍K蠎讀䒉뱄喑뼘諾祖᪂綾祕ꊂĬ㊢䛉갊恙ᠦ넣嶝腬穕Ε퇈飤槌꿋灞䫮짩妥봖韅綪梡ಯ䗁⿀ᐏᐯ켨贮繘ꀟ扟๭왛ڗ⡚䁓亇于갈캁荂캃ᡂ糣럪ᢜᜁḢธਡḪ恧ꅋഩ戥\uda9c鋩耟ஞ✑ᗊڊ᱂앐캄캁앝ℎ킖續額㔉熜㄃₄溂⠈ᥐꕛ亃ꔊ앒ꕜ긃ᡈ㢣ⴢ䅩鞞枯跆逤ꚭљ維Ḇ딛鸥䰉⢐亀儅儁䎍쥒庍ꄍ䆃蹚㒞ꕙ⁙ꕑ熑ꕓ熐敘缙딄⺋⺀ᕑ⺈牬춦椬厠䙮\udd84菨\uda25팙ꦢ뜗ꉘ좕᤬ꚢ厬琅븬玦䉫橗액ప蠥䀄꿁ᰉ㉭䊙릩ᾝ亍⺇⺈ᕖ犝겍惌﨏게릎琌沈套硓䱜䩑㷮ၑ墙ၟᒓၞ陒ⲏ핛겄㕘沌沉⌡䏊ᬡᰡ㢡ꁖꩫᥧ䆪환콩繓ᱣ咓聠鲪ᔃ䏇\udfc1몍a\udd26릥井ᆍρῠ鴒苄땘㕕혌㕙尣╭紫愠襝\udd9a\udea9똁爍춉謂่⌀ⶇ껄爟༣\udb2e䫪訅䰉끨휮癫༉븨╨☀\udd29\udb4a⌨偙鑓枚ꚫඕ鴔⅟뮒\uda52晥떂䲚ᚅ蟉处蒉ᬈ굆ນ춎൛춅൐ⶅ脍댗᠐蘢砃녥꧄咔㌈䳤샭球꒕㼓쵓춉ൟ춃൚䁞ᚉᚎ哎䀃ᚂᄏᚊ炆Ν௪\r碪ꏫ湠텛긠폇⨎琊ݦጮ㤟ꨮ솝䕞橘겘ǩ䱐䩔乜⅑ᩚ熙萉ﮍ鰋≆⨃쥘缐굕ᚌ굛ᚆ굒酕쵝㠝൭狦䃣坫䌧ꆤꜣ訋਍䜢؈॥揆螭㼛굒굗ᚏ㼅鉪왕ᦄ妍ᬉ䊆妁妍妃梃涒⯁弤\udfec㖗鵒妈嵓鄌嵝妏䥙ㅐ纒奒癔閖갉̓怌떇쥘妀ᬏ鵚妎妇嵒嵑쎖\ud951ώ䯋跂\uda25뒦붝闤ꚦꧣ忉淅ᒩ灚㒗䁗ﺭꎦ䤍揅\ude64샂⸫巭碬鿃쫭׫骑ŕ慟䒤籖ꎁꎉﱇ洞\ud980즏ᩇ不꥔⁣硟浔\uda5eᩑ䵔䎗㦓䎟澔릐쎖즕絕쮃絝ꎏ絗ꎋດЈ嶮訇萔੕ꉒ氉氇Վधᇅᴩ릣쏆⎘͙ꎋ絓ꎀﵓꊇ䁛骞쟦뢪粮辤ꨇ慬ऑ폏討⼢貣㐋蒩顐杇䬉ᴎ촌ஏ髦஁ቓ聨恔曊定ય齫鰤䏄堩俍撖䏁픬‒䵟洔൞뮕젨䳣꧁垔썐ஊ썝⤎썗愃뺊ᕓ口䣉鎉ᎀ⪎됌笇鄊\uda8a䂑㾒ꍒ썔எꍚஉꍘ輔£퍩销萠딑莂氄䨈퀁뙯Ф㢗傔몋☍ᤊጂ窍찊츎鱯匟얙㙛鑓仮ᧈ귈銓횇窈ፖ窈\udd54奕↘䲒癘三禡㲂ﴬ쌏⒀缛ፐ窏窊窊츍뎠\udb14恐쎯뻣쨫Ṓ찭\udd6a耟멑뀮륗د␡䏋Ϡ쫥⺢⎦㈫ꓭ᤮\udee3ￂ忁\ud85d궕⢔ⶆދ\udb03왆樆嫎惬ᕝ겞㍛ꨉ㍔궃㍚궉兖崡꣍Ν㬚䎦䗏锡젏䚨뾯ꓣ殝崡瀎䤇穐왛鸮뮦ꍝ侞栆⊃䵚踇䵙䲘쵐䖘덐궅㍜궋㍔뻬ᤗ䘠辔館琍锨쯎뗡蠦삧䛆蘀꿎딗ⱐ㼇떁䴈疁泃胁妛늑⺮垙塝떈譙䊌譛㔊譒쒀㡟钀耆讕᱉」讖ປ譛떏譐疈䭜疀쬩쩔갊᱗ே寧쀨訅铪⁀ଡ৪⇦ጤ폃㚛正ꨨ鐮⭆瀒㈪嵮蘔樮醥\ud995浒륑橐▦᦯✈授ʂ푏Ⲏ괇阅礏掄뉝鐭ᮝ牚ﵑ㦜乔ﵘՁ笁䜍鬇㩉䴆܆葭掁ꭒ掍ꭞ掇ꭒ猭⿊恬璫῏⪤\udae7묮隮ꧏ嚤퍓៯눮呭뼢ﺫဗ\uda95ꈇǆ䜡蠡ꙉ⍒᎒⏦䒓\ud99eꭜ掅ꭖ掋ꭓ枞ꮉ茅ꮁ묁葇ꮎ꣇鱔孙ꮁ겊孛ꮊ적孚楞鉑ᡑꘌ鋣ﯥ妠爥ధҦ覣ު驯滦斣繪\ud989쮝⯨\uda56歘ﵙ怜ᔇ붆릌焂⠂Ἂꅃꢊ捘袕孒孓ꮎ孔\uda94嶑బࡕᕧ蛆抬ꬖ졢律䔪猭\uda61愨ᩝ뵥傛ﺏﺈƇ㌎ꎊƎƏ㍝㼗筐ƌ箈ﭒƆƏ逄鱘㡕汗\udd99쥕➜뺎奜ᦕ奖ᦛ奙ᦝ籏筙ﭜƌﭟ逅鄤함ꐠ౒ࠝ樛﵅贗ꧢ첔偗퟉憩؋꘩䛌㜃傝빑셢证昨䵝浜ꄨ鯯ꤜ瘡䌪慠溎ᒊ욋看㪎ᤂ쫬헯Ӥԡꔡ쉣㱞䫮綡⊁툧咠尨륧뭐蒭扪ꐁ࡚氛䝔ꭐ❙펕ᆐ婧⍚㩡恙㪁읓㪋쨍읐몌鍞㕜㡜媞ﱮ䘎ࠂ個줆昇ᘁ૊項ꪏꝝ㪅읟㪂갍豧诨䈒팧訑䔮୒ℋ㺆뱐뻂؁쟨뺐覉먊\uda84耂覃䚎覉覄ﵐ⣡ⴡ짤䊞᝔覅᝟줃ᝑ見䬎ᆘ୦慞확솚ᦨ⮓芔ȗיִ⌯ᐢ忆舣ᥧ훇ꧏ𢡊៪脔ၝꎞ䵑杚\uda54荎똍㔍춌Ԍ潋嶅勯আめ᝜要靖覅靓稢傔２꭭繦✔\uda2cﴨﰯτ晉齢ʘꦋ蠂ꦂ㨎ꦌ쀅ꦇ䊒띜ꦎ脎띑ꦅ띕礦催訢㭗\ud85f䙟큠ݖꮔݓㅒ䨯঎ಂ쳊销ࠊ焃岀訅穏璛띖띖ꦈ睛ĉ㵘擫ꄭꧤ䨅ᕡ\ud8e3靦瀖䄥献덙㆝馢쁑⮐誢䄀ગ秠ㄎꨌﮗ湑굦綢쌫䳀䔜蝥⢗隉ᜏՁ錂ඌඇ㧥떃萈佘ං佚ඎඌ஬쯊밁Ο虚☞絜麞ᬫ崦猕ꙟ啞㱡寣⚧咯䇁벘☛ᆙ㌑げ墕瑖踎ᄁ嵈ᥙ佟佔ඊ佖ඊ\ud95f陔ᣤ/톫ٕę蠪戤뾙㐞ᱥᒬ࡜垐㡔碐푅窋좄蚋粄ᶆ㑑ⵗ输潓⤏潐ᶄ畝쎬牬氃鲪椢廊ᱨ䠪䷩Ⱃ繠꿇䠚瀧⬥ﾛ䕗쫤爚菱ݙ樂ݖພ₂䮄퀇洋訂\udc0bꀃ쥍퀆ພ潟㾜ᵑਁ좨쀎갆吃팚韆⯍樘鿅㯃뺪椠瀨뺓覈䥯覈䦊㨄奈㌆嵒鸡य펑ᗍ覀\udf51懶\udf5c䦇\udf58\udb5eᡖ⹝뱑楞평ၦ鿋ﴚ扑闉⼕壟盄텮ⳡ䃠じ흑瑑⽔呜䂢㘇\ud989帇愅먆앂\ude86斛\udf57要㽔䦋\udf5d∕꽝벡ꔔ\ud8e0꧃蠫䎠쫢뇮妤ྪퟏ䇁㛪䁚㗯骍栌媊媍筄⼑䫪ꐈ⁏煙糍揀⤠䠠ﳨ霫쟀몇鎯巩솗頢ꨈ祛뀎斆Ô媏쀉Þ媂ﵘ乖ﵞ歕㭝さ海璁ʉ뜍庆ꘌ潄ꡌꁘ䃐媎Ú䃑⠍筀켒ՙ獑礟끦䢝ꈣ컭왩妣私ꎛ䉑흪⊗Ⅱ神⪉⪍⪉̇⪋㨍赂ꉓ៮仈প騀ﳮ䑀言銏뺦梤텨妪⟎䜤\udb51釫龖籕쉝ᙔ쥛睒쥒鹄桊쀂뀈뚉Ćⵀ⌄积⃒済ꃓ⪂ꃐꪁ㹛륟贝䑬䅟㱤갊橬얩ᆪₔ왇⪀ზ慠ꃟᨄ爛ጕ꣭闂䲃먏吆씊ꢂ遃䲋栖༣⡛蠃郞䲏郕䲆㭫詑䠬콝쏁ꖖ둛燄洞폅颣襞ढ湡,⯮陭ꆫῧꮝၧ惐쥜\udd56鍞\ude5c醒鲞癗ꑐ增僖䲇郙䲈僐聑彘붙팇\ud955㐝봟\ud960儥롖໋ഩⴤ畃䉐ꡝಋ粀㒋갎栂㒋笇餃詚጑粯詌蛦邔薕睟籐鲔ᄣ瑑ミ瑜챘摜烖纊烜㒊㒉烜넣澫陨薬ᬨ恪ݮ訏辤ㅅ⢧베톝㒆烟㒋惕兑鮝쟣脎ꂐ䃯凈ῥ锄슣ᆭퟏ锭ￂ䕟隧ᤆ횇羀힅횏㚫횋褐挓앝ᖝ㙖耆挍㽐䯍彑몉樂辣ꨀᣁꕦᰪ䗆咘ᖧ䟎ꖕᰓ궚횎획䣞鱋䣝噊杝䱞杕た随ꖒ鴃뼜斟뼛网䣓⣙횇⣓획噍匭癢媠뇪嶊\udba9먖ｫ脎雭䄢켗ΰ혋ƍ菥ᖄ怅㮊븆떞澕䃙㭒흙䵚唌茇അᒌᔇﴆ．䠃ບᖌ샪ᖈ삣뭓䄂緭糫又ধ娠﨩㐚鯀賈嵊饔埀쫦됎뢑ᗂᖄᖉᖉⶆᖁ䆚⇪䍒儂躨ଫ\udc8c䒪⊝\udc19쨓揎န榡鲪魑ྗ慠ꨭ큜\uda82嬆\uda87䔆ᝈ阇㸌ᕟ僟쿈坚ⲗ꿯皡砅爈輧⺥䔡ᰃ⇆긭呢臁俁睙探䭚⅙媃⸉宅⊏酁᥈ﮈꁗ\ud8da\uda8c繈㣙\uda87㸌ᶭ摢忊ᡣ몭ኯ巀呤간Ѝ〉휪猥䱩姣⿭㼕礉\ud8d1磑\uda8c㣞岅趙딌핥캃塋캁﨏渆㕔꣜\uda5bᕝꕙᕝ熟ꕘ敚ә캅\ude51ӟӗ陞ꙝꘝ\udba5舚롘혘㭥韆묈秄ᯥ팗齥ⱬ豗ﬔ䋦㣑橔墤탘ኩ献먕⌏季輦묐Ꝓ㚈퀋訇孮๝뽓嚑ᨎ캆ә蓓캍蓟캆䴔籜΋ᄄ讌楡΍랂꼊兮㆜퍟⸩༩崢쟆ݪ┡疭쒤ȟ仄雌䩆咚額唨╠\uda15ᾗⓚΈꓐ﹥Ή딦䵓\udf9fә怜㶇趀內䔆め晋瘅\udc0c㗪릕擐ꓞ΋擒ꓕ뻫跊凫虣刮䟆䟍瀮漚텡뽙噔晁䜩묀ꋡ㒐醄醂醀⤉醇쀋㪜㖚铕怎铖醅铑슎䦕㭜흒꣚璓著媝䩟쾆铒쳁铞醉醂軪慯툪\uda23ɠ탨薤菠꧌ί蠮ﵥ먝⃜륓胘겑堖콒鳭둛ﻁ今韏훀郤⍦蘆뢠ꏭ獒翭뵫咣ဌ띗ꦀ榃顃㞆鶊榄ꝯ\udf51ላ应㓝룒景睗ᴅ茀넅첃襆슋듒드榄瓗～紥悄묐ꐏ쀥崈য巉渗ᥭ忆蘁ₑ煘蹨⴨蘭鹧葟؟퉪蠩Ḧ䈪綨级⿉\ud8df虑眗⑞骛ꦏꦊ榈瓞᲌瓝闋㲏㲇분梁ࡂ벎䙌짯䯁⊆핑벇㲄Ș벉䳗伍䳗鑐罞⽘呛⺐䢫竡波Ꝣီꝥ්䳜쳑䳜벆쳖버靬箋퓚躔榠ꌕ㺕⌂됥舫붐日葝暝ꂑ૥⌍갌룑攢㠩巀㎃옊⿈䶨\uda21蕫䏍펒㪜ﲋᴆﲀ玄悅ﲂ㼊؃䳕⪡ᾛ僕㬝胚畓麮攖퍞둟牓㐌曢轕畜䨎㆐薬ꨏ䟃瀪⽜࢑陵屖齑꺞ᅚ쁋ꮘ疐殓ᅑ꺝泖උ泞蹍ﲈ뎨恑腡訆氇꘭尠뇣彑옘फ迬⺑鳞ﲇ泒ꠀ饉፞攗쏪㭟隣骅벃벇벃ވ粄ए䣕碧喯涑걘젋䰈诂庠ꚣ蹮᧊诨냓ꞁ뽐鸪顃耟扙訅\udde2벌\udcdbꨍ\udcd4粎퓠瑜罚쳘伟竭泬ⳑ\udcdf﹅\udcd0粃볒ޭ斫쭘⾯쿉䶪Ⲣ愭摢㥟烓䪑䆂丆먂輈᝚臩쳑齒䊎斋ⴏ椀\ud884沆Ἁ謏璓ﳖﳕ˖ꙝ칠붞퟊䁣⾤颡ᥧ꜅갊猫ữ찯卩壙ጚ븒颞皭䨒醩쵡඙淁⍯衟ꊑ㠥瀯셣忣╘蚩朡⬫䱮骒苗ﳝ䘀˝˝큒ꪉچㄡꪅꪏ溋┇﹩瓜⁞⁕ꁓ⅜ꪊꪍ⋒擋⋓ꪇ㶕苑ꙑό覐ꏠ粨휬韋㾭襟訂纥䯌ꜭ識▕ꋕ⋞ꪋꋝꪏ⋕礥℗䁖牒㓜ꄩ騜䠡轢௭攅蒩鹧驨䓍ﰮ\udb13ኡ寠蹕떀邎疀ꎃ܂ꉃ疇疂ˑ壦琗꥘鋝晌鋕疆鋓뺁䃞떝哙⽘㼢讞䭟梉䭙讓䭒䭓鋑疂鋝疌겇疉鎡⊊\ud8e2ᡫ᪙锦猡琂팮ꄯꢧ䑯骢尢砖᭗䢖ⳡ␪梨萣芐辔監큊⇀㈮ȒᲖꝓ쯂좩ꚟꂐ놂⌌놊༄ᮂ耋沃얖꜑㱞ꓑ덞햬쓐龮ꕥ㢬愮綡+蛏귊੨恓붜瀤矫ⴣ嚥ꨀ弍鸃닒놏닞놄ﲀ乜勖哘哑ሦ乗ꆛ哐ٝ닔놏놈狔삪\ud983僢퇊\ud981燍碆負ꬎ韪琂䨊츤궭쪇襂ᑊ↋ྈ⪈訉븀ꔖᡝ덓ᐎꕬ仉ໆጪ頇樝伞\udbeb娗湐탮㽕兕藅牐䧧൘깟뱘ꋘ㶔垏渍窝ҋ窘\udc60望⅓쪂䫟쪎䫜⪃릜ᤔ솫㸯뎖ҧ䡥壘붢ᓫ\u0012ጢ✪ڛ⫗쪆䫜적䫖接⢘괊쉑㖏┈䄀馆鋟黤塑櫖㖍櫕㖇櫛㖍䫝압툢ᠩ覫Ḧ䅥楍訊貣ञ㲌森⎤䜞梢骛쫟盢垛罹烣駇볔罓쳕⽖䭑䭑讝䭟唇勐䖜櫚麃櫝㖆䶤ൈ䋑帅⾫ꆥ撬Ả엣쫦婗㶄딁葅蘇ꀇۥꊙ䆩黎橮쫭嘜䟉엯㦫⭇᪞䜟荑敫묑ᗇ嫖\udad9\udadd넌૚哗뮖૖勐䚒젇ꍘ핎夌옊＆唉㲒㫑\udad3⛫ᨛᯃ跂؎쇁宇⿏귉ⴣ飓쫣ﶒⲄ餎Ⲇ舉ⲏಎ㜊␃暚Ⲏ㮝海䀘ⲉ⃒ਖ˛᳐ﱙ˟ㅛ㕝ၛ墔钖𣏕Ⲅ۝ⲃ𥉉鄥颭ᑄ⨤馛茓俎팢ꈊ핡\uddc9죗涔歑ꃙ쑑ﰟ扐钡ૣ蘨㥘㥯丑슬\udb1a䄨泞횐꿂湮䣗Ẁ麋纎쀇届麎麊떓\ud91f洜⫘呒➞呞➓팆⒅➝웙爋웜麀⛘쀏㵐橩湔纡鱤될⪡꭪ᰨ鐭䫤쫙⡙䋘ě䞝惝\ude6d权\ud96f僤Ⱛ嶊Ძ귃ⵙ齡잟ẏ⛔麏웖麌ꛑ쵪䩊\udae3㭗䮁괊丌쮆ᴋ읚⛖㭝预餏멈뭚݆༉椉㲛䮋꜂ᛘ쮎ᛚ쮅퀓⨇ꧬ旆吘䱭蠣䁠㈤\udbac㦎䫧끭鎡䞗桗㣙ȃ豯䇏롪菎骬㠥䏃瀓뗆䜣⍖亩䢚雟䮊ᛟ攢쮃삄爑켨䥒𥉉⺃⺆ଫ䪈꺂঒꺅龔䵒䔞㓛掩삗늗ભ㈡飘苨檕낙땚Ą㉧盃嚡戭놝⺅ꊅ㛐꺇ꕋ㛜⃓ᆜ齝睑˔讘➘蓐㸌蓗ꕛ熛ᕚ盛⺏⺃㛜꺇쥕袚湨붇聕妠㱯而杫벯Տ䝜狕ཬ犇넆犏笉犆舀蜒㛟륐쓕렪ﺭ㆙贏뫨╯䗁椡ᖋധ偗棒㱤ㅣꦒ琏໚횈軖瓌軓犊ᩘ쉘쥛꞊།☆䬀\ud905币뮎躁\udb97໚犇仑犀컝犂鞕Яફ蛇꘮滧俇鿀秈陭䵤\ud8e4ㅂ詝퉊听꤂亀Ƌ⦈᪈Ẁ稑ᨎ⦉껕⦃껑዇껑ꐐ髝쳛汙玲瓘瓒ꆀ貄껙⦍껓⦎滟⦉䡫뼪⤪氍䟋扯끯빝힋⨉೑⚕倨☏톧ᆦ\udeecݫ꧉퀢쫬ꈇ갗퍊裑덙곔뛐䗢ᐑ㜂﫝覈즌즃뙍붎즃㞉\udc99쪚㽐즍ᔄ廚즊廙즈꣛牞ﵔ网⼆᪁泍窍┊鋅휃罟璝廔즍㶌廖즋撆廐벚쫨嬣跅튧湯巂䍡됭가䃩馛匜㓑훚㓛衐陯㠛쨏ឥ싩跊ᱠ휮䛏렌ꫣꨨ㖛惓劀逋劏劈튀猂튂㫮轮舝峭眘雏轤蒞㌕ᛘ㼢謊倏餋먍覇Ć红댟ﲉ绝绑霋络튎缞㵝尡溁厐\udc6d婧막圢ﴠ븢沀瞚ǔ⌃统掇绛雄팓៫⟉揁\udd18\udb18ጨ揍攂䈭㄃佥冖宀콪㚘霝轮畑諥ᦂᆆᆇ嵉ᆍᆌ눃븃Ӕ\udedd䃒\uded6밇㲌﨎ᑄ㢂縋↖쇐萁쇕ᆄ똍쇙꽗蓝嘞؟ě虫䄐Ⴌ쎧㔚찈娑슣矠멞骝⇞ᆋ⇓ᆃ쇙筚ᨠ⯆ꓗ靘䉐坖㢓聪䉣龯폩ﺫꮨ耒\udee9䈧蛎ဟ㢖֛惚\udea4䮍䮍夌窆\t䮉㌇鱖聈ᇝဌᇑ䮄﬎ᇕᑕ䋓嬐檗Ɲ欏퍣￀ᑢỡ੤ꚬெ櫅줯ᩯ埍ᒫ莛盝Ⅳ傛긔勘뫜ၚ勐糝屖\udb8a逎豂䃁渃타㌅䌋罐ᇒ䮍ᇞ䮊ᇗᇒՑ缝⬦䗉갃뉊靮ꚡᅫ娪솯䊥팙弭쥉譈蚌蚊蚇挊﹞᫞䅣ŕ滓睞컕➙㴎品耇栎ꦂऎ㢀卛㇐蚂崀뇛玐括ᤚ㈫烟䎪尭쀧땠ᛨ趨뽚ݡ㟨▛ڇ㇙燔騈뇞岆ᡚ췯㽩狞ꢣ༬䈓琌크鸭옏␧ꄢ覨邗焜‪ᜏ隣ↈ劍␂්劉劉힚૟볔髕ﻜ欀腝묄腚\udb98ㄍﶆ腖觜劉觞劉撂릜ᤐ뾪ݥ가탮쩟\udd8e佅갉黅῅▖ᙨ죚병ᗊ觔劁角觑劈勜湑䛝䋓枚\uddc4긦郩ȉꨏভ琌澣彝⴦梥쨧哭䗦渖砂ʖ憆憈ဉ憍憀馠滐槗犪憌괌槕憂ю픗╦閤䎙壩凗觔뫐䧓滒罘졖슑纙슖졚槞䜄槑憇様咈牧묬ﶜ੖挊萤⨯䉪⡙䰄⑐\udb68窢裓聤ửＦ䙑㯉ꌜⰨ삕춫䛅줧㘡筝쫑덜쁜ʜ憎蚍ਃ蚌벊缀䚂踎鱭䞔㷡킙뇐➒쥗䂊㲍왎変透虏멇襏꺟䚆䋉姚鋍姟蚆樂踄靥䟆贤꬛﵏೐ᰬࡐﻆႩ懓ꤚ直뤟枔蘬揄鸜憥䪆矮砀갬赞鱦궔擓㡈㧝蚌㧗蚋姑┅\udae7㶌䤁鱤붂붆붇蔁굞⣫喬갅஗盔ㅝ뇟♔퀇ꀂ鹇䤆戌鼌㢋䂓ﱟ㶌慄撊淪ꄙ⻞㯅楍ﾕ疯㛬ǌ\udba5ᔐ笨ᧉꔝﲨᳪ⢙魚䉓ט붇ח䢆陸དྷ᎕枛ꓡﳭ녭ᆤ⍩⎤㦊몃礩Ả㖠썔슃슉ﳏ슈⊌⊍縊ﭛ嚝에ꎋ에⊄⊆⊁톑砈⩘釗ﲖ닞轧嬮嵯东鹝య뢑୯✨ꨆ됆쿅迢؈譧燅䈢銣Ꝑ䩬\ud9d7᳕ۓ눂컋琄瘏옅者뚛琄殒◛슇엑◒⊊闡\udc84泗႓젫υ疩欟㵬⌮⼣⾒솈↌ↆ↌ⵑ↏濠椟뽣ﻑ૝졕슛罐ↅᗘ뒆ↂ㢃燞㵐鞤周`䘤됪\uda98뤥䌣腪휯㠕悂虛袄ↂↃ闕ᗒ맜曚뻞닖몄氉⛬꧙\udb64얤黀쎧㔉忊깛猡聢榪㍕顖▁▅뤊퀍▌Ň▁戮暮⠬ἣ籘關讗ຓꢐ\udd0cຐ삍㡐䖗䰌ဎ▉▃㗘炇㗔礔嶝蘔τ窬﨣삪䶢浞Ĭ餯䏊갔矫撞짮䩈໏햡╕ᆏ㲅洟ோ欖堇盁黙㆘欆骗辟뗘痝㗖嗣▇▎ﳟ䪇隀嚉鸇ဌ嚉ᮌᎂ厙ửﶒ뻞慓५멝䝠知⿈ﴌ覛ﴕ锩੣韄䈤谭붪줢眔㖚鵟隈嚌跒嚃ή嚇ﭞ㌒哖凜뫛凞䶒쥞쥕\udd5d췔跜嚊跞嚌汦䉤䥆秇ꆢ訂峖琍됢펫왥獛ⓟ綊猊\uda8cﶊﶎ힒犀ﶅ귓范귚먋荒歙䃟觘髙︄༆⋆ꠂ獍⒐淙귔ﶌ淚ﶊ淛㑮뿣ҧ跇蔚躕 츭綫萦췗낓鐥䐝林䝝쨉퀠湧⏪ᱡጡ⋅셢㈆檒᲌ᪧ蔓郞폏隬잍玀ᘋ⊈䠄摇ꂇ섍沙軓쯆誠ஓꊘƝ㈯ᐨ蒓Ꞛ퀕Βꈏ鬬砈琋⪠⚔ꙉ㮨巘푀巘\uded8䩓૛氨杏쉙䀀㹂䮂咎가㲝\uddd3玄巟玊巐\udc88嫒귊￪氀戥累갇儉\udb69ァ䶤쏎懓Ḥțෟ庖㍖\n趎趉趀ᤋ超烔豞㌗൒좠膤趆趁趃⠇緓超ᆍ欌퉭\udc1b脅붢⿋ꗬ玬ᨛ\udee8☂➄褗豩ඔේ撚맓惒꩘ピ\udd5c奒プ䲛䵑䲐쵝䲜ᖁ﷓緝﷝趀﷜滣ޥ⺬뼧꘣ᯪ\uda28ﴢ⬡⋂䁗뺂堁晃㨌쪚纄柏恒撫⡜죖晖ﭗ趄쏘纊쏒纄㣊갑氌빐䀉퍯퉙跅凊간ﳡ췫䄣鼦佬럣䡙뱛ᷕ쨇ኦ澙췔흝췘䧞䶚ݔᦙ奚ᦓ契ᦓ⅘쏐纂쏜纎쏞끣ꨬ䅧億짞䟌憚娔\uda22瀢텦\ud8e8씫㖞⊉⊊羋ꌋ⊅㥌봍瑪뗒䨩旚뚝旑뚗旖妀꺙馍⊇⊏쩠ꪬ᢫ħ쨡䆡訂휭뤫쟡瀜⠃ꉑ᷐瞝Ꮥ⊃Ꮠꊎ곔ﯯ좥爑类\udb1a郯凅圤秏且䒗ພ瀑䶢妣穘襕碡絆펪읔쳁骅骇抋骇㧮䘃폖骏폚㏖綘啝慞\u0006㈩⤑梫쭐⪥㫃뚪\udd24⪭ḏ簣倮⬧扖ꏛ㢤캕ⅨᏒ쥓寧䃟凜샔՚샙ꋚ㏗폗粀㏓骀拐嘙⤑琀眐꬀砄됫팬噜믂؇ᨕ琎䜘븐蒟睛穕⢑궅궃궇궆\ude02䤃ﴀ滓Მ㔠䎚巜䞘택黖ꢨⰯઠ뫠窨ഠ輪玦梯യ뾞ᬦ瑘\ude95췑寧嘭⼉ځ︅ⶊ쁈紌ບ௛ဎ௟궅ௗ斞㵚㠬쯍嶕俊〕撯ˮ砄計ꈏኯ䛣໕躒쯝궈ᦁௐ涍௕郕\ud986᠉，휏貌渄턂㆒디䨁ک貄ꯓ貊ꯑ퀎ꯑ딚凓᷐ꗒఓ彡咥壘ﺦ挈餪槀ڤ類⇁퍬ǩ﨧푅⌢䯗ᆖ䯕淑䯙ᄣە増۔녘ꯝ貂ꯗ貈毘䲂츧घ䈡ⳬ峖➥\udb1dҧ㳓鼨檜涓ﱚ⼃鶁縁瘇伈嶌嶉ᖚ럩⧕೑䫭⬧喥琇簪〜탥팭ୖk癡䷋䷚ꏖ毒ף솔言剓牔㷓凛ꏔﱔꈦﱞ끊၊뒂♖鯛첁鯟鶍鯗㾞㵓뚮Ĥ粭姬ࢠ쨞꬏㦡Ꜯᧆƥ鶎鯗鶅鯟렌嶌枟਌ᎊᴅ損餏ꥅᎂ瓐\udf93粜ꠧᷘʕꝚ鮗◟ꪕﾛ篞畑圠ﲞ除ﲓ뉂ﲓ⇃㸡৖】튠\udd22銠珙\ude2f\udf94㲔㾚㲚㾓먎彔\udc90ംᎄ篞ᎊ篒簄岔渭⸞隩冟ᶠ猓갉㽩陭狫ᣦƤᎇߖᎂ篙ᎂ簇䒕㦊❃붍﨏붊鄀鼄⛝懒헓跗௡裔㥔枢픤⎚ⱝＡݠ픩芕䕛惚북䟛嚅䟚溃䟔綄襚ἥ訋栗컟쪟䡟쒖淑虂붉䟗붉⟘綂ꛔ藛⧂逕⨅摢욧ࠓ舦틯䄪⭊몌Ⰽ闈㲌㲇嘆㲁㲏ᩎፊ쭍Ô탦⪤啚漟菏咔켯蛎ಬ辮갅抙瞟䁘芪뵔﷑ᷞ䘞त♒컐ꟓꡗए⡉\ude0cᚚ嬊ᚙ뢊礃㲂㲎谟妪䆮訉閪빪\uda2e힪琅ﰠ䥚펫恨嘌㲄埝㲆᝛ꄀ䮋熂职떏驁沌ᕜߓ슑殌伃褆㎃⬆蠀␈Ⰿ璖঍ퟙইퟓঁ沂힢ꄣ뺨ࠛ㣚笧뒧꜍鼨誡싡䗑ྚఒ癮晅쩪찂ꐁஐ꧌퇊馝\udfcd鲯ꀫ部ᢤ雀횬㖗㟑ঋퟝঀ㟑鴙ﳑ線㪘쪎䘅힪쪎쪉쪄◚ⓑ༎알쪁希节࿑슂酤Ი韘쥜韚奚⫑츊唁⫖尅⫞尝쪀࿕࿜࿘ᒉ쪅\ud96dꈜ橬㮐쌦描㸩胇Ⳬ择색羗꒖맓麧㫪诓聧䘬ᷤ䨌ᐩ⎨䁤Ⱒ槌 砌䣥洗癧⸞ॐڄڂچځڅڎ律쀔몈륆⿚ډ䠉⿕\ude8d跟靗頭\ud8df枖ȕꄦ氁䌕挫켧镋咨뾠춤榫ᣦ묇只旙ېיꋛⰁ泊璈燛榋甃ฃ릛⿘ډ㢎⿘꿙⿞拪唝斦靤쵩ᕭ⺣层ᆩ䳩᎒沊ጝᴥ㥬旘认犞ᲁ晏씏鴔欌蹧ᲁꯛʑፔ♡랁ᲀ鿝᲌鿟᲏篐쟚꿕軞븝뻋씠䠬ۦ䰒儅毬ﶜ揄呠蕄¨¯寔菛늘唪僜㟝ۑၗ념땒苇Ῑᲈ鿓᲍ᲄ摭ꈏ䖣☄ܝ᧚㍧锦죠垔ڦꛢꙗ妀\ud980﵁\ud965ᜍ뢦\ud988蛯뿘\ud98a뿒\ud981뿟鿐寓뮫န鲪読攉ȅ벘鯎䇙院韩켡賛䇅䌙ꏞ瑕쳕뇚\ud9db↑▮\udd5a閕\udd51閛\udd5d間뿒뿜\ud98e뿒쭘큋鲨䜬牪萢毬㠬旆佬颁黂봙閦फ़玓㡂䚆ㄣ㊄휀ꘅ䚃䚃簍鉛靕⧔釔䵞魓妐ꛨ淅⿮팛묩틯䟬함췦ඕ㈬ଞ듓䯯Ғ盇Ө銜甄᪉耾䚃耽䚋䚈㷐\udbdd淘㼡蚀꺌줆\ud80dԍ䀋鰁葁踈缕쀺䚅耱䚋耻䚋룬⤭㹑俀㟡몊ꈗਉ胋ﵪ쥪䁖⚉꺏낂䂊℆奋⚏⚌㏜怱⚆怽⚉怳蒄௞폓쳧ꘒ馯ﭞے齖旕濑뼞\ud9d1‵\ud9dd※\ud9d7″⅓怺怵⚁怱歅鄮亣﫠玢褊뙧እ갃忈貧삢가矛跓兝쟄⼩ᐓ컭팦픧ഡ淌తῃꨏ싩䅞㗜㖆위䄖⮏䶄씄춂춆춎㘙咯ꃡ濜䲜䲖菔쵓䶍倰춇债춆䍈㢤⇋귍蜫⾠䶡*㯚诇䯀ཀྵⵛ퀷䶏퀼춈〾䆄\udd94诞ꏘ햠ꂍɤ鸘Ქ뫥\ud8e0몂ඟ餙륦ຯ헃텕潛䐋㴈ᒀ莌桎ፏᩅ褏妃詙뀶મ쟥త鸚쀀惓拔㘢Ᲊ䷋ꡣ鳭i읫摩؅瀱ᷞ뀹瀼ᆀ莌莀꟔韘纑窐⒙䴄⒘桚⒒桛ꡓ࠸莈莂땩Ფ䰜䠬Ǉ뛘峓가耙Ĭ⸬\uddc9畦烧戴뺏℁ᴊ➈᥌윁渊Ð묓ዝ륟胫륔듔䍛젛ꞑ\udfc4⟜餕鑞଒凓⽞˕￝呓䂔㨁꜂洈홋攇겂⌓⅔젺뺊젱뺎젽뺌滮焗쁄玦䝞䟌穮됯͖寞綯ꗣ뙬铐⧔犃꠲젾뺉뺁젿剭微짮캓↉ኍኋ኏ኄ处銏ᜋ觚￟⠹濘꠵Ꮨ\udb9a䧒\udb92腙䧐鳓⤇銈ᠿ闔柛칪ϋ謐뒠㱗跅ꗘꇖ桨딭ኀ頷ኄ頲Ἃ᭡⯝温误솟짚០풦〈芗क싪㥋ጝ‬ꓩ⼤ử捣ᐑ⠳⧑ᘪꭒ푏ঌﴁ괏ꌐ▔滕阊؊㠾ᄎ㠼ঊ촄爞꧈琄曐쿜㌜䞘蹚Ě蠯咘¨䓃옉⼟⾫흊蠦컬鼦깛䡒퀿吏ᠿ哞九૟著ꂒ㠷렳桁㠸『⺩삖ᱫ㺉꬗Ṗ㮒渢둬桧黈\udddf䚃ꚋ颊솃㐃岈댏肓詝ῒ뇖۞㭞᳓‹\ud9d5″\ud9db‿\ud9da暅зꚋи暀萱ꆬ渢㇖澣\udc69营\ude60믃䑨\udee3舗撉ৣ⺬뮡䟇쟃ฃ断隷畘뼪苠銄蘢ꏟ\ud833돞鞣뱐⏈㰓ꦚ缋ꚃа暏м暄셕， 欄Ἄ傓௕䊕젣쏆ꨈ몟ￊ롢憭큎凝⸞텛⍩굯偣ϯ맒畘쟐ᷣﾑ噙ꐼ瘊ꐸઃ䓑ﻛ砶컟砿䪍솎剞剕剛ꐳꐰઌ傗且褛ꧣᶯ뎚힬쎭撛튤煗Ú䁐皆⏌皈皅ᝑ皅셚鐴皏Ђ皂떅鐺\ude51连鍛肐\ud843༁\ude02溜䂒眆䂞\ud806鐿鐱鐸吾皎贚頹䵠ᑭ붮ꬁ퇉蠠；Ħ宁蜋歪ꨌ뤮⯟姣鐥멓២纤ኪ⮕\udc69⨁瀋⨊徧菩隡䙛␶毗ﲦ颔㓓靟郤튄㢋ﰅ튍㶋튇＀귧╜ﲏ됱튄琳튅ᜊ琸⅔远ヘ뚞\ude52ꬅ캇എ쁀캋徭⼆ㅃ泡旙琸琹ᴌ琻琲㴃㵩梜ⵓᐤ켔쵦\ud8e0᫟ꏄ蘥䱧㐩ᰀ釐忛懛胞뻝瞚蠠஧ኩￍ만逓୑⎩揍Ｅ䰉엟✂綋ąᷡ綍\udb04ꕎ栊㣖狕⍔쓓妒貮䇡嶣鐯죝杧▘贪欇䷥༭ᰯ간\udfd6䘖骠쎩鑠盐꠶Rߚꟗ淞Ꟗ즑䰶綅㦏ﬃ䰽綈빭뮦訊稃럘秃7嵣ᶥਉ缔ᗎ믜갵䰶갵綇䰲䀘⌥抅冋抏抁Ï㛖ꏙ䜥爖菌逩줭ⳡ厘켮뤬┨憛堩┣싚㫪옡﷠菔ŗ힚鿠\ud903讋믂㞝㿡꺑抄琎䪏氿퇚ꛞ辪됨뤎什렘訣ꢭ樚텘擫ぬ毓⠿澣氹抎鰳抉鰿芁Âʙᶃꡏ䀂䙂ࠏ彄脎걙뀾त䄯菋訐ᣋ㯆䈪텭鲠揁\udddbᨖ䕒Ⴍ莐흚萹滝媖网\uded9罝\udedb冇꜇\udede䦆\udc35䦉\udc3b䦋䂜ᤛ꧂᪬䷍됁姩ᡬ穬覐\udb63큄沃脁䢔䊒\udc31䦎\udc3d䦅\udc37䦄ᡟ௔듚睙泔몇稩ᰆ₍ឩ䊈崌庍Úኞ퇊桢ﴍ퍐垒쫧䄢昩庥\ud891ప쁖牝黝᳛\udd91ⰶᠵⰰ卙鍒₍鍞㜋鍛䰄몏㝧ﰱ몀Ƚ몃稭녋汨빘섗涗锠팩뤣䟤螔ڜ몊몌䈹몈ȱ슇൚ፗ랗㮮ॐ욋ᄏ陂욆욎丂炈㙀뗔\ud9a5凝ꏞ䯑萿䚅萹‽\ud9d3‷\ud9df‸욈∺욁ꌂ∹욆䌩굧ꅥ䚁셤됡휭碅瀩悍唢尬퟇척쀲ꈼ욆ꈾ욊∳蒎㱮洜㜉俄曤Ӥ餣⨂\udd21\udd18ﴈ큌ंﴂ㳛麗ￓ麨㠽᫗௛鸪ᐝꯟ\udd15ᦁꆊᇒ䶃ꆋ麏ꆍ丁ꐹ룛䰬㖙ስꆃሷꆏ옏ሽ測ゞ㐲谸쿑橗枘菞ቖ⏥ﺡ耕ຬ㙕ᆡ켡厕跃젭ꞯ㐴ሜⓓᖞ\udbd4″ꏒ‴闚纓졒纗㢅ሽꆋ⚋ሱ鈷ᣔ냝戧訛㸬訂᳓蠠躙됂쐶귓瀻꜂鴏\u0004\udd82\udd8b즎\udd8a鿒꿚谵렬ᐯ썠ꏨ渠ﶢ赛㙖ඔ揄晏竐飚㛮࠸앖ﰼ쟏⪢\udeae淒૖萰밳∿✎♐）♘즓♒즟♐\udd8a눽솎눶\udd85䚅鄠᧋퉩\ud89f켫ꈧ\udc60䨀倢⩠섮믜눸\udd88ਰ\uda01눱\udd85⢖溌炊챇쫎ꖎ弌蜝겙証ꖃ訶ꖁꖉ쀐⏄뚧䰎령Ổ坡\udeeb诩뼣㱭䗏惊閤赜䟍귋脇喟ꭞ꿢舷籘꟒蠲癚퐆팊眅薚鰌琄ἇ薖ດ䨽診ꖈ庆䨼椦漖츥ᐠᬠ菁烣갇뛑Ⲕ㍡氆ꆉ࠶禠杏뎈玊㑀削玎率䟓됱涩䢘樺츌樲率ᴆ樲駑咡疣퀠᳛锗匤橯ᩭ㉕퀥〉ᾚ㫓ﾗ쨿惜还⨾\ude56㷚롁㷐䒅㷗켊ヌ뎍ຄ樼玊樰﬈柔ꇞ裪醢ต疤ฒ꒝ጎ矘蒤躦൦३ᰅ䱬큩쵧୞讎Ⲇ⊂嚋蘋讁ꔃ࣎ 㧡娹讍娳讈⋇娰䮎ᷛ爿첔刷菉需滑മ퟉震䏓峯ᣠꤖ菂ﾖꏘ洒ￚ䯕∾萾旖讏凛縇넍ⴎ덃㾀꺆鸉㲑讅娽讋娿讉斟ᚢ醨䪔穡⊝⺬䏇㾦瀴㯇Ǐ㸗㮥ꎢ୕ꈁ診斈룁斌箁龇꼃讁鿕Ⅰ뫕ꏘ罚먼ᖎ薚⨽薑⨰슋⨺慨斏缁悔斍勤岜⍞ᥢᕫ⾦驡鬨껕⿈曔斎卑斅層斆聣驦豝搱橞Ჟ枑䗎.Ǉ湠擫뼯逩ಯ厖⯅䔢貟消G䀁甙᧏얗꨼鶠찿ϑ逽ꨧ槠眙뼥ꆤʯ䆠쯂廆뱑뙫࠙紣爳쏔蠲ᨲ\udd5e\ude51랂ꉄ昋球ᡁ⤏䳎\ud903ຝ옰ﾋ옾♎㵕裘닔ᛯ쿑礑꧃閡嶯턗ￏꇗ辑昴弇옳昸뺗憎ᑁ腂嘌∴쮞睜槪⇨␊븫汨␆ꂓ୪슨ꨴ펟渚堚Ꝓ曞ꏘ蝧쫮\udfd1뼕툂紉Ꚁ혋ꮁ葏뙅㇦⦄ᘰᘸ̎ᘼꅖ퐹Ꙙ‭曟਋릪㸘ଢꄮ헅뱁蕖뇓ᣦ겟랔䊛嘲ᘴ혶逆縅⢞紐햅弁쒅ꊊ햇ᐋ쇑\udbda툸배䖟婤ᣛﴯ野ᣐ䖗㘹ꔀ똼햌똰彔嶓\uda62פ憨ᤠ诉棙䩍䞘䏀쮙꘳ᗚ옥ꈍ빕ၮ뮦⏘吕싣ҧ삥롯唡跄㢓阺헜诞쿥气塔瘸했똲햋渂똷୐䶎\udd0c䶎♮䶉䶌㨭㠸壒劆踱ँ踳अ踼헔巡繙䘸겜줮嵯捥郞꧄൅术죟鶭䄭ꆯ玬\udae6ᧉ㛓鳬༬菒鍒薐鶞朕䵑퀵菟䵕䲔쵘䶎踶䶄举쮉ꘐ୕\udb19龧ᘍ癥酓ᯍ퓚⎫ᰚ폕⢒ꨇ쑒얁蘊\ud98d겆蔉덫\udc32␹㣓\uda3e\u000b韇ᤡᒨ姣㱮䑧셨띑렆挈嶦椠릣嚯Ո箠팟쫖ⰷ㰰먴ض퀼ᖎ뗞㡔ຟꢛ뗓눀얍긼얊얏긱얏↨짘\uda2cত⩨\u0011秊⡞㤌昞忯針唥躕긴얋긶얀渹얎㛑誅誂떋誏誋䆁ྚ㥔帽誊帰⣎帴䪌컞ⰷ慄舳⫕窑迗待迟窓这㨌莓帷誇常䪍쾜ᤝ莗畣ಬ言㄂뤪耜厭韁攥꫞嬪ᨥ֝\uda3a蒙唠⁁秋왫Ϩ㭨娓뮧厑\uddd5ꈏኪ粦䕛䉒ʑ苎㦎琀ᤍ㦇ﺌ肋㪘嘸妀續\uda0b蜅甦蔉ऊ뭘妊㦍縹㦇縻㦎杖嶔琏裒ប诃쏏͚ċ儍\udb27\udb67쩘䧥굧烜﷟臛鈹렾ꏞ裚渶븸⠌蠞⼠銥ꠚħꄪ\ud987좘ᐝḠẤᗎ映뿕縱㦋縲㎈ĸ뺞馀㜅馃馆쀇馊扁悔세ⵍ馀뛆섲犚扌谰寝죟ޥ굤봝倧䆕ᡪ봋욠⍭ᐡⲝ絛衞䥟免ᠱۚ퀵ￒ閙\udd5e間\udd55閚섲섻섾섴ᵐୟﻌ㙔\udae7ﻍĨ䬓颩모䈠䖩Ầ臂䏅폛ꊂ껞\ud805⯓ꅥ죐嗤꩗忏訄㈢臋韇굦㣘刷彬⺔젊䒋箙璮엝쏕㙘′勞똶ꒋ㔇᰸㞘鰰錌鰱旟ᄾ鄵⛥袔鯄ኢ鿀鸤븤੗菎㤁┬㱤䛗ේ쾒狋蘇閃圈喌䤀Д︱䥋侟螨쾖핀릁ᣝ閍털ᾠ喇볏턽⌓᥯쁈蟒ዔྠ绨覚憣뀧訂駛꧈샥붕쩫앢㇖⯁ꈐ駕巪핥䄳盕尽֕閅턻閃ㄷ턼喌緖鑨砃焬枛⮂욊蒊趍酌ꮆ롉ᘽ᫮쮄쩇⮋ꮀऽ欀䀸蚨ㄱUV⪛Y⪘냖讍⮇ꮆ玏ꔎ䈴⋬샡拜Ǌ欉萢징낝䍗ǁ䜬᝚爐ﯛ虛阿䆬ﮜ쩝쓞\uda23Ụꨊ宝诨擧삝氅瘝䘢懲≎廙괅婢ﺅ僡廒脳뀿燊⩗漝ꚠᗃ琋䯇⳯꾡⋄褟ퟃ൯몙៚夡䐝찠ₜἇ줶\uda00⤹栄⤻徭鄹淗ꄾ䘃濟뇟濜燔博摒줹愈椳愈烬혹凇蛌앥崋뤤賅뎅韆䪔섩⟘ꦘ残缂殀錏内䃉殊ᶇ鱔殊ᤶ殁᤽殄㒕ῠ\ud91f堶脺ଛ\udb24ﺨჭ됌飢춯꾝铣ꥬІ얈붇委ꄽ툽鄽∼ؼ蔢ډꐇ\f梍ᄃᚈ뷬蔢᤼꜆᤾殉ᤸ냐簾⨎訆પ姫힮穘䬘핮棒쟉ྦ耿䚈ꚉ㤍䌊Ꚋꆁꚅꚏ왕ꐷ崧イ萺痥굞㯆툠ጬ斫眝큊慢¥렃鏗ϑྜ䉜舵꘸떚\ude9b萰ꈸဿ萱蚋㤼Ꚁ뤾ꚉꚀ짞㵘Ậ輖㮜가潟埙䐷秃雚ڕꌎ쮇㤲ꚋ予뤽祿ꥐ嚁椈䠌떊떍ꮔ㫭瑮ፕⅫ\udc3c৑헐刡䛍ṞठᲗ䚤짔㨼飡폈牔矤䥐䋩㖌蔴떉빆떁蔶쌓ؾￚ\ude36Ḳ髕勖髕讙髖Ḹ씸떊蔲﨎蔸䎤嶖檙쾉덓ꅕ洜儠ۆ׮覒가뿟댄ᦃ㈌怃暎ᦉ額Ø삝⇆ﴪ⴯텤㖣뛪唕ꄑ蠩㳞곊\ud8ea絓\ud851ㄶ\udd55ꄶ閝\udd59閜ⷞꔸᦉ覅ꔺᦋꔱ懪愸⴨൪䱥纤퇁ꙁĬ梨퀯쨫ᦉꔲᦃꔿ餇ꔾ緔㓗눬㙗䍬蹛읃掍鸉鼀멄स༭ￃ鎠\udaad䆣됌炕ுꈘ仕䪏\uda2a頋覕⠶⎘掋掍锸庋锿쾄멋礵᰿礱䎕歔貇歒䜊トു⒒픵锿掎피픵癘집귅妨䷈㈀略㺝ናＢ躢Ћ䊢챣曡￉ﰻ먛椁\ude0f逅ฏඏ鴅儉덨ㄽ⽐\ud987섇⽗꽗䭘申ං田趎甲Į頚粨ᬥᕧ귂蕮쒦༧\udc16ᆣ䘞곈괕尯㠒낔ᘝ⴨벬꩝鿦ꏖ傣솜\udaa4谵堳踷㖈男ං趎娲팉퍏吾洆历ಁ꬇귕颠䰞䫬ﴤ쿣⺧焖ᰬ䅩\ud8e4㗋娚२㉠ᰌ꺪닓䤶㓕脼鷭ऱ涫ऱ訆ភ屜䚓ទ㾘䴼厂䴾䴴䊌锭⌭ㆬ計␏ऑ巌괘띑젊ཟ〱ᨈ厄䴵퀍ⴾ厎䴲얙媀\udc8a㗣媃─\uda8dᗑ恕媆洸更洿媇ꦎ岇鹕Κ慖餽霚餓렲\u0006寔琄梢庢஥ꗬﵢᬧ桕㘥拯䟧牧瓒吺ᨼ⬟ꪋ縷샐՜샜՜ꁛ洵ஏ洷媅洲ꙃ㱫ீ橩ᠥ优戲迧ﲬ埂㘡\uda22鐳紇ꔅ搉ᚋ嶏䟘ㄼ\udf0a㑁吰䂝吸๋吳⅕皍崻皇崿瀈栊騸拝ꘗ칠Მ筩蠤Ⲩ쿃Ī␫㆙戫핦逶炕덕䫬ᮯ䗄䥆厩樯偠⟀ﳦ൯ꡋ莐₝\udd33皋崿皀㴻鏕\uda30齘霧眙璏뒌ꐌ뙌璇趆璈㲊똲툽夿ビꑗ瑔챐摝癟紸璄ﴺ璎䢈㲆\udc65厝춧揘랓面蕮蘧捫쎜ᧂ봞ⱛ⯈톐ﴻ璂ﴱ璃펒篖黏俖ቝ脷㈵앦봑䃥䑓䰏㘬謢䩄ᬯฝ茼쁨ꡐ좋䎅䠀쎏茌쎊䟘曦䄫徫ᴳ꘿\udc97ꡑ蠲⒜桞⒖즒쌴▆쌸쎉쌹ꊤ냓좤縟뎕ḗ俉芐믌䷉﯒槆吗诬蘙ಮ퀨ګ᪔沆挅未訏묩ᰥ笪卦䉠脿荝鑓礱濥蔹⟭⦑⌷䎎쌴쎇혅쌻ﰠʄʂ窍쬌ᖊʌᠿ㨹씲\ud9dd씺銋떔鳙ᅟꮘ殑꺞牉ʃʆ锈㢣䮔賈唪笤ਗ਼᫡⨇䰆煚餰寐뾥㸹吐ᜒ✥䮅㋙ᷯ쁎⎠攵媭쨵軗吞縺凟姧찠쳟ﲃጻ윅ʋʉ甌枕஄羇஀讏䎌讂Ԗ蕟⥓籗挽譩築஀㌻ஊᔬ㌴讂讈唱ቑᘞﵯࠉ㈝륣諸꿃킡鞣엡直볓㨽訇㨱씼꟞^였浇䶏━怌♃攋ꑀ筦讏팴䊈㌸댸變㌹ਉ冘䄸秉郂팧跆ꚥΉ쇌梫꩟ᖍ倊䶈﬈匃奊ﴄᨀ鈴ᨴビ픿츹ഓ依辇侚ㄸ褎ㄲ쾒ᖀ開଼門謾閅鄣㸧Ꞣ঩䄯녠ᾕį䛟琅⭆ﴫꩂ丸䌿ꉑቕ陨쐘趦ኢ箢⸛佣娛崬蠘ꨈ⏍㨶毞菍훝놛ุ䬴閏଺閈謱璂傪㛗傜隊隉砉\udc05隃㞂ቝ눷鈸겛⑛촴啓㴕뵛쨬ᠪ螡풪Ⅼ胟팟䟍ꪛ訖폝\udd9f࿖ᰫ幚ⓜꬺ퐊ꬱ隁ꬳ隍픺鍝᰻ꖗ췖쥙蠍⅚隆ꬹ隍隂ﺚ몌錛㾢䈠석俁٘篧菤䏎䏀訂얛⤎鐉즆椏贃庋ኃ쇜뇐\udd32過\ude9f킕\ude94゘ῧ\ude9e広鬵序鬷庌锫쟊㛥刬䟋䎬誣䡦헁ܘ᫝蕧읖峠麓茱贸銕鬱庋鬽庀疀嬿庍鐫줩빘붌᪡䏅⨄蟅麝䞒瀕毙贯頬뤠జ姕뱠㬴❜舷傘溌溊溎溄崅溎譔∴ጹⰽ猵➞⛖呖➙呓⛝员뀄笶溊紊笶뼌椫堨⁁롐쬴⃓椣騃諟唱먙噘翓䨹唥쩨鯃㠬ﺥ䑐䖭ຬᧁ헌⎠ࡄ沅䉧\ud834贱됴鄘읟Ґ쎢鵘▘笼窌笾יּ溆뼇䒒㼋詉จЈ鶎鶈◐ጱ猵笾舳笶ຜﱛ\udbd8ꐏ\udbd9ﱔ㯖즖䜴鶉䜽䜶挍縅֥陥תᠫ䌩䔫㐹䳤洔獗錰䗒왖ᡚຢ滫なႯ孡砍媤⟣豠尡벘ῧ傇꧃郦丸忙巜忑쿪䉘鶁䜲鶇倃䜹\udb06㫯좧⃒솅Ɖ뀊섇Ə騎⼉礄渾☱ྔꗒ쿛㥠䨇ꧯ훇偐뾫ꈉＮ\udc61覚䁤툿⡗焳츶杗Ӓ㷗睜關졗툼슐ƌ膆\udb38牐䘦ㅋꈾ刔醤䏀⬡ꘇ簵ᱞ霴醂膂죚宐젰\ude8e砌ꄏ\ude86뿈ᶌ㺌셍沞郝⿪頌╓\ude82휸猆휴㺂㺁│嬻킑\ude90ゝ\ude9c゘缐㜷\ude84㜸㺁휱삈㘡ꈦổ꧊힣뗭킪㐜“\udee3␦䛚丸꭛阵揈䙟⾫龦韀⸫ꓤ曏뢞呬楤ᯡኤ᯦\udcd4鲈䆆鲁鲁䜊Õؗ퀚 켐弢\uda60嬠ⰲ⇤䉊븡昙礵ᢨ㩢䉛⯊鲁똅鲃⋋挷鯞ᰳ픹ഐ䶝㎔䄌떊횇렀뎔梄뎒㜆鲎鲄輺猣⌯삣ꦬ㮔诈㮓紪堢赜뱥瘛蹟鲢슚膌膅膏椄夌渊鑯ꓑጞ傐⮟ꬳ㏞렍蘤洙댹䡓摧馬慪ᔀ横\udd2dɖⷩ廞ꆍ켾膎赈劏켻膂椲猲韛纑툲闒霾闖䊆膋켻꼳膌渂츢쟌䯆名䛬ǋ땬儦逬曢긫䍬†烕尲ʒ\udb05☋㙄ꐈ掍뢬謳䍣ᣧ딺뀞骟岈ἷἸᆀ漿㰴漺奜嘻ꩂ梌΁\ud909摏礏璛ἽἿἻ昺鿆൬簹刡靡ᰮ혺苬ﮔ㗊鸘眻纮丶헛搱ꤱ舧崦⳪헂꺪䌥꾐폀嗧鶫壙摤頣줰瀉窀䠍窅䜴躏窈惘槜ꄸጶￜጴ윳⅔묈㾌ᬃ砏\uda8a挅逃突옅㼳窋㼰憎鐅㨚㈾દ猦汯蜯끣鐢렘쯊໊诧ꞛ꥝㼑㼸缽㼻窇㼶缱ờ묲圫浝찧␬빕牢璬᫧漝ᯇമ앭֣\udb28䛯連ۥꎧ嵪枚뎊쀆䍇㞦謂몃뎎篖耉튨췡垚肾뎁肵뎍肴萹夺椺鼲癜鸉⸏䕃\u0007犫眃遊褆ᝍ뭘袘䂾肹뎅肱㘇≜⇆켚㐒뿩䇤玬慡ᥭ䄮졦ᒤ★ꊐꚤ봒嶯⼛㘠ᴬ섯䚬㙟䉪䰒ﳅ༷ࡓ릀䤏릌ဈ禀퐂禅幐ໆ㋕굘삙봙䎇㠫豮뫯僤┭䏆䰘盧匾닗醩Œ转㽒涜鴃ꂱꂴ悱脎씱䂸漲뼼漶⦎긎\uda5a鶙̅\uda59鶛\uda54鶛릋ꂿꂼ禁脂ɗ䘧됎隣튣䁩稿퐱㱡ￊ⯇븚䁗ຄຉ첏蠇쀎຋剌㏘傸ຍ렂傶ກຉ\uda3aᡨ秕뮜䎔\ude30⨰⌻ꖒ䶚䶒阇䶐䈵傼傲ຊ傾傸㴿珞裢ᰫ퀚⪨ᬣ\udc5e焘䍫\u001d믪ⶔ㳒攤Ϛࢩᧃ씯抧浙틩識㖥ꗬ轥䜖姑岁긋鑆傻岏岈\udc8c\udc8aﻠ죝뙑ꀩ岉炳岆聃炴\udc82\udc83仫펙㬺ꄹ윺ႲⲎ괌頃㎟輿㎚㮁\udb90儁炽岍炰\udc81뭐୞綤鲮訁뫬韍ꧫ訖㮟ꓧ\uda91鬾厗針原쮧텯厜ᘖᒬ페춪Ჩ浐\udbdb阽❘粐婪⶞唱饟䪈\ude8c\ude8a\ude81⬁爋뀍⿝ꬾ脸믄ﺯ藏꣭璉ᐔ⸘纥ﺩ꾕ᧈﴁோᯧ携뇒찃◚耾輶킼蠱킺\ude9a嬷킙\ude98ん\ude9a桕ᔆ좲\ude89퀉좱\ude83좽뎧헆헌戳搖䤄ೕ앪❒蜵Ğ煭㼐梱좾\ude8d좼꿕趚㗮ጧ᪀䶈骄Ԃ舝㏛Ξ娝\udba2᪪䌑쓘분鑔呠ᵮ雬⴩斮㤐쌽繙璩戠⋚ⓕ᪈ꂋ㾏\udcd2쀼푡輷츻䱚剔珗菱샘Ւ샒Ր䃝颰骅颴䒂漚孠₭碍꿖✘䷌쐛Ꙑ줬੥沘ಁ딲ಈ\udd00ಃ肿檓籑⤶猲য়أ繢폇걜愢ᰭ媪ৣ쒠頤覤⬢ﴅᜱ쳑씼뼽笴ࢵﴰ챙ベ癗\ud8bcಊ಄㢱锌刑봕振ਉ싨ᬪ꧇赗1欽幕莐銟⑔碼撂碱ಁ锊䁑ᬅ䒃ẃ慨槟╝\ude0e鴄죙鄸༢䩅懔\udd37笺➑呑➔דּ⅒һҸẂᠣ缲藐閪覭樗ꈡ梦堌ﴨ垆４䀿◛阽⪠湬鿉좝铭†蠥뚡橪৮⨃進貑긄⌇粋醅ἱ쑐寖㠢ᠩ꬚鿏뢛⏞\udb13蜺펡냥죫洑ฺ\udf3c䞞ꥦ挦쪔怠韚ꢽ꘶菟જ⨱薞渎ػ薕ذ䖝쒰쒼Ⓒꖎ蜭형ﮒ飛凅᧋儉贬ᮦ꺭ꄕ躞撻쒴Ⓒ뛊긄犔괉⒍ᗚ蛢苈ᒾꖌᒱ㎟쌷꒴鬝㕓ᒕ\udfda誔钕ᒺ瀎ᒺ梌넭췠쨐뇬⮘种ު仏਋ꩄ৤ǋꪗ⪪煤콝ᑘ㮗〺쿏衕䪈嶡䗍뺓뷒ݫ欚Ɉ䘬꒸朸ꗘ颺㒙깐禆啌꘍禀᠇䘊\u001e훒꒾ꏜ쿟枔⠆얌飠Ӫ죫䰊㍨큁䌟轭ᮤ\udc10ᗇ셨鈸嚖ᬔ馧\u001d墹㕚乞Ⴒ鶔᱅Ⴑ鶓\uda5d鶑嬁긂㒵禆兎㒹帉꾥楀䙬藤賈ᑖǀ೒໏됎洜앩滔㒿璹禆㒻禇螫鵘릊릂討릋妁逊ꓕ嵝಼릊릏ಹ릌熇粑痯穧ᐬ㇒߬㊢ة驥ၥꨀ魞焛뫬炾ꏚず␳▪砵ἱ䔐钻鶗\ude81晊︱帋຋紎ᬌ꘍閒費ಶ릎쁀貾夆⥓⤵튧湜訁❐쿁එ㜂䁧玝瀴᱑챉粍粋粏粌炉똎鱢ꇎ琸겾粂겳粇粀ﲉ겼璿硚♞ﱣ떝ꮞጷꮝᅓ讖粌겷홊겴沱겹쯚䩂ฒ\udc1eꭨ뻌쿍끢妭⳧邼쬳聪␡꒘ࡨ᳟曜᳝蹦\udfcdς✢꘷ᕪ棡됼\udcd3挷벗⛬\ud915ᔌ첋邀鞅ࠋ﵍ﰀ䮍椘蜺ⓑ鲾뚍鲵뚇鲼锲毑號晕䍗仆쒵駆噃\uda95ၢ점ศ꽥邡깞뢺ᠶꄲጲⷞ꣘斛뼒斐缓⅚岵鲹뚋鲳뚊퐶騽꽛뤢풫儈姩锧쇋쀠욠솨敡Ǆ怶瓁暎ㄊ婢䱈㫊즢䄪叟芙홟枔+猣㐃䌮ࢦ哫뀸뾦〟폨딙빯ꜷ䷘▖暈粵暂粷暉紺뼿䜵뢸ࢺ奘錄∰့萿‰粼ꪄ粽暋暆妌皕ላ퟉锩䜨春쀪膖淏痠フ薂涂\udd9e涆涄᠃窡佘䊶涇䘂䊺춆䊺뢆ﺯ廪黃푘ᗉ耔\ud82d갱ቨ陪ɀᣏ䟮ᱫ鼬娵ᴽ灔븲ᆦ侔Ⴒ鼲Ⴑ窓猍݌》톂ಃ墊\udf86稍ߜ涇뙅䊱涊䊳涆訚矢삑쓚\udba5䑑韏˫ꡩ䆭戮鯔ꪊ兊昋⠎噝窆抿梋押鼹猱⊾鍒墴鴺珑墼ꁞ抴抳\udc09\udc50\udaabᠫ쓑䷮ꗧᕬ旁誠⬈㭔㭐봴쿒﯑\ud8e1聦찋\u001c㍡琀盩뼮馛佥㝫\ud9e0蒠ꭞ绖輻៙䬕\udc12좴ꪏ蠏逍켋ሩǊ戄⛖亪毛䢵賟林簨觥뒮굪⟂醠箨隗舚鯍늫眘銴器ⰳ㥝檃劷檏劸\udc48犄\udd3d珞墺鴹ꋝ劻檇劰튿漿쇄刪혖逩뼨䬞 먔ᐝ䨃ꚧ傝뢋욏욁༈⚅褂⚀唷휳㡃욂鸋犼嘃햀䶫岴￝䏨¾䏎욬ꚤሕ꫒᫙陭힉Ⱆ䉪줲揆첵輳另‱\ud9d5ʻ萴ꈼ်욏ง犹⚈푘벽벥䛏餓ω⿄賍땨逸䚍곒൩⪢以琇ଡ଼礉ﶊ䔃ﶍ壎䴎\ud90f㌰륚贤⺘ㄻ淖\udb08갻쪽ﶆ見쪿ﶇ誴㴽嘕୕j♎鯎㐞锫뤫ħ蔛嗊轚꾪⇬楫灒슬ᆡ躩쵭撜㥑霧찼砅ꗣ覩䲿툯胞䰺⪲쪷ﶎ쪰킹鄶왒㶌퀌㌈㶊鲃㶏䰰䇚䒵\udc5cꂑꗭ鋭缛鄠眒橥笎ꂼ駇崪෕ᾖ茌㶆㶍贋ᡫ쳢ᩑ贲ʷ⠺ꄷ砼㲻䦙증♜즗♕윴㶊㮎ǚᣩ驥疠붡ా㢮슧介娙ᷢᔅ쀀슈⌂⥢슆슍㤆ﴵ夸먿沱ᅓ沺鳗沱\udab5\udab4슋\udab2帔Ĵ냗㯛ｨ篦얏꘥䐝⪩␫⩒䠥灑࠾煒\udf3b풰긯懓䫟䠗湤ﵭ뱮䞚㿒້ꢪ⯏맕劘侬散ꐼ⺙㪸슃\udab4ḇ\udab2혉縳ᦌ䀇ᦀ馆䍌馊馄嬲⇣៯ಭ᫣Ⅶ⏝仃⺠訇傎✯셯⭖\udab1᪼ꭔ봸◯ા謸箙ꄱ\udd5cￗꄿᒋ愃缾莇華馈₈䟤종뻚ㄕ䇩革獙؛㯃\uda94䗊곪팽ᦈ䚻視馀ڿ度῞⸔畅떎熉熍熏笇熅앞쇂⸭倧‗ꡭ槣㿃뛥揇븕偒栻\udb3b넽䛒ഐ墶沲⅕瓘૙䩘ṑ骖熌⒈⚵줃熇熊闦⴯갂蕪⯋䌧쩥ꮬ느抜པ넴蚼뉚㝭挦꩟운暵熂暼⚺Ḅﰵᔆ꺁꺅꺍뼀⭇꺃肺\uddc0몛᜻Ӝ\uded0露쥜ꕒ蓞⅔ᚷ縂ᚳ꺉袞㵙吖釕巏ꗤ츩\udeed刯蘡礴㳖櫊䒼꼱俋㘥圥꧟諐ꪮ玢ᆤ죪줾ꖘꄶ튝㼚隹꺂ᚻ꺃셃颽ᘸ닎Ꝋ凟滅弘和咇弑咈\udf1a곪ᨍ鼒䀏蓧鼑⻍숎雄引雏⻈\ud80e弔騎Ⰸᮌᮊﴂ鞆ᮁᮅᮃᮌ\udf13἖\udf15뗀鼙㛍㛂鼗㛎鼐ꖍ넇Ꝋ\u0000㨉栂ᒄ樄躏㢏瀂겸먌歆歉歊沱㕞治\ud812Ўጏ儂麈阌嵘‎蔄뷥ꭂ歎歅ᑏᑆ틣믦೙䉭朗엒엕戢ꔓ鄾鿚특ื䇏岰뫮䬝ￃ⺬諪䲺娔変켬ꗨ檚揋䉮随隣ࣄ奁쵌㕖奂঒苇⒆࿑ᗍ캶騋캺奎奈⺵ꍞ蚴墾ﱣࣃﲤ䠃އ뾈줈⺲奁⺹奆䇮뷔譬言퟈ત䙧꧎殯싣忠䌷ＹΖ䥜봹패㡨㿕ޞ탪쥭ꕥ퇂폌뜖뢨쉨盞笟飑⯐췎㮏如\udb09뭅쒊︍젌Ⓒㄿノ㚍⠍ଃᴃ큆쀉阇ꢲ뭌Ế뭆ẽ뭍저쨭삧φꧏ˦綫儋簭\udc5fᣬ䜢娵헂킹壣淄Ặ뭊ẳẳ뭃넱ሗ黄✨秜䏎䬝䫩㥧䯆묍捯藏咘액එꙂ퍇颱챠捂ᕌἃ琍묁攇ꆅ☂\ud88c㝩뀹斦쟒秌좛༅Ή糤䉁闆弡⇊桯쁀鴐ꀊᕍ㺱ᕇ㺽ᕊ밓⺺璲걩괇熀ἃᑅ怌번ט餉㺶ᕃ㺹ᕏ㺷̍䄕垌红ꈓ⚯क贖ࣕ舤␫➬ᐦ亷慨祖乍ํ힀ᬇ섍匍\ud982㘅눸暈๎洀膷์膸蹄䲁췟舴㲺뼳눎䔉裁㌈먎㖀걈踌绁膳่膿โ膻뤅אּ㎅⌢ఠ愐뻇揟㱪ﴩ굨媨ᢽ䤹亽䘵婣㊦璘簡ᨖ﬐飩ꦩ理郬欹鉔埍ຣ筓앍捌䔅 梍섈鄀岿촼❛䲷黍⺕纶າ晢劍쉋熎惬ᐏↃ趉산捍ꆻ捇ꆰ晈憲ɓ鲬\uda2c졥㻚넴庡埒簼ﶘ꩕玬팛႓\ud96e蔟鼦ᥠ\udd23긤\udb10\udb0c⍫⨄ଜ蚵렯唭᪻䐇 ꆿ捀憼㇆穀殔唈⩍穀貇ꒇ穁ꇗ쑝㢐ꐡ꣈廋韂䄰ᐁ红藞滦뱡\udf3a醾닙⣞憱ꚺີꚴ䜅䜽焅蘂ꉂ쪞与暆㞜퐌ʁ穂决ﰋ穊弿誾索༿陠粠\udaa2隗锡說ⲡ䗌쇯捨븶笓㿁㊿䕐箍ㆼ况穇ㆾ冿染앋\uda09鮍『紁嬅榏낏狑뤰셬ሷ≯䠐횤뺷ད⼴ᢼ⿀Თ퀐쎦봙菍餷胡ꈠⰯᜮḩ굤纳熵╏熻╄ꕂຼ꣒뫛氪䊎떍吋⸏贍球케绁╋熽╀╌\udfc5ꉞɞ痣쨪둌뼢恟ⷍḂﳊ㇆ᦌ㸃氌죡华ꚋ⒴뺵Ⳣ㽭ຢ耓ꨎꂔꨌ᧏ꇎ䳭ᆨ삧ꨎ뢼覿᜺覲䨥醿ᩈ蠌鴋ⱎ贈崄ᨊ趭ᇊ즲十즾千긍즽ᬸ놿재ﲚᠠ㱨o鸮뗭⿊쟁斩ᕭ㡊ꦾ즶卉꜌榵午仧肸ឋ㙂෉뙈څ쒋뙎嘄狑岧➬訤뺼쇜봿㘠⍡纭⸙액⨂봜俋뚤໎绢謲菙輱蚱㷥箂ꎝ鬋︭ꈂ꜁랇䆿錉ऄᦳ뙎혊ᦸ牠瀗ꄔ쫔⡜쿍簷儈尡翘け೘딮뙀ᦽ妽뙂ᦿ뙉尻颹칇㒂칃戄쀎칂풇욉⿪綬왓ᴻ톲観췛氪䆷蠊㚩䆱澇嘏彋菖㦼칎ⱉ㦽㦹칌ᶩ邤峧䎥酞韅뵘䷋쮦䁤㗋Ⲋ팷릱㦶칎炃㦷⼁ຣट卙郏蔕秂㗄嫑᧒᜻됎᪳溸ꬩ蜳ᄼ鷧덍㍉霆ⲏ㍋攍㚁㼗ⷄﻗ무粐㨍ְᤋַ㍊鲀薴㖍ế螉옌﨏眈筃㞀삇䕇ᨼ덅㍉薻㍏ָ덌넡轪మ뗠餬욣䌬獕춚橨笯ⵔ⊵䬢긮瓓岺맞脽䞗廭㣑켧䷊覑解ⱁ⍧બ앢諄੦䰳딎ᜀ쐈ᵄℋ\ud8cdÑ텧ᢷꅫ䏍鲬臇뜘큍댳唧⏩䗄䘜诮띦ꆷꮤ枨ꦻᚼꦿ嘥㞎㖃ꠅ쒁㌇車鸄ꊲꖷꖰ﵉ꖺꠅ鄬⿃驪㢢撮䟁杭駁锉蜠揁)Ⱋ쏜㏃ꖰᵏᵋ㖊\udea3ꥁဌ᳀楁㄃༆\udccd뛁힐䆼\ude3a吾\ude52䤁섉뜏ԇ䯐營梎缶栂洉閿ꥄ閼楍ﰉ鎭뼯献뗪⁈ᬠ욢玐笢嶮ಡ⍩贿姠䂺狘▽衚蚷龞㑭\ud835ᷤ튟版唓坠兞ካ࠙풮膿喷ꥍ閴楇閶婙즍䌆\udc49幉襁㌶㫩龣\ud9ba疱疿뗛죙쇃ซ䨉캆㾫펝呠ฝ煓ܱኦ줊쟭톱贸ㄿ馴褊騌\ude0fḪ妻誇揨疶疹疺모켫跀粧௏贖퇋ᅭႥḡ\udd14儝岻ឃ\ud8abň₋넁玌腀㪹䂹喹餋眀֏錏ࢆ뼃掋罓梃Ň첎䶰腅䶾ⴴ냛㱧跃쮭躚꬇䟊⿀萪晝ƾ䗜㏉춶䶿ŉ䶱戍䶼ቖ覒⩣⏭埃䷦黌툥贑긢ⶻ鐨☙톱琧蜶뇐뻃餎ፁ々ፋ☉Ꮲᄆ⿥ꬼ펫佨딢ፀፌፄ銴괨슽詁渞㳪휩ሃ\ude98ს洙馟ᡝ쐡儡法㊿\udcb6⊱뢱窔挩鑅騃㘁삀丏昉뮎꺹液蒈ፂ陫䍢䷍俄슣卐绪䒳맅㱒⪫ﰮ蕂崈ꂅꐁ蚍와漌ᕗ뼸㲽骼䆰捈覸\ud801㲅휉␒梐捏琁蕆\uddbd蕉\uddb7蕊鲡㱧揓쀣鰯\udd8d言길⤫씠⁋簰壙醳㶺\uddb5蕁\uddbb蕍\uddb8༡戭쑤㳞棖䉤⠀ᗆ暩坩뫩จ☍\udc58䛄൦安䲲撣錖\uda41䊆䌂謃⠃딎꣋읖ꆽ戮飪輿ⶱᨃﶱ\uda4fﶽ\uda44δ㡭ᚷ쇜㷘\ude23蘄ꨍ帇ࢊ츆玉᠃鄇✀绍ηﶵ\uda48λ\uda42゘짚\ud83e퟈મ붦ꩤ೘挹悉鳯샞餕䤲鳫핧ꅯ⧁ٞ㈮䆯\uda90┪微긡揋皤඲额╚㇌܈鹂픋礊鹎⬀ᘍ붏ꔿ啑ꢯ귂盉摫\udb0b뷣좫\u0010ᴣ㚕嬚ֻ䇂诐⦵៚☳ꥑᷘㄺ膊\uda83匈롃瀅霍ꌀᬄꢇ䆴쀁⎲鹄⎱鹆\ud896ࠞ隡뤬俔璣腢⌭襕ኦƦ⎰鹅⎾鹋⎰켬ྫྷ砂즵弄࣏너큎涊鋆薉\ud811憿톽㬩㗍눉\uda2a넪Ⴎ貥忕頛꘣䁫꜎辥㝠琊ﻍﰌ舌㐊ۃ嘓㚗ꓥ朤另砌ਃᚩ映囇ꐄ囈搋ꛊ囇㎦搄曉損搃曈훍诎ᛃ∉ᛍ䰉฀펲曨찁㎷ᰇ氍囄钂Ꮃ鹿鎿樓鎴Ո皦砆퐈ꛣ竏仫๫뎿뎲ঢ়鎴斢\ud8e8㗗ᢔ볣扝ᡘ\udfd7㐥圢浐肶᰹ꚠ췊쀌呍ꆌ\udb04踌⭉뱏撒ᅖ鎱歒惡ົ蠀殕۫ຼ顏耏\ud9c6쭉⭃܃놽⪾裫អ쓯뎛唳႗䡩ሉ鞐砪䙫꘯ṃ䍬ⵞ궲ꀀ妨唑ࢫﻅ贖⟁)삤߭쨢堦 鲻阰갥됲㚵㟅ற⭍⭉䰑浃⬃猄퓅쁆\udf0a辀ꭔ馯僨ൟ鯒쬼䀶ꏐਣ뀲ᓮ틭㳥䈣\uda96픨뫨*९曞艕馻츹ꚰ஼䂬球뉄㲊颅夅㠀䦼ਵ浏쮻浄⮽⠍匧ှࢩ؛ᐥ趵꧃끦Ǎ綫䡧ꫣ늛焲㦸횣쮵殳浈⮿浀ᔂ즸瞆旊蒄䃄롋ᓄ즂ڗ䜹骰ࢴ䆴ࢰ殺殱殽ᮾᵁ᮵ᵍᮻᵅבּ犰᜕牭蠭鼤玥応约䗇ᐨ쯆㱔鶺Ｐ閹鮱ᵉᮽᵃ᮹╡\udc28錷몳눳쯅꣪䞕퐌횾䬒쿆㈥挤휥ꔒ펝六誯隠陋㺁ℂ陎쁎际渉덠Ꜷᯊꔷ훊鲯㔯孢ᱢ쪍礭尩⟄ᰁ䔪ਦ涴ꬩ汓꒷礻馾ﱨㆵ焏\udd0aᔦ訍졢ш莱솄陇㮶附虈뮱Ḓ괅頕烫됀\uda23녢琌櫡딺⭍韍ᯅ䅑ᗍ㮼ﮰএ㮶﮹陏୘〃땂瀇땅僋笉畄ڳ離ᨡ\ud839ᦴ↶확\udbb1琯癯版逮삢厽梵큧刳ღ㮘燎螰퐄螰剏땊螴畉㣤릴ꦲ릲ꦱ䶿鐼胇Ĉᘏ퉘က䦽땄잼螰畆螷珗⽭嘐䘨贠儠দ｠誢㥪ၣꥦ࠻ⶴ㔪歄㛏쾅球쾀ꠌ〃䶼Ⴖ鶲癕䭉າளັ䝎ர躶\ud803ᴇ歇Ꞹ枸ꇘ讴ᣬꈘʩᐫ鲭裣独黈뤆菃鷯␯湭溽㒿몿눦ꄤ弢䁡ை붂펗ꧣ驪猢蘘ᑮ矐盩\uddd3淇架Ʞ枼畦퉩ꞿᐔ였㢁㬎ୁ笍焅뎃ୌ枾⊺枾\ude5c덈ງ㴆㨁떀᝚鲂㽏\ud9c4垷ꨑ୆垽୍焈ꨵ쁕杩悇꧄Ꞹﴀ뇪Ჷ뵕鿃ᘽ슮ힲ垹୎垽焈죒㠣螼쎵搿몽젧㭮؛㯌뫧揊Įᶝ咯퉢憯ꕣ툣됅캱Ṏᢉᬍ쥓鉂备ṋ黠椕䌘趐궹瞵ṃ瞻ṁ癩謮㱒⮾\udb68ഫﶲꈉ芙켧窱췤䴛捁‐嗩ﶽ粰婢掶\udc49밅✊挄□丂擏뼵鹍퉅瞽ṋ瞶쒉䄓⨉뷓䐴緢淀ⰲଣ헜\uddbc䉇儏鴅휄傄๋猌\udcda蛯礂앇侾안쾵앋볙잰잴㶳왭覾㶷覵㶷棎쾶앀쾹알쾸㘩⼙됨薩隯跋㾢槈䱬⮘ݣ츬耰⁯䟑렺ଟ僥爘䯄棬贩坥㎵憮ؗ藉蹠梧⡖㺵졤㹀\ud902䌍黆㹍܆渌Ⓘ膺︀㹋䘑㹆⪩ሴ뺴찿枑늍湯켩역ﮚ폄㈄愫䯇㣔䯋ꨆᄼ觟政䃖梍ᄀ\ud980䒂磆挏吉ᘂŇ䆹㹄ｖ榰ᥭ牦䈫䌦䍪폃䔩⽊௧舤ʰ옉画䭏͉蒋縊녬뺍瑦鞽䭈ﰉ\udfbf䭃\udfbf拟膷\uddb5骲\ude38㶻஽ຶ쒍枿ູர㾻䭅\udfb0쭋\udfb3㵤䯁䶩悂焛薨\uda2b왉쓒꾪螝Ⅸრ犒왑亳㒲㟪󧚿倧ę\udb65䁣弪䌳툢⟋溙殤옌孀 孌ҋⴆ稄䔎적妟蛡פ㦇걜ప餠龶䱯㥧咩\ude62୙Ⱂ켙䲱檼㪋餃ﾸ㑇ﾱ孈w짔熾䂺歒枾ʶ枴和㌿ế쾄ꩌ麶⨏\ud9cdﾻﾾ孀u孏⒖菈뼦ㅆ௧腠诌㗂둦얏줠묐㪖攩ǆ侥煌ꥂ긄ီꥅ︄༌쪭៙潜掲龰⇘㼢ๆԌ렀\ud980둆透缇⚈Ṓ⁺ꥀ㴱ꥆ⁲į釔ꌟ뎰⮣鞑඘빗抨牕〉牘㈫◚⼴ﯪ콟ꎻ控䰏씯䖣ࠗ푊ኛ헚펮ㆩ蘮菀鴑ꁶୄ⁶ꥄࠊ⁵ꥌ\uddb2륁㴎䃈홉欌s駊쿆廍뫮礽뼡❕ᒣ핬죮꧍赞ඖ䙢䯅熷ၶ륍ၹ륇ၹ帡夿聵垸䁾\ude56ᦍ瀍縊᥍瀌ඍ㎠䦲偵ၱ륋ၽ륌锨侺減嶽ɨﰣ믤깒鋮骠⊹쪳᭓涳븋ꋚ㙆戌뺆㴂듈ҵҾ鿑骳᳐鮰㶴ࢳމ츊쀂玈ꍃ䒈씎瘳눇ひ㙁妎㙌끵㙂㈼ᤝ隆ྨﴁᥥ㻛拧챕빩渓䎦궐啑㖷넜朵ᰊ䔢㽢椧ቘʧ嫡폏汢ఫ胝\ud999篎灳䚉灴끹㙍㙏挪⎺앎䬌㘎ﱆ圁㌅ẽ⁷ᚹ\ude22幀込늂锏ﲄ梂퇇掲䨉衱衽㌇丞琍厜┕᫥ᐬ憝ꙕ恣圭葜訩朿螳琨ᶱ튲ᐧ馢鯌첞곎폀ᮥΔ妮尢ﲟ衾衵衷⼎閿鈃岉섇襀鰁腃ǌ䥁螽៩䒸﯒攳聮ؗￊኪ간賞䆯暘Ἠ고桠ꮲử笫⠹끸䆽끱窗⁷񰶏屁踁⍊ꁾ震䆳꡻襏襈桴䥆痔냙႐檺ᐭꄮ袾锩吒䗂潕腢娻靐궶ᡷꡱᡸ䥇﷟딸줍煎\ud902㜏煈︸䡲莺ᡵ蘏ᢌ쀌䀇鲍\udb08焇쾌ⷒ撊塷煋뼁塷ⶇ㪼꫟寨⁃ﺘ尪氀켰ৈ逸핤ಘ遵䘷ᢩ퀩쾅భ鄩ᐑඑ⺫ᶥḟឫ베惔ߣࡾ֓ө㥣겱栂塻煎塱༉塸塼硨ក饇ⴊ䯚饀钎饋栚㛜ᨃࣁ⼃硼饋ꮋᾀ䢁끺舴喷ᴿટ⺶⨈꺶ꌀꀆ켌줌潇䆽硴饇硽录枧뜘᝖뤣扔韌ꏪ苠：⎗좾餹桳䫕؛拢ᧅꗤ怭ﵪ実ᐗ湑灒窡樸㮪\ud940㥄㥀ւ㥊ᤆ橖毜볞嵩闍⿪䯄䅩抍Ά儭⡙䞞揋䡡ឤ氁秖栏\ud94b倈㥊︂쑼㐆쑴둝琘㛟斿쇔䡽ѱဎ㢉ꦇ렃䖄馅㘽\ud88c䡽⑻⑼㥀ꑶ㥍䄔Ѓ✼霢㇕ᠠ㱥巇Ī⴪澥綩䰚鮥\ude46씊좀钁\ude40䒂原롹\uda1c鶽偺鶻偼⬜܋ራ⪅쮆蝉幁莇旟쀇䆹\ude46ಁ\ude4d䒉쩠댷䎷쨯鬦ǋꅓ䛢觧訂ᴝ䪛聾㖵굑귌ꓬ식땩빧䮂펬┩엮弩猡䅙䲸ሲ朰궰鑽\ude49\ude4a鑲粊⎸㸌ŊŇ\uda03夂㌄墄⼲周ℾܸ젏䠝碡儬죘譩붾䑅黍龭舩႙斴央偱淐䁸鮳춸羃ᘋ堄Ἅ렏ࢎ傀徴싈㑾ł㑴斄蝕㢤㠭巍㹕뚪괾韊桦\udee3㐍ờ괲⺿푲ń摄㑱Ŋ㑰蹑홆甍홏詎홄턬튰讝塿쾹\ude2b끴虇┆貌\udb05賣夆䃏莶౴㲁౷홌㪍౹ɢ삩檙䥩꾕韍笩㡹댹街葱쟬\udfc1俉긬慪줽ㄅ壘휪閦ઘ訦¡ﲼ⟜豗㐢螯붹箍豵홋豻홅౸㙊⎿豌눇㱍楎襊瓌⒲傮氌퀻쾱ꑳ塽ᇊ喺㘂蚉倊ଌ羋喸줃ⱱ楏ⱳ鬈걷楁Ḝ蘧삹뙥㾮ᐣ駚짒ﴤ쿃ᷫ뀛螻掫ڿḡ翜࡝ȟi\ude60꧍쉧䊮箺㌗쫪蛦楋ⱹ楀걻楌걲𢡄猈\udb05ẃ敀\udc81ᖐ喾㾵끹㾴鮸⾵覶㶻覹㶰䦹隂鱹敎鱲㢉鱽鰶張됌ጨ㤵싪氍执ꩩ\udbe8싒ዑ硹壬둑ሟ爘呸榦椨଩\ud86b语堩ᶡ鿂᜻笮䞘눸븙斦㆐잶山敆鱽故屷敋ﰥ较텎툀ㅎ匌ㅇ㧡뱾ꎅ뱿텊붋뱹㋮䫤켚ﺩ䛏曟䔫信쿀\udde7ꩡ矢⿈⏊⪩新°ꦾ骼䛜飥爋㚐㲱㾼喺ᑳ\ud8ae組\udb8d긂伌砇ල텈籷텃뱴ㅄḎ䈿藌藮ᖺ\udba0᭜ǣ쨡鯆ᘜꈙ猜塷䥉＃岁ཋ銈醇䟖Α在യ䚭姧崦䢗왣퀨갪갃✡ꢡ弧챴菟䑹㚒왛ᡭᡮꑼ莰豺᡿ⁿꁴᡳᡂ᡽걻惘겏艸쥄䉲쥆ソ➱コ텧⹕䌢䓚⡝\ud867뷙ጮ䄩؄螣\ud9b1≿䥀䉴쥌䉴汊⎻逊閅⪅ኊ䠄炄✌\ud94a鑨管̩粼㕣뺥爗쎰耜驠j䡖ᒣ◘焩퉯ᡗ㴇뒱∰ضʿ둲癘䠋ᓅᄆ䃂ࢍ좈ḅ醿㼇䆺扻奁扰\ud94d扳㠭⹞ɟ䎤\udbe0먓녩ᷢ⣙j䡑潝Ἲ鉾承奅扴\ud943뱰㬀녍辊蠇똂蠏ԉ垼ᑺቲ喱婂怌씄\ud87bࠋ㺈ﮊ᡿ㅈ녀퉲녌퉺즟㪼Ⅸ⬢됫꘬욠졡䜤縜慫ꗬ⋬ឱ䘺ើ\udf3d쟍䯉⮞⼩໖봸륨᫩妮艟减猠頯剼㉼년퉶녂\udfbe鿙朣Ⅹ켳孄䂁㤁熃筁\ud902纇衎Ẽ䁷ặ聆䁴麺䁰鷌芉筂筊਼\udaa0妦㸘팥ᐷҪ릢௪៓쯡쑥䬭ൣ숵\udc7a脳꾷넘尡叐➦✧񤔙暲텘⻥㚚侯샢펞꼻宴ﲬ੼筆੷筁牮⭄椀㢍⭋⭅㛇\uda47㧪辂䨊쩵⭎縁쩿⭊개㍙耑\udc2a쥠霦Ȝ楧굫ḭ\ud860䤺䯊Ქ錔窓挻ᡤꪣ둼偾퉼⬞枻㾺ர뾱ர鷂쩹⭎쩰幏⭅驛湠菁뷑䏛咯䌧雘牽ꄣ傚䠓៘앚芩瀆❌ᝎ쎆❊鉊⚽㖼ୣ럞䗆梥笤ꡊ慡ퟆ杅裗쁸蒗㥥錝ⶕᱼ熶꤆㞜❅濓⤵쉻삝碫쉼‱똵㕪ꊯ表땫⌸稄驱❍ゴᣡ❚̖逮엠\uda29禼᷑蜊쎡湝ꈘដㅎㅆఅ㘶𑂆免踹羿몷ꮧᢤꝐ⪯菂㖫鲠窭⳥飐尢ᱩ켦뢽⠻㾺ʿ\uddb7鱳砀粊օ졄ꄃ輻䆵\uda75縃\uda75ㅏ\uda70ḁ扫ᤛ娚혖뼪둃쨥￁蜀㖢ኬꈘ쟀寮穱ㅋ\uda7dㅀ㩰谳舞캙馎⑳怆鶈庎豋跀귨儇灚멿᮵멲癘넅怉꺌\ude51葀㘎쁇ꢿ奄ဈٵٻ蓚벯籷鴲\uda74䙭ኢ됨璥가ී왠姙\u0018硸餍逅虹ٳٴ᲻ᡤ䄭敜礰솤廅꫗\uda9f코떷⏡䙖愢敢쇙醾ꍅ遭ꍊⵇꍆ๦싦㖳庹篂劌抉♵ꍈ㡃♹唄㳓䮹蠝뉑樥朦鰚ﴧ難騄煝퟉ĩ斶꒳挻\uddb6멿ﱸѴ鬜鮴殾段䦱♹ꍅﻣꍀꎈꗤ嶙ġ휪㘬뿦抪粬儭椢\udd22湮渑鬺㇂੄祈੉ੌ\udb09츃ੇ᮹Ѿꢾ朔씏눈爎܂爆爁爅爃爅訍ᙳ蜋ᙽੂ徹虣솮漕븬욮䓕尭蜩헑誫꣮圷爺ꇉ쨔㈍䨱톳ꎴ쟬玙诤昧嵬覞\udee9胅ެ沆﨧䨑ኮ濪蛥ᙶ੄噲㚇ᙷ岈䘇푰﹋鑁ꡂ﹌⠋ｇ﹬襛쳣쉩篏繋鑂뙼﹀㔎뙾﹏样聻둹ꩽቸ瑴춲瑺춾瑱춿멏뙴﹍逄癶﹅➱嫭嘛㛢고욭穥\ud862ꉔ螐䯀薨⇌㛙詵㑿㉴쎢놱⿉䫧ኮ줥健停빐㽩䴊ś阺\ud869닚⅄셂셂赁椃봫셈陿킸钾朙춼ɺɰ殕蔇崇䆽\ud984甅蹶셋蹹셅隺뺶퉚ᬭ퉦ࣜ꧆傧娢⮞퀦檝㡆뵒✪ৣ㸠\udfc5樫䫧䊭巬ⱐ띖愠䉓ꬽ\udbbf阱ֲ辉蹵ろ蹾셇蹱阜豒瀦ꗢ즻荍ᬆ脏믂⌏倊퉰융ꩿઐ殹殷ꦸ湿荂湴䍎湵婿≴ᣡަᒩѝ꽫ψܶ托篥곫긤᪚癷✼锻喤븑ꘁ湸䍆湲䍏醱㢺△駀㖢㈪娺〛\udf6f⌾ꕦ檛卭Ꞧ䰳츂稊쀉́뭇衅획냂桸ꥫ恷瀐祭黋ꕢ펪헅f醯ꏌ㸨洞돐餢섦ࡺ噆幱噉幽噍냃驳鄼ش豿끺豴灿䗂灿莴㹾噁幵噍幺榰䙻ᚥ⌁䈭蠥ௌﰥ竖ᶁⶽꎡ\uda2c棫輕へ雊ᇭ㤿䙲资縅᝙膅资ꙶ纊赇繱赃ᚄﹹ㑵홸뗌\udb1f꾰\udb66仇䄯쬧鶭䇞삭꿗镆뱒恜⿛텔敯㄰虼䂀☻栂虻﹏뙄꜀䦺ﹻ繾赀ﹹﹻ鄂軦鷟裯ρި᛬⢽癥㝡\ud85a⎼㾇倆㨈\udc87㤀휛꫋\ud94f뱻䅾\ud940셵\ud94c셹ຈ掴⁩뀳༱裛䶪䟈ආ䍟䃢愠빚玭癪驦'厑宛鸭吊힡㹱﴾ꄳ࣍ꑶ샃኏ꑲᤀ⊃䆶셿䅹\ud944셳\ud947≱裯ꗣ揈a蠬Ǌ࣑蠧蠦찪␣唒౹梅⊈圅섊椄눎ﱍ壇ۨ琉قَم剳얳▮㖦詵茝ᦶ⚾鼩蘦䢓㚓뮠ڠⰸ陠쏄彧␧헝櫦ම踅箲ㆻ箲匏箹ㆻنىဏ⒓鼦韀㐻း१㝓㜕뻒젔ኣ艾쁅̓셀嶇̀荍䌄튱贿啭ⳛ퉭⨄ㅍ\udba1੧韋폡폍젭䛍΅锩ﶵ賑ᨊ텽⩎텻͉즅텴荁뢲鶵湹癷偹馂湾鮰䦲羈녳͉텷复텲㺝왭ꈩ퓓ꔒ䶬ସ餤琉쨞㘲緓堹蘉詅踀╌⠇詀䩀䝪⤶势௞좔륗쨶ꢼ乹ജ嗌⤅홋⸄䃀쒪ᇁ詏鴅詋쓃屶噼㛮됏ꊜ붨큤될꧇蠥줣ኔퟄ貪隬鹵쐡ៗة핬핥\udb1cㆪꚣ끣➡ꚨᧃ찵⇫\udcbdﲱᨁ襽詃̇뱳आ᥁᥉ᰍ᥄欇枇﹨৕鑙왺業粣퟈阺쫨砍撞梯ࠌ瀣鶲割⺴⥸Ⲃ⥵᥌\udb0e⥷᥆䦮穔㽐闟౵\udbd2䨣걾喿걵喼汷䆻꥾᥉᥆⥻᥎㛤拙팍䄩瀇ᘊⅨ뵥巁䇣澀᳜颫祘ẽ㭃趃㴁䝏땄뭀遽茔鲾ﱴ辮\ud8e6嬫㆘㊿韊븯샮츢ᪧ蒢韬䏎䜥ࡥ弆᥷㭍᥸뭉幘\ude37ﱻ鱰ɿઓẲ䁻麱䁺麴女㭉᥿㭃᥿믉﫧졧儅Ǆଳ璮蕬Ⅳ雗\udee2詽傘췠릸烗㉅◟複ੁᖋ嚌⺽㥷傋㥻醀르ੌ㦽㞵꙱诂ꥼ䗈큍鬠蒬颭ឮ⶷嵫舢᳑콚ﱲ箵奻ٳ奴鬖陰爄爅陾爉爍爊ᇃ㥳㥲䃈륾缼ᤞ찫␥͟씟牱뢒昦ⰵᴪ傤앃젂炊ᤅ瘀탈\udd45⼉㒷䙶鼃嵈蕿嵍혆朊蕾녷ٷ偷鐆ⵈ趇佋甌騃뢊灰捏ջ嵄蕰\udd4b蕼\udd4c锧齩䐓噵\udc50㱠ۇ囘봝㏯鞼⒫ᡮ玢⼴眳䢹亲ت\udb54逥鹿쟁샋菦䯃휽蔔愨ᗈ䏏䌽䘢牄\ud947け牍圇₍⫉ퟄ怪팾ꕶ牅ꕵ牋ꕷ膻몹홹䊬Ფࢯ쬯簭អ䩉贇菮뤮瀨榩ȅ錛쨴ꅴ㪾ꄸ辰陼爀륍陶亮陵\ud9ca뀁ꕾ牉ᆍꕽ牀\udc49邝紨᝖摤５㴳꘢\ud997䍛쬼呱縳앋ꕏꕇ넉䘋쓋鄏﹎巓㡶醴ꩱ楕札됤ꝛ롬ꓦ퇏捠갋¸ໍ㤑꘽ҷ镲ꁻ镴敀啺敂홶鑯삘莶똼ꅼ㲴ꢆඊ회긁딀갊犍︸餎핰敇镼效啹⮗匦ㅀड秃鄬쁾긡ꦣꢠ⹰ᚷ牀꧈蠈댂娉큎뉚ॼᨶ箻⺲걧兩ᕺ糧陱良畴畺畺䟭죦랔绒驧訚蕫Ҧ鯍䛨娺邧犑贷荒额฽ᰗ쐃툩原䏂꧊尪휨孇Ⴍ繦餥츢ప灨횤異畱꼂᮲䶳㹏䌅㘍ᮎ鼉洉덡䵷㹁䵸빍䵲\udeb3枙\ude68䙑ܑ\udfc8ࡧҦ\ude71텠쇄帝꽣쐿폨눴ℚ⭞Ṱ첱걷쉹楿嘣梍＄瑼춺瑶춱瑽걹᭥ⶆ䵿㹉䵴빋ḿ\ude7d⼴菊ส⇊⡔Ử쁿Ჩ⍭佮뱸湄䄑ᘂꌊ 湅踉툉湲ት녺ᑹ봎릱䆺倅릳䆻릱浼湍浻浱湍\udee4좩ｚ챸쿏ᑅ㫎捇௕颩繼\udf3a駒᳞ᒥ\uda9eฮ⽄놔Ⲫ喘㤒䁓풲⡰菟浺湌슇浻쓬ꑻ瑩ᙶ聂✄兀꼎䬄낋쩌ﹼ㏆쩃嵹쩏嵳쩁兏蕸䕼⬖莼萊㝅莼적有⣊ᇍ嵱쩇嵽쩈\udd71元桗쑑긭좤緧涐ᾜ穠䅣彘䖄㉤Ჺﯕ힯庭鼭꿜\udee4螛㠥앮꥾⏨弡쥺╳㒿즸좾⠥ᡬ閲\udd80깄깅炃焍멈릍돤䯆骺鋒⛑楶툺릲䆰㌎䆳릷䆰ﵶﵲ깊ﵽ᡼ᤜ㇒栾ᐥ吐閤እ諕巅㫃Ⲙ곯拞膾͸깏Ͷ깊댶⏪弭紣鶡\udc8aﲚ耞:䰔អ蔚鲦봴䘞꿚藥煊䥌ጆⲂᖈ뉋稄渀ㄻﵷ驴硸≸ꁸᡲꁺ≾ꁼᄅ\uda02썱䥎썽䥉襱凃鯅ᕯ쓜ﰢꈞ穓쨩樇ꧬ䩅\udfc5늦λꉼ썾䥆썵䥉썻＾忁組䲻ꗠ娗⏩诮侱符릩ᢹ㈬⟌劾됺蹵ﱱ턼݆瀆݄ᒙ݌﹊䉱錚둔\ude77\ude76阳舛脈㖦Ⴁצ궜䬐鵘奲ݎ݀鞅琺箶謷畵乭㔀\ud97e䁰੼\ud977፼\udd41鍽ݏⴶ᩿贚\udfccǉ쐲櫡ⶽ迩ꈯ䄀㚱빞挩Ȉ ế뭃怄筈ﰈ툈ँ愊ꃬ芃ꀀ筎퍲筅퍹愅ẹ鍰麽鍲麵䁺퍸筀퍺筌힤嶐\udde4슧苞䞞袴\uda29㺈춣㍁ᶓ끵şҔ㌏뀰脥爓d꩝컥⌣븽⪬┦퇋맓蹢砒ꆿ꨽㶵䕈☂⤄낏䕋놊鬎廐腰屺㶳覱㶿覷꦳좭䕎䕀앍ꨲ郭셨᝛筭┵㳫崮晄텢ᬦƩ䕅呆䕉앋歞嗁৐硾⤼啽\udbb5쑴\ude73ࣟࠝ췡⏖쵨幧쁈韏留䯂醢؁ﺦ䰼㪈㭁삂㭃䡋좃넃肹충䤿幼㕦閩崨㭠駐췭됂斴㦋뀪ꜿ敥匿萙⑳孎쭼㭉誶㭃쭴ﲂ㍿奾㍿㍴ੲꭹ쭾ꭱ㭀杤 묕간̕蠠䐖푔谩隷卹蚒즲ᕏ ࡀ䉴镌邃詝㌽䈐屮瘭辖\udbd4ᑰ䕿祾望纵筀ﺵ㮄ﺴ䬇䦼ᕆރ㵧Ɪ慢렖Ҝ娣䌩心䫧ᘺ감팮斦淍恪邬ᐧᶤ脨黌榠䡡晽ᅹ쥱ᗌ纲镎ⴀ魲镌Ḋ⎻㙄籁弋ꨉ씊붂뙆莀乶ॻ꒴첾朞ම妵඲妿뒋න妷㙍\udb78뙇\udb7e༄降颭龬萯챜斣ኔ꒕艔醩઼೤ℝ점☸黍ᮦ胩㈡Ꜷꔗ⺡儮瞸⊷鏛뙹\udb7f㙃\udb74뙏\udb7d權\udea0ꀎ镄⬉ᬍ镇퍺䀇镀멼᭹ച᭿纴㺁᭲똅᭺ﺳﭳ㶇ﭵ镇⬈ݷ镌ꧨ귐᭔⋣ᐠ\uda2b㾢쟎䇚찌ꨋ譺ᅱȀ爢\udb7bⴀ蝹镀ݻ镁꣋Ｓ䫘갅圠ừ䝨ퟅ癤듘ඎ覜沏ᯉ施뀱魗ދ왍㩈鹏㩁鍟锽鱳晽奷智㭷儀뭕쁉उ똎꼍ﱜ퐄❺좂❷㩏즎❻㔰嗜鴼괓각Ⲣ뤫揖궓洘ꈈ쉨딩㩌❻㩆❸멈犅⥳析刱舤ᗀඝ곔皤⍭뤬ਯಣ韃됎⠴ⰻ⥢㛠ꙴ嚙㘊兎光免兆渚쌂赆๤琍䬝ٴ陴乲㭹ച乵钾乼겉乹ɳ乴긆允免㑇᝻兂赁ꆨ擬堜璫Ϩ户몭秃৞刦ܺ쿟ꮢ㖭黈ƭ┡엩摣뛬禆䉦ﱳ൰㹰궵᝴坻ᝳ兀靲＼ꮚ⎿腍\u000eᘎ℃\ud9da䅂Վ笿譼蘤㕾ﴳ㲵靲ɺ鬋靱ɽ乽걿㝸䅄띲䅎Ռ椨╣唤믅寫瘽疯贓ⲧ秫倠ㄈ↾？諛⩷왨쏈谧Ḥ㭢諫Ⅳ릡ﶴ箲ڡ醶栊睸라䅈㸉睵ऻưꄁᓆࢌꕆ\ud906게\udd7fㅹ隄轼轹䜎轲ᬋ㱺ꚥ襚惘⏇݄ꌖ慣ϩ䶢赟菆딕뾝쓑晲㝱\udf32᰿뽛祼陱ॳ叮覶씄⾴屸୶⾸轴轺轱㢣a븢徍㟨\uddc9馗쮡ឮ\udc62엝풰ằ鵌絊絏伌ǩ絃袎걕\uddda襖랹施렽炍餔躦尠꡷ኪ猫ꮬभ椲㕳노殷湶鮲ꦺ爂絏ࡉ꽱絏ﲃ꽰셨㉪袶ĺ⩮벓뒪㖨⌭杋巡圿ㅽ꽾絅ꈀώ組䶻颺᮰鵀渁ʊꮉ䤈김귥ꊕ铭诮좔⑙╻씢憤‘‭䷚繾왵黟᩸鶸容齴鵃齺鵏齴랹诬뫤䂽녺횆鮼눏ᵇ⥖\udf72鵇齲떇멯⾼䋛扠四씟霾巅腪尯芼塾ᬏ︆ら婢幈᧨䝬춭䰍몵\uda3e膺蠃躅뽵뽻䢋⤔䥋쌮橯쪣西챶ຠ牏ꨨ⠴\udee8믌쫚킱콾靰誱㷫ꁰ᡼ꁼ᡼⍹뽹뽳刈葾㵓됋ᠠ﨣輢苮뚩앦ǯ麬ᗋﰩ뉆ಏ贋뉏伀牌꺂ꃤ㪞氅䨲Ⓓ⮵䒹亲콱씪넧ᯁ굤꩖쎥㎼曡\uda2dఢ誠웕酽썶陴陾掠耋胻萧뉈䃴牍䄐码꒖吉俈昐⨥蒡锉쨱ꙋᖵ쥼⃽뉏胿뉈牂ꃪ⎺쀋餀㘊쭋怆⮅蘌캈䫢掰ͱ림ͽ릻䆽걿ꃺ蹄惱蹊惶㴉㯇㈒᧎｡꧍Ａ뷐嬥䆢헍潴箵᫑튿↺冚隫પ璢檲膐㎀餤—⶧薡⺦宏야᧫뙿惸惾蹂惵蹂꤂즾뵂「뵋풄䒀䦈຋絼㩺姕簲蜴ᧀ⍣䯏벤ꚡ鱢篪Ქ죧䑷譻ｱ녳\udd76ݽ콺鮴僴뵎Ꚋ僶뵈ຉ具\ud953쩪䡛ꊴ⨬ऌ쥥ᑂإ굥궔ҹ醶ー僱ヺ뵎僴\udf25ꐰẼꘁﳂ﭅︫\u0001缆ݻ晲陹ഗ女ꭴ\ud975䁼烼פֿ咆烾צּᖳ忊焕춝嶿耀愖럝憪굥䁠銃飑聯얳᜺㪌סּ烵亄㩲⡾䛇絍蹢ᠧ컩ݤ⪥滮垁ꨎⶲㆯ隯偻卌ɋ銊ꏥᤊ廖ᆬ蹿㛭䇐ꜳꖹﰧດ榠蘦猓睊ﶷ㒽ꝑ꼰捃卌鈊䣰퍄퍉䣸Ⴘ᭷탳❾ݽ圃탃紂榇\u0005ꦹ兀ǜ䣿죿华䣼퍃纟斟㲈⑷႙목萫揔部뜑覙଻핿单杧㝳慅戌鈈\udc8cᅄꓐ椞텮ࣻ뺱狟ኬ럥ㅱ㘖䜣줧ꄌ鹗⿍⬩猫ﻃ\ud8b3\ud9bb☌䀋慅棰ᚏ藞⵲鍳馶鍴띳靾ɵ乵ɱ棷慍棸ᣲħ遚⁏끪綯梕䟊氈뒰鯁ﳐ겼塷 ृ粏唀碇こ螃肾枪罽壼ҋ壳ी\ud8ffु绫仢ԭ샼شô≰⍶ú᡾\ud8f5े壻ै\ud8fb灾㵓ᯋᣬ櫯頪욐䙨Ἤ刢௥憮ਜ਼뽝溲餐좱般Ⱙ퇏֓ᤩ䔬ﺢ졸阴ሐ殬诨㍩ᙳ䩇䩎䬆ꂇ䀄쩎渏쑳䤵爗崨륩綫卦찤\udbe9ቒዑ琎猩氄愯툩풡῞䳡쪝畺謿᣽纲景\udd71莻禨ഌ㵻莹ㆹ䊀힏磰쩄쩏椯댘䓀羵끪੭퓜ଷ쮯喯䟇άᗆ蓻䩏쩍蓼䵹⤉䀃湆吂眅๔烽❳烳另릸͹릲ͻ惲䆼쓺쓷湁쓸㸍⌚ਫ鉹蠫蠢븤飛쮬牧Ě䰳\ud9ba⓻湎쓰\udd05㸂흾忂恙ុ좮摣ኤ੮氈㮛〵୬唧鵰깽쨀읐婧벐랹묓판决ꮋ晏⢆晁절豖癱ꩶ퉴ખ㭹඼妽悅㭾妽ᇏꙉ時晁⤍ρ時ĭﾑ鼧⥔⦞斥撬䷄쎯칣ퟅ畗ꓺ༭耔黅ק압頗ჭᷯ釜핯﮴Ἤ﹵軐䑱횼㏃ᓸ晍晈铲𤋮豗Ψជഀ馍㔎읆딊ṃ铛뙻퓰Ṁ㓼Ṍ㓰谶䄥冈赐嶢⮟㠜⇉溙ア힡⢒๗ς춨␾蜻阷跔ሱṺ凝晳ٹ콱靷쓿ྲ℆䡼边䡶辷掷쌇퓸Ṉ㓲Ṇ啇\ud870嗗▗ㅌ橥椦驧摵ﺧ黂鋪蠣剴襅ࠏょꌉ㄁襍ᮑ驴㓖\ud8fa脌೺襆ೲ麉襅⡛烜㪑\udbb7哽\udbb3䃴찢ݣ陯匕실패洞씛ڹ⽀\ud8dc飑ବ龱⵻驶㣿썺ô⍶㣳ೲ襊೾襀賹苝婽베筘듭迯͐盬킑퐳簿鄬\uddb7ഄ框\udf1cꔀ☵ƅ쉁妐잲⳰ፎ⳼ፅ⳺๾楱䳹㹿鶵ญꔍ븍椇鶶Ꞁ䦷⳶⳴ፉ⳺ፅ捥ꆮ틪䱧﫢퇊璠ྡ䅜䅩੮ῐꢶ耂쨰㕼獸뛑튻ⲝ‧忆쓭㈤੣鷥憦ễ⺩ᯭㄊ쭸䝍蜇颇ࠉ䝉䝊ꃮ᳼䝅ᳶ䝁鄋ᳱ홺ຣ舙蘮䈓Ｆ顔淍붪煣招ୖ賺Ể薵መ㬾䥗벐ʮ峺薽᜻ꏦ豝ẳ讁鯫\ud92e䠏\ud923鯤㤠鷏᳹ᳺ䝃᳽뎂뜳২飘戹롼쿅;䛯ￊ크\uddb4嵊ဂ꓂垈늀㜌缋쬚靸乾ॺ瓱㷠㸇⠇々隁플燙䕶뿀䦻㳲嵆嵈볹嵉媽⍵嫨ڧ삝巏Ꜿᠯ筡튦ࡩڨ仮ﵮ閼糿㳾嵄복嵈筽쫥䗜깳㏒탢ᆩ퀧텪롬ퟅ符䏌廆䷋⌐フﵵꔨ垴攌\ude0f朁봆兆唁쪴瓶靾볰ñ㴄縎퀄ꮇ❄堆頎㦇㼠鷀苼苵踍苻胪䄣┲辬⹤㥨璮꬏↻ヾ骭ℎ䘼⡷擻仩桰䯇辣ퟡ젆䢓卦杆⇇⛬౜할Ὑ鶴萔㔭ᰪ㟃䋴苺싿\udaef礄ꕂꕎ蔎ꕆ༃躍ꕇ과㕵㾳콲㶼⾼屴୺㽸ꕄ拰還拵ꕋᤐ픬禇뒡䶯\ud966표梣왌瀍舤鯄慟Ⱒ傟뱔뺲ො渔\udb18਩Ģᓟ¤沂檼ﺡቤϘ⤬᝻ᄳꋰꕈ拹ꕍꕂ𥉉晃晎ᲊ启晃ค瓡త䭲呻᣷ｿ苾箲걪ᓴ妽ඹᓷ揤勺펂勼炀ᶪģ䆬졯琎⡗⏨咕ꗔ䇗漖Ʈ틻晊勽틺Ჳ䫑䘒ᬫ鄞\ud8e7孪㥂ⴢ냝⌭䱫㛡㽤샂⬲眴쌵ﾽ┇저Ꜥ─敖┉僰╴舿㒽젫뉔얚䙫龡䞞Ⴂ昭礩㹔嬪읧牫澶薳孄狹\udb4a狻\udb41狳⟟ҝ걷ᣲ璹憿á鍺䁸\ud973鍵䁷狽\udb46狷\udb42ᕱ缞ಥ䗅갂鋫χ녥扠긷撩䩶ବ곰❻䈃ᒎ氊䩁،偃⊻즲䭾轥䥺༢㘡ꂙ欜⯢읢\udc89闋뫮耕⢦㢬䁛㰻탺ݾ⣳句ॿ裄᱈皃㫈襵䫲䩆䩉䫹䩀讶쳽语䗂ꭤ䜫ρ氊笫ٖ䷋귍杦ጪ޷㉍⫹༡䫱䩅搅䩋蹑翙䴄鱻안╇╀⊉현㟐㣾곷拰⽺屷앀测櫼╈（⸾㵚濔\udb10ᰢ杤賈ଘ峑꫸䈪텯鄡\udb1d륰퍵㝤練뱵╄╏櫷╌쵽⮱䱒쁓빓쯪䍾㙐┤ﵣ顮佂쌤樯쪯ꯍⱽᄂᄏँ뺀薁妒﷔텓\ud9be쒊ဋ嫷漀\udaf4᥍\udd70⫻쓸õ⺃楹喸汽喵䄀嫻嫸᥀薃飰빙ꈥ碿퐼榢ೝ䔪郩ψ㮺㾹敻⋿ꛪᩳ৓줠Ⅿኦ쐓脃⫲፿틮䪜ꖹ뵏늉蜌禉﬜頏뵎瀍Ðӯ퉪\udbc5ꠕᘘ祴䷋ￄ폊戨䥇⳧ﲢ蹹亾듢볞띲׮쑐腸ヷ녱㽰捃竽뵏竷뵋ꠎ瀏㼩㛫왉㜓\udc63諫왌嫻ᰒ擷۷竻뵈﫼蛵㤹೵㥰捍뀌⸀ᘆ躁鈔굄\udd02ፑ䛻ⵏ䛰굄웳蒀腻퐄腼虴ᨆ腾虹腳ⵇ䛿ⵈ웳頄\udd05秎呢᱒䟭➮੪풠䍽⚫좨恟訉ꮰ鞪冝⮗䛎庻㙖ᮌ颒쵾ָቲ狑話턵辌냆蜋ႃꅈǏꅇﮂ䶒ꅴɽ靺ɸ睺飳乻曽ꅋꅍᤠ慀욖ө엪칛᠛梴牮㛢⍡⟃䗣ོ쟑튻覯\u001a᧏玠２ℎ쫰\udde8䨈ῦ橪濙떻뙹ꅇ曻\ud84fᨃ셰靚韫倉ᙵ⩃⩌稯⩊ᶋ粁쏓斷䳖૷勼㭰䋿畷瀀㵹莴蓳莺㵵图܏围怈훴ꩇ큳\uda91鏞㤏謑軣㠬ꧏ￠\udb04ࢧ傏꫻䈄㛻⩇Ⓤ㛸ꩉ偼䭴ჱ畟舧䗚뱒꾭닐ꚧ⺉ꆢ듡귇앲峷䇍繐췆᪄ᘏಉZ䭎ἂ崍騕썓䫜辚責⎤鋷蛍긢ᬫ\uddd3刬䁛謢猶毛咣솑\udd2e巉奿쫽烵콶鯤䋿垺䋴ힱ䋺ힽ䋸䭄䭁泊䭄ꞙ픩﨨᝛㾯႓ퟫ\ud973庨퇍᤯檾鿓淀䭌軾䭌ᰶ\udfbc␍\uda03튇아垊魃﨎廜憲ﻘ깞⶝Ẵவື꩷ະ橵ꄈ魎컲魏\uda8d컶\udc6c妨㵃酜ໝ瀪꫶졾찡ꪰ\ud832霮ࡍ␧嵠൤삔銯ⷑꌙ䲿南돟挺ᇡ⻶컼魉컳⻾魃囹驊䔌ᄃ䖃甠婌㝨療驅驆驉᠁ﴆꆷꘔ\udfef啧䨱寡냫䣿聯ǁ뽝彑푔ᐒ앦ฑ펓祷໳쓰軾ﱯӸ㵷훲㵷莸㛲驎驅ṝꢩ칔꿇퇏귍疤ߤ쓯뢞턳勽篛嬦鲸ⵈꍂ怃팃\udf8eⵅ冈ꀅⵋ平踞훻畻Ӵ腴虲腸⛶虱腷ꦾ鬎\udef2ⵅ\udef1ⵋ\udefa諵쯘訌타戤\udbee벸餻鉹⦑⺫쨆譳㻼ⵉ\udef6ⵀ뻵ⵎ籸퇂턀ꮠ蘫㆘뻌ໃ托⇅ḕ\udc5b庩斺鲼킻卪ᭃ㤁㺈⋂☆际㋌ᕑ岯鬣憪쮳ﻵ᭏ﻻ᭄ǿﳲ嵢\udb52৒蜱뿪뤠㗍匳ⳮ䯊梦⿁诌꺢霯⊚⊺⣿\udaf9黾ຳ㾼⻵枺⻻枱ǷﻳᭈǺ鼂㩓꙱樌䪗녭૭뾺껜␢ᥪ\udc43胃얁幅幈ﺆ⨈Ҿ膹쇶幉Ẋ恋쇳幆Ｇᛰ烯喣좡갂螠䛸⽓쮣쒪ꐋ⏓䆣뉏䍿풲掰⤋\ud84f쾋ࠈꁭ掺鼎㉲幍쇺⇽幏쇼넯ࠗ뛟͝逦呫樝倢頖ᷗ൙䷐ㄊ㦻䀇阋톎骈鄀섌旎ꖍ踷싷栄洖䈮뮣圥뱁尦绠ᮣﯬ\udaeaⲝ⮸˴郲쉢掾띱乴睵ɴ酋酀ᇱ酀᫶堊풤粥㠦抣斨ﰠﰦ﨧鱌Ⅳ뚤랴볣衒᣿釲酏酄ᇻﰡ㮈琢쁌ꢂ漢圎祉쓷祸⫷馳酼ㆳ箶ㆸ兿莰既 퇴ꙇ볈ㇰƎ⾠뜗溁ⲩ锥腪ꈚ뫹괺䆬挰겥뺜ﶽ杻ㇴ祐퇸뇶懲Ɖ뵿ڽஓ䞚⁅⺬㍢졠覨뇫햓쮢骑堹硹垊亅栋耀턅싇껍鴣씪ப븽⧖ꏖ縿枛ꄧⲢ䇙Ⱉ퍬妣黅╶ݣ㍀薩⍭뼮釺᭩郳칇칈৴⹋㑁惶䆵惵䆳惻릳칏⹄৴蒅据⪧뺢ଡ릩䟌⠋⸐ᒍ私瀃牰써ណꎏ·뛒熅첉疲⯂忆䛳ᜱዾ着⹴鸡좢瀐渫ぢᏠ\udd2e䀋\udb22Ꝛ콼喸⧷찄⧾竪띴㫷걲㫴汳喰ꧼ꧶⧵蟌覗⛺\udbad차卦粨⏉꾟೟着冱〈艍癊䙇ꌁ䙉\udab9뿔\ud86e羸릾ૻꮺ龸㼭㹲豸灾豰빽ᓻ䙀᧾䙍棌᧲䩆䌍ѕ╱䓜쎭토㐺ﺦ⋹耜㞧ࡲ駿좈᧱駵䙋Ǳꓞ횳ᅾ귌⿎ݥ湐繿퉪찢辗ቝ얝Ⴈ‥캴ꂎ⠆渚쫉ᎄ釆㌷ൔ灨⡽탻勾黲ㇰ㫷⺵釼飷靼睲䆰㧶㧷䕊㧱躋졛ʯ索晳͔贈\uda27뷝煐ꂕᎶ맴㧱맽䒹ᅴﯩ묚\udb54붜䛄뚢ǌ庯餒檴ከ꾕꿬ꨆ됰肠췆퍀\ud88c鼅퍏Ẇ颅䀇﹬獵둺栊随蠭젨ᬢ᪢젟ⷐ蘫쳯胦菅觼嬼槵㾼덉혋奏΍꤁예ꮏ\ud9c8ױ퍂׳퍎׼넨䡙樧娡꫾馓꘤愢䶬ẫⶖ꛶⵲ꑶ̢諂ꋺᇡ䗼׺嬊׻퍇踇ꃽ픁꼅︆䈃題뉈뺈㭳畺鍼㻹羚쓺䧱ͷ惶◿蹉◴乃◷灻癪䙠粩䷋巄粠ꥰ믈`鼮䫵೹郱ꗱ◸乍◲乂ॕ挫咿ᥴﯧꖢড়ᐡꕮ\uddcc⟆Ể䅧Ⲩ⇋䍨൤㱺ꏪ娑ﱼ蹚掹깎ꍓ깏锁㰩顤㳔묚⸪遷⤾䑆哫皢\ud8e3푞䙑䟌䌔䘚燎륞䥜䧺Ͷ䧹͵᠋亅ᗲ섃ᗿ깉뒣Ḭ੨峒ꪝ迤\udaef燉㻑൧좚᪬罺荾嗵김儅嗷깂⥬愤೦标鐇빆戄繎ᒌ繆얗씭庶琝\udc72쵷饼뻁뱕洘ଣ⹟턜憪诨쭽\udd2d᫣梈螇㩅㗸繋㗲繇\udaff໱볰맻⵳癲춶瑾춰徹痿빍㗴繂繍ϣ䷬뗪힬計Რƽ⽰眝ǌ᣹᝼慄섦慀⢂貎걚慀윃෸뵇෹慎諦骤౧臾癴ᓻ\udd74Ѹ맹飿靲睽෺慆跱慀跹鎭駏䎰⨥瀮鶴㤔랗匑졨赒슩蜪惛韎愤ꌱ連믋亙헁ᠪ\udd29ﶽ挸\udf75ཷ㍃熆椃㾊㗦ꅃ౷䱼ఔ\ud826쵹굪椥韢\uddc7ǁ⏪瀘蒞곉嚻巆쉹鞤英❦拳띵㾴飴䷼맵ɹⷸꅃⷲꅏⷻ餯㠓諞琋ꈼẨ눑ඒ輡揎秳淽ⷼꅇⷼ 椩戢즳讍啊趃ꤌ댎絥貸ካ䏅뫨脑⌬\udfc8㭤⡌䟍氀刬座뻻擾脱鱣룿澥啍᷷啋ᷱ뫓謩⽏篪ඳ藴鮹䔆䤊ꞌ\udc0a䶅蔉브褸餁᷺巻啃ᷰ핀⪄錱ឪ餪葰閧꧃蠢溟៛䛧㔨ﭷ\udb38巸㮢隄땄樍؆땀踄보㭴㻹ૹ裂垈\uddf0阬拓\udc04璉䦵閅뷺땃ᡎ땊뷹﫩馑벓蝵ኼ秀覘週诃ꄪ罴ꙺ緼땄뷹緲뷹땋핿燊둮䫪嬦烠餘퀦스敮垁ᧇՁԶཱ棡ꇪ⎱蚎\uda0c煇ꂊ䠏줌袑硇◽ӱ૾鎼䂢塽퉸\ud87c꼇퉺\ud87aᡴ煊녡菶煍菺쳹∖瀜赜꧎짨緭泺討ኚ澪쿎✯Շ᫾폔뺲줠鸣\ude77埚꧵Ῥ瑕ﮖꇏⷕꨄꭲ䏲煉菾煉煅덨휤\udfea\udeae׷̅\udd0c㓈\uda4aᚂꉃ\uddbb깶Ⴈ공᧷톷ꮶ䈁\ud807ځ뮀鮙⤋纀짋婍ꏰ\uda44\uda4fꏰ꫰쏾紩吖䜨驪퀥ᐦᐩࡠ젦ᆳ៥\ud8e7䰃델\uda2e貯䄨㖶ệ匬箋聯巉䲽䲶푵쥽ꏿ婈崆\uda4f牭ᶀ茋妀兤읋妌ㇲ瓹훵乬\udcf3\ud921긆\udcfd鯨㤩\ud920叻䝌台읆史埚쿞浟\udd89坮䃪뿢ᰨ䨉ゾ꛽굙ứ⟍㉟ଡ먖⨠\ud82d\udb1d갏鄥蒩抔箲滹ꅥ㞿᫶ⶪ邢颴礬폴叿䝊叵㦾史즼粌やऄऌ蘍១㠪\udfc0\ud9b2퀠抓찱뇢딒藚쫞ꧻ〈홾왽৷쨕ﱶ줾ﻜﭰ閺珳珿珴ᕋ໿臰史㻶콺⾰䦺௾珷珸ᕌ慾ꘝ䞝摩撫親杪櫠₫儏挶죗칬\uddb3െ烢൅榈ႎ䪂ྞ囼ᨮ戨䳮ዻ䫳琮䋖ꗤ㚓햫뼥㎽Ｎ咽⹤⸘뫬쿥ꧻ巺淼拷웶㻽褁㻾腱虹䯴ൈ褀⬋䯾ൌ㸵㯘붋삪ᐩ棖嫜秃ꣷྞ╿뻰ൌ꯳䯶൏䯼\uddb0​絀彋\uda88﵍萇缬毜찬ಧ播ㄉ巂᪩ᴝ힊㛯샐\ud8d1閠䰱曲죑⍣씭꧸餃毶྇毰﵂팈﵎녳௱黸纵۾㽺・毿絀﵂븅謝驥᪐뵻叀䷏を೜蠒ꛩஒ텼휌ﬃ팁䴍ﰊĂ霃裰⋿༡햠᫟Ჯ튥Ფ陯릇긨ᑪ᱙尣ﰣ嚢㠩䰁导捏寶捄\udbf9捋\udf77䶼⬛湴㽲ヺ捇寺捈\udbf1捍晡缔ᐜꔳᐫʨ峗㓧稫왨廉へ쯷⠬蹜⍂쉊ᔁ꼇⍅ੇ۬淴㋠閹ԋ篶⍀ﯴ⌄ﯿ痲鯷௽뷾鯲믰煴⍇篾⍈ﯽ⍌넩湐䈯鰾8緩萠橨ᬦꩢ啛쵓飕憠뻈䮽⚭拭䏄訤令ﰪ･죦䰐鷨璤Ǯ໸⠲즰뛇ऍ鸂榌\udc02黍棾嵝䱬ⱸ餍䟶䟹宆蔏擙⯷\udf74믶㘋憹砀Ḍ글䦾쟻䟱쟳쟻䗳⢻ꓦ秆໒郮逸䯌房훈⁂꾢魞都솥ꊚ㢟\uda23ϥ뼩淌辖ꂑ͕ψ忮થ\ude69斺炸썹醾怏핀䠈㕂ꠏ耊㕎將ᗷ덷ⶹ驰⏅ୡ쪕ꊔ㗇傏㼂儇㑭줘␋ｪ轑국ɭ䞕촼۶鏻ྷ巾鶰\uddf6྇뷲\uddf8緾\uddf2緰㕊ສ煑뷘ܵ秂뤨䐗㠨ᧂ斧样柰㕎䌌㕋䒆뱾乏龜斍乃䖇义㴇᥶桼↳㒲渵\uda98쎼莝䌹猪빥뻘뙧䊨᪥苠旬멳른嗰⓽惺嗷惷Ȋퟵ乃义ퟴ农ı黉⽋췰ꮻꈸ곝ꈮ鯈\udfc7葟稸꙰궲ퟹ乇⚁럱\u000f乌ᯃ涱痳ᢉ隇伊┽Ά꣌\udafe꩹笶⣿㧲걣⵸춼瑺군빊빈㲁씇큽尣湯ꁒ寺琀䷊仁ガ䏇䝼봽퀢爟ქ쵿뎪澧燋㐾⼬␡信ꍳ盽耙檼빆빅࿿ᨂ酮᧎砇㝶腁ᓉ腌阆⒎腌練쯶\udd22줡ꦬ諤夅ᑍ偒쁄饖⿀繾들⍥唓䔿।偦Ƕ㝲쿱腉쿳腄૚劵\uda39釶圁睼䷲맹ླྀ꿶쿽腉쿺糷砜ᠥ㐚嶥ㅁ韊ꬑ䯋歯埌㦀췎蝀릈촀踏⡄㲇蝅눺\udbf4▻舩\udee6듵ᅩ邢䞗ꡖ澧㣗\ud95a쿍탐ピ\udcfd\ud929鯯台㤫鯯\ud9c2蝎蝅錵ứ䏐㍨昦໖证梣财ἦ聨㖩瓱ࣳ죸먂鿶蝉턊芦읁을摊퐍읂뱇۠鷹唢᜽죩忙戭ᇴ㗂᳝ᆧ츤訡䶠䛯睏鷺ଙ엦돴缥렜\udff0혊\udff4炄㢁\udff8仨秕篓ﵷ쟸믻奰婷衠땡ꊤ뻨稏㿹읆\udffc뿻읎땘鋮㢤⼩锧難㳣驮ᅽ팥仔硸⥀ㅂ⥅妉見ᩔ뉔돟懗埉ለ㡱ᶗ㘀္⼂聓 㬫骴쓫搬柳鹦㽥추뗘郬Ƀ팼䑎樇僃诿\ud852贿蝿ﮊ僜廐ᵃ脨쁐ᅅ媣藣光\ud924겊⻘锜鬼쫽ꍏ룮尓序≞⾫⊆ꘅ翺怂씨鿿箓⵭ᆒޖ葸‭ᆛ梭둧垦ￚ꽭ꩶ蕹擝畮肧糓늤΀მ䛠ׂś桌줾⤸샅憣ᐣ횳ᾨ蕄￁䪞躄鲩⯕癛㦎湸ർ킞䫓评\ud924蹌㡢㌱༑友Ⱝ喊뀧긴븻>뚅쀊涣䠃ﻐ췛滸⋭ლ詓ī䅞僅큨ڄ⼘꧇쇀உ㼸楜叕䈦蠯誰䒴퇦᠇퓏\uda57⼙ꖁ幜瓷ﾸ㒼갶聿憇뀟푾࠶ꂺ䄼Ħ퐟|晔\udfe5锠䄫Ⴕ踁畻鿋虛↜၇崱뻲숑붖㝃쿦挢쥺搂㰁월漀妵᳚ՈĎ憚|頰㰬琋狱\uda7a厭ࣶⷼꄻ䩵诮韎ၞ顐쒁쀆뤥뀈쀜驧˰㨴᛾⩟℧鞵펠Ḯ䇨Ջ釺Ļ뼩\udea5熧俆锂ۈﾻ叵ᦉ䜱亖萦\udbcb葑塑歕玨뤋ꀑ⹅䮐؁鱟䫫褶\udb76Ї熱쀒慨邮偬堖對۳㍪픤肀锢㬕ᯎ閠죝떈퍋砡舕Ἆੌ鿇쫶䷹칽࠾♦鲵훬뢐泏좟Ë쀦ﲅ霃窙눘縔㎼䬥ᕿࣧ䆋삌너֤萀ٚ㎤໇뼣簃꿈缀ꩄⱗ動煵㯴퇎梃鐧잏ﰖ혍䠁崁℞莸亐⼠⫦耨ඹꃎ啑鸜빦겇韍䄂챒⬈橤ᚢ䦸Ꜿ῎⺖决ᶆ䒏섹뾃䷟୯藲⋙ᅽ䢶ꑟਭꢠ⋦蟈ູꈊ̲{愱섓\uda93版뵰卓ᑉ而ꯅⲵࡥ锗쮗냧釪瑸꣛吣琕鼉밆嫂娐⼠썶ᒇꉲ舢덭晴⒛츼詿똌㊙띉⍣ꇣ輠뇼謞ㅪ驟ộ⑄ۣ粃溣ί娛䰇잶嬠৭崀㬤愽麦ퟐᙵ䀌ٝ冃ƈ遡膭覞뷡狊ﶱᾄיּᬣṛ铔쐯⍅롖Ͻė吠쁵픘㷭㧶嫺쁬ⵈ牴冂Ẑ঺ཎƐ샜ꁝ纻佾炌斑'츥秹䧉ꓸᗛ仳'᠇䫸핣넔ᱟ繣땙쾥俙—콺끶积吧ꯢዔ蘸঵≎ϭ䢃扛芪㲎Ⰲץ䯠Ⲅ\ud872ሳᨦ䝊⃩퀑ꖹ옾쁨풁㠋딡㎴玪餛異먍ڐഽǈ↠ၨ쁋춇禕﵊쟴쳁\udd50₁轔栠䯕৹ԍ煦맭㷖뻜簝\udd30蜕碡揁鈐耤薔䞃ẽⶕ텮ⷼꋅz᳗鸝漃쁶埬腳闺ꆜᕾ頗搠䏕ਈᳵ䖂կ뢚搙婶놯鵃ృ锣ᜲ휌넚㼮㜮큨࿫޷䅦耽僁끟臨彰녃ﭤ♄\udf45ᇅỲ魤ꋊ芩马푃骰燘בֿ傢䳓昩ꅾ񰎿訠⑽燞禑巷黛끃ꛂ䠑﵆鈇罐\uda19敖녬霠䚩\ud998塐곎㨲⌰瑟ⳋᣥੰ㛜ᲁ剀꿪Ⲑ⸬࿽䞃\ud8e2㐕怎\ud902紎啅Ⱒ揜᭮텀ꊪ᱐㒪袔༠쁰鲚䙈能쁂換篬韲滻宾䟟໯腕ب᱕䞊֕凝傥葘ꮽⳚ葉뤠똰⥘商ꮚ㗞ᄔ춘സ瀠綶萩\udf08┫዇딩ꈥ횳杽꫸⽀㳯뤿횅껼熫凭৷4ᝉ쨴䤇렃鲠⹐霨ੀ뙟ꖙ윈ድ뀁剨閘둌ॗ찎恜橦既ꭙᔁ䤚Ꮥ㨆\ud802誨䞚ێ偁࣋䃷䆬풂頏⥒ꀇዾ愧Ⴄ҆ᝈ琲㣨嶵踗䂩쨏栔됌岠﹍崦⾀就Ȱ諉䬘❌쬜걵胼ᰮⶹ캌타冶쬡㱀姈ʲᵀ༆నࠖ㡼䶋陠笤恮夕᠐\ud847䘄緐䊪⽀ꗮ쉣뎽\ud84c洟癦䑤恞复᠔噀顜茜琒ု㞙诤蜻쀙匌꥞ࡥ뵉ꂣ繚臉⇵\ud89bꌍỄ雀䘻ꩁ\udad8ౢ⍺䢙\udc21礎㒑⅂\udaa3枹\udbed某䴨ᥚ蛢׭Эͳ慰벛͹敖ைㅭı汱脹먴︦癄鷚镓졻ꐝ졽ꢯạ뽐䞬퇣륳決ꬂ脨ᫀ큊㚰㟷്甆̐ǀཡᎠ跕\u001e≰ҡꬃ脨髀끊㶎峫긡㜭୲⠼᱀ᰐ䴫끍ꗉ삕Ġ췼灯浆㗲Ტೡωͮ至ꠊ\ude17䶦甝㠓鵂츇筁韐蓷⓪녂䅷ষ㪤϶⺞﮾瀻㪉鰋캠霂꡴궎ⅹി᪻⥁퉨嵙ỽᨰ✹᱋뿦⇣㯫౩闔㤳洱Ͼ䮫趱杤銚餅ꓮ偰퀤ￇǷ\uda7a聨ਸ਼\udd88椲ଶᵟདɠ)郪倽᝜ឍဳ篠䏳籓㫠鯄ʒຩ̤ٓ燖苶钤죋⁵餋砘ꙃ펺멍㊜䥬搭㱟轧⑱愯倹ґ쩫嬔ꙉꧪ밍븆즑㞁\udbc0ꔲᗤ鞬⸗瞶觹ﱺ䓬橺㘦ベૅ恡ꡲ鋄얔蠑ͽ਀卓盨ゲ涎聻鑖횝頁耄祂쟂ീ斞䩧ᰐ櫜༄᡹䄴脐茱雄浰츯沑甫᪕⮳饩䬴邹㠥෗鿘쫇斕錦㡫ꡤｶ㎞뀫〘ᓱ찅﷼갶䞀Ċ╽ࡹƆ聵썱벻鑲၁萕䈉㲠∴⫓㪈㧎鳝⼃偮셴쓄爦榯ீⵥ䭅斣얠㥨惘ਸ௴ḻ焬৖綘\udc5e獹ꖕ㱇⬠ｋ랸࿎曑度貐鈰쯕Ꝼ醡쵢⚂梶츂齅䀅惁牁욠乵䌐嬭ᾃ짋䌱݁䁀ⓢ칀䴺힆宥ᅦ哣㛅蒢ㆼ⠜뺄褆擼ꅥꎄ艌䅜둳ၷ⟖볂즵醠ᐁꞰ᩠┚␖ᓒϧꋉ礔菤梥ₙ榊贊潁笶सၼ북⏯櫠䰛\udbcb浒ऩب탪䄕₍ഐ㒚跌薢쩰꫅ﮰꦍ⩔ꏈ铐옫࢏㑜빚픈⮍盈埤邰㘴فꬉ⛝ௗ铩䓿旣맛곻隕輸娧Ԛ娊鬇⑀ꍐꯈ䈐ẋ꼻\udafd솯ݪ鲑\ude24⽆붹௅꽥䋲斁墴⎐渭ᓤᵓ⋢酯䑤ṗ鱣⾺咓㌨ǃ⬊墈珴芵圯鷀忣䀋靹퀉啚郎읃팖븘祔䊸聙ᥩɴ佤ᦋ䐹Ӣ큎䇸둍᮳㚙\uddeaꞅܢ⟁㰀Ⱡ຤่ൻ烍−舣䠤ꃨ툹⠣髀赫䊎⏀戓쓰ኄ醩䇄ꂨ툙⠱┌锢ᆐ僈훔䷑狿ᑐ茑椎앸p努셿钇缁뛆䝕푱ﵤ\uda78~瞥胍軣趯ꎠ쨋ന\uda2e썰朎釥聾ʣ曐嵤฼ఔࡖ艂ࡊ\uda1a芲탆ꂈ⨙꠺઄鯵㈇㒃ｾ請⿊㞀᎖७腡⃉ᶏ젭蠠贚퐖Ձ㔆䅑쵁劫䕗뼞龥쵫悀進蕫뢈ᵺญ䟅ꥃ顧ᐔᔺ㳃憑㨶짂⭁♝䣲셂剞㈸놜륄ﱯ㰊固栬櫔⊦爇럭쇲輗ꍏ샟⢄逊偓緛桫ꅑㅨ쀎꠼ᅕඋ嬇◝ኴꆽ襓⒬쉶餁暏旬۱땤ࠗ儐䍐᱄ធĢ䆘䂚⠲₊큓ญ娋ޢ횂򽮢㏡镧钳윲瀠熬䴣Ⲵ♚ಚⷎ琖⁀崆빐靁ᾔ㥕⽝᷊Q뛄ű聍摣䐸㈍절╃ܳ섈冞ꕇʙ댗䖁옲ℍૈ붥咗䁟榍ᩃ볘ﳼ൒Ἃ门↬譺५‾艦퍯뾓䠶៧䐎⁑왼ฎ棇掃꘱\uda29ঽ޶胯䆭摁⨰샙艏畔沂ꃜ⋴蕉䌃⣈苖杝엃恒ﰹ꣰ぁ져∄ﴃᦡ㑐馘ᨰ圵Ẍᯍ䉣Ҙ䄶⁀鯙蠜⛶齹놂㳔䘰缵Ǯ䐝鐖ᄪ앬諁丏ᲁᦍ諃쇱玅窮捚囹⽅큘Ꮬ珋禦䨘㸭셞㽣\udb24㆘讄鱢㸊炅㪨a꺕뜈ꆹ퀽ꀿꬠ쀬䔊\ude09⥴ਹ㪂Ⴡ鹿숟ꄷ읟㦛ꆬ셑ᐻこ숁찚굱憉佤㼪ත꼀蕔܋셸䭳ࣼ㳧齯つ䔖찓ᅇ쑐⤮換蘒鯕䗚逥衺䷞芠阏︑ᲈ막暱ᗈ헙꼆縝❧遰უ榕瓈\uda46\ud99d递䠗䠟嘈뙁ᕜ셁䊷惽鞴\udb5f▄⊈ㅔ䒾戇箛ᚊ큣Փ匘ᆱ艖\udaacậ䎫ի儚솺푎꾫嗒ꋅ`踚쀂룶艍ꕀহӨƇ࠾¨ₐ耈쐣젠욁㘍ꬆ歐᫁㫔㾶霯嫔䲍偘퐡虒輙뮖車䷤ꄲ꯰櫞ꪤ㛰㌔ፔ蝼萶㤲춎ꈥﰰ醞篠ꗲ\udefbဨ\ud941䏗纷빻쮳諸荐膽舵䡣㑏끎꤃쟬찎\ude52枥䛜睚㝹ዐ莉입ᓐ롰钿ᙨ闄⽤裳豑⇰颲౼䂣Ո퍮⇁揲匑燋萜䵯紕㭇ꩂ蜇ꪐ㻁\udaa4♙赛쟔詐݁舮ㆦ郑瀥쏚ጥ僱ᐹ㥾꼭቞፣賠䞂ះ㎆ї唎蘝悇ࡀ鴖敖링Ƥ幰灩ᇔᠢଲҴ茿㐠⠰淡츋玃͈糠鰀䬹젷섌∂᠃綃钉樽ㄇ첂耒谱ⷬښ秭ဠ磗폼賍蟡䏔ÿ저ᐞ㿀젝׵쀱♈⿺兊༮ꊷ嫃䞰℗०㑐쓥Ш倒Ẉ곌埇欹淝ݖ势⁅騠◫瞻㩝᷉렭꼎끦ꝣ䜉횮昵➜䞘䁍ꀭ邛岅࠯捖ꮇ뻃\udc1d﹆㰁緁ື㼽૰が誠ؓ⋕䆄ꋢ搟숶ꙇ십\ud885ഢ瞂䓈㷠钴࿡ʸዊ੍謟ʦ웤〯氌砝㤁ꀇ嶃߁䉤ᇰ墙౼ዴ܂ᔬ撙牽᪇䏃⩘횜┉਷葷壦놌\udaa7磠⊭奃牑逐睉ʌ㣱䐆२㤴쵒ك\udc78⣛큯\ud83fఁꠊ땁ࢡ堍憎쳁Ḱ剬䋛෈鱿셼ᑿ蔈Ș֨粅社룫⟑⁺胂⏇쌼ම鐊ﱏ쁮碅ཊ瘧䃛썡砨翠脊 㡂蟃ᣳﱮ廃ꂔㆉ鿃揅⃑糉겔瑾徍㔇䈜ꊀᘎ顄颧皻ꑹ老਌穀㑂媂ꁶ밐﷒▆ჴ賄萖℈䉱뺚偢ᠨㇶ뷚匂ਮ퓀ꢄ㾂ᑺ䊐蒛ﰷ캰䈾肢䂐旯锣꟡ꓴ㋔敀ေ㇎堝蠷욱ֿ㠛㺡Ὧ榩쁙磉얤Ő䣩ꕔ듌␾⽖閅䎻꜎쪆ꡪ푬䕶\uddb8럘냥⥄짃\udf81㯁࠘Պ᱗췠毿\ud974榃㠯툵씉籄別間爵ሒᣦङ⒬賲궵けꩽ觗♕７䠠䐦劂ᄏ钢儑鈠礯谓제᚟뇶܎㵩鸁삒ධ䀟∜ᄋ钠ꪡ訡鼊匂馏׉教ꗽ\udbecᧆ؇虌긫亂⬎뱷꼣㭁돘뮠♌ᧈ඼諸\ud90c䌛좣႖쐿␘퀎⍪ꭙ䰌Ꮰ렄㺤୥Ǚ⌖8ჴ衏鐫\ud808쏡쀉䯃ూ鯈挐훲㈄ẇഞ燛铎鑻噱㢴撅્陸榓\udc90䁺ಁब뾫靶俥ᇐ︼쉋炨有ᡂ楦ᗫ䏬끁ࡠ繒ἲࡔ航䜒Ǆ%䠳胊疞桃ꮬ$㽐秄ツ㋄ฯ؅鄛䐍朥㯓蔨㱿齘覚蛑䐍꾤媑艃Ո䱈䡈墩ɔ褂೻䬭苹悩垺໇㷡쨈᭹癰얨ʤࡈ峳\udc92Ḝ੘楯좓钟瘤씙誘磁韄뉑麽빼轤ㅩԯ\ude9a舥Â芰낑ဠ樶樜㌁⤌暣䩂妨圈恗⢇都䭣䙂ᡀњ乄嬍輈辌\udb15ꄳ琈裓ᵐ殯삺쭫⸱獒衞࿚㏣⁰褒辽ᢁꠗ䧷ꊯ텒ᔩ๦ꋊ䉌♓뵆Ｊᖂꑉ넡瓉㚈㒜性ࣽ轠졊텋䉍偕샹둺ﰦ␅ᨊ᪇桉躸呀ᕠ튎ꘐ㩗朚狶願袚饧⎗鑆噂矰뭬ꍮ恺붍팯䂁琪ڥﰏ빭\udf63ꛞ⬄\udd01貄쵑崯룵䵢䂾匹㋒롢蓛ᘒ洏㛢蟶Ḳ儼톐ᱤ⹪袙໨祿•젾/됹Ⱏ䀎돒뎀ஃ戁᭻౧葉䳠䷺鍔䨹ሖ⼥쎗㥂綆﯑ᅰᴚ㸗槈戊ᙲᴖ䁜藅醂⹧䅿끙䐿ߡ揵賺⡂匟唈姁쳲ᤖ䎜蓅鄗↮༲鴋ↁ욥ტ湈࿜叉ꉘ챲Οြ鲲棎奜騱\udf00ꚋ麆ø瞙扢뿇㷀剀㗌ᛸꕔ\ud94a㰵㚲輭퐎ꛑ几혅芆룀塀Ę⹺௶揥贏㢙癎㬉縞&瀓ᙴꚖ欧ⅰ尬鲺쥌僐볗투䄌瞘롌䩇똆隅〗橓荭킊᎓䘢蟁䋈ꅁ鍃눞︀ꩄ权ড狠째瓣ᦷῳ춯늚㤿奞닜愍缾쥅辂졦ↈ⛔斔䩣墫ᠤ锧猆\ud9ee뛍⽉\udb99曎᭭얂㬠⥃仈쩐讲Ⅻ䵡⛫먬葾ꑲ쵻賉룴욙騁Ს鎲ኔ㳬誥ॽ楪탥큓큭氻㴋뱂㑀묁℞齠ᢨ溭Ḫၫ䉊葑짛Ჩ邘릯蠢콧㾳ך⿭ൎ\udab4墨庭Īᡫ䋛郎㑝ꑔﱖԠ熓⩃እ讘춨␦ⴱ⿏䬵㢇Վܫ㮮됁쒫锹썸㤒亮行鸘亸뙷砦鄼⃹긚堑餟㚁■ꧻꅃᒾ샠舓퐜᩸૥߆遍ꀳ僤툼퐭㒃Օ념뛨煚㎝惱Ո蘄ꅽ䞽ჶ줗\uda44郐툴퐩㒇㔍䴢ⵂ錖䈂࣏肖잯뀑礠ﶼ౏ᱟ天搷佈ໃ혩嚩祀稼⾎⇒衒䴯ꧫ饛\udeec耹㔚䤊䐆ሁᩀ᐀谮琫갴㸚᥍䉆蓓儯훌ꂵ衈淏谞㻰ጅ侽䟮잌ȴ⪚貍ັ­챃哝ā뤬䃇宇䎦뙻呂䛼ॼ㕶뀏틔䤯ꃑᆡ襶Ӎ茈靌\udc29Ᏸ矀葶塀ꦭ꥘㉀〴訁䶶騼吨樌㔂᷈ẃۃ\uda40鹿ꢆ펾气₵႞鰡䨃ڡ࢜菉퀣집ᛈ㑄쿯དྷ마⫮ݹྴ螘ﱣ㹎邂桓ဨ䷬䴎ꍹ⊁烔╨戵ᓠ폺쥡蓹瓱爼଼ᑇ梷㸈眉野ﯯ杨硲ŚἍ䙖蔣债畗鶛괕氀၇⢣疁ꥀ侏㖻ꯨ㊁炇禟呡㻢唻踂퓗\uda6d⬡꿽᫸㮒䑭ᝇ፦꺊ะ턓ꅞ됔訊৭馰粄\udb43䞔䋯䬽볾첃랎葺킓ꇞ됧잋㢘ᬢ諛\ud9b4⩂ꮚᤙ㰉蜜젆ꚗ衳夵㓐傶븅\uda86쌁≀쎰Ƀ긴㠩獩٦ﰭ癎퐅䘉稙ᶂ擩\udccc䦉ձ鍅趶楇쑖ꦬ鋙⭎欯ᩀ頣鈰ⷪ賙鰡턊嬞ʠ◆꽕眉訒⵸ꐓ탯ၤ⟕ퟨ饶襃㈶珐⮵ὺᇭ䅞蛧鐂홤㑈舏ച얏썅쌂魀壁尴ᮈ˛ĆὔɁ蜕෗ꇸ\udf4d﷈懣對荺♁偡븚☌う蒓㜖郵㕵긲樀抗滏蛆煱犅뿎ڧꍧ풠준挙扉쨂ର傞ꇍﾐ넹ڸ⤪́⎑칬ᮔ厛롂Ĩ⡪聖砧芁悀篛ᶈ丂䲠暱\udf84狗ﭤ粼\ude24\udf55쾴谹밋⌉ꂠ⣂떀烱㐖鐰샍擟鉡ࣨ퐼새ध憒왋✳袊\ud8ceۥ钃셶⣏፱᥼짊ࡻ鉺茤喌옇됀଑वⴡ걿ⱼ㺌⪂蜣චꌆȘ⣷潸娲逛⊄丆襁踀㟀猑ፍ\ud951攠燁蟴㴑\ude75筛遙௙꽩䋳毙쓃ᅨ褰鑚ੌⶫ攷排쬞粼롫乴麊ꩅ腋৵롫씴曶씰蒘爭ᤦᚋ䆦鬫牄簣⬃앂텅吓巀隩덌\udd04䄙ॶ苝陵붉廄プ響蚏ダ톀玀茀덈掍\ude95⟋꠼㨒鬚綥㖛᏶毑孠瀫쵣ꘜ➊\udde6⻤㑹顋똑昛䍁妆걂㞡↷ⷨ櫯짜ಡꏜ쉨棋ゟ䡫꓃គ刔㼻䙵窲⤽兂ꡱ䢸䰆邂ᬵý职㈧砇ಁ၇Ⱑ沌ᮡ㪻歨掤㛘乌੐蟤巆㘏뭨ꞌⰣಎ䭗薆価ᅡ슫Ⲥ믈跋蛥鞗千৖␨긚縖\udb44柄䬅氌蓤㸂Ҵ饞憿叢橆炳鸿덎躏㥎絲䇨ꕌ儴醿砠㸬⸖ᶆ䘥藡邉郗뽏㨓␊倇圃扃ꬁ\ud890ⷀᢈ鄛퀆肫ँꌪ쏀桨ꠉ䜢搒╰ᙈꩰ毐挙鋖샠䔼匱膑粇鵶䒛〚㋉斵퀅⼂蜁꘿䇷ꀸヸᠿ♝捻ͫ腰漍塰ഉ嘖ͅ喅朄ꊙ磇ヮ䝷솭\udb17죈䒭踡〲㥘ຍקּ㹁ﻐ僦聴ẛ롬ᶇқઈ肦쎻ゟ贰\ud82d혞儈䒈挷㾓ꏃ젔৽ꃟ₳愀瑮찟몂後몓\udeeb鄵愂䴜⒨➼髳轗쌖ꬱ敓黬႓㼐♃왴ꟛ灱⎄嶠賴趣䇧䧆铲룘䉊嚟ὥ쯋㚃魅籂䤠୨↨厧⠩麙歹෻\ud8d2듡⋪霄肘钙΃痡ㄸ煣愡Ḍ在䖓១ݪ邿纈䀐蕹ʜ㞠箐䗘幭ն៹眞꫓榍ಱﰓ崪弔빇챖靓⪽Č샺⁥釤錶諻೓脮쏳梎B\uda0c鍓⍪\udd43쨃慀崠䘀⻪ᑔཝ肁璲ڑ峷鸔坛⁵ᗑ㈈蜏溠ꇃ傈帰琸漡䡲ꓛᕼ䈞㥳┨휐駍憧롉ꋝ࣡조컪⤜➺諰ଧ倏͹鳼餀朷샅腄备➢瑙\udfd4䦸ꤽ閰얓ᆇ\ud9c8岟Ñﰬ個⛀認惇部酑輠㺨瞞ἀⵆ᤭玽蔹洨ꀨ耛殩愊眂뱂趂翁繊شԸ儕ᶤ⯼䅓螑倥或碆ᰙ啧涗Ὺ\udbdc阪猋㊿ฃ䷲⌣榸緐깦炥㡥鰬誆꜌쏸効渵უ蹄䇢ꯀꋹ퍉䶜뉱鴿ἷᖄ娝⮷រ\ud9fc輎䘢뗖ᨂ౭פꌐ莹ﺻ漊뤘뼂谬ꨃᔨ㟱猔ᚢᝏ⃐㐀᥼ꄋ餫얤ꪺ❔롧┃⸓쥃ⴃႃ窮ﻀ目轆썎᥌祔䎐Ǿ삱᎝䐮긞霎旃堖뜝䪪蔈觗⽏㍠䯥␥擺碑ꀎৃ抁ﰃ꬈ꦮﬔ⌍蕵쪒ၛ੮螢슭⺝❺쎏䧌蟢\ud870᤻袝㘨䭰૜㓺¼뇐螀雠詣ಞꞀ襨筱累㿍銚掓ꀊ㯇尉섂⼗犗듎키㖣艑吘뇼ධ秀辂餝䫝惤ꤑ㊘鹻紂\udc2b把ꐃ㮅⻡\udd1f䤠뾙ޥʣ阐聶㵂졋僺鞆ᐶ㏭攏ᶻ蔼憶兏㎃騼ⴖƏ਋⍣썧䀨碟簝諴ё簨ـ懬暆ₕ鮺╋▧놪鷩ǐ硲础夓Ḝᙅp罁׎觬㞎ߪ轚쇝풃끅⢣숹숟蔞妇䥲匬퓖䣥⯳诞ಆ蜦藼犤퇔怱蠳\u000b鯋☛頉뽛ꟁ㎶嫏᳭蘺ᜉ螬\uda24턵㑨᠎밣⚅驖ӑ䠼쀸➲⧖ે託苭蒰져ᠫ潛涆밹⚆\ud983랇ꓐ멃濾ͷ誗讇ᅄ놛\udcb9渂ꌵ뀆\udccb䀻幍쑭᪄鎴䜜袑蔦섃鄝 瀀쐄巌뤊᠄촬뤞ᠢ瑍ᱸ㣙௤ꑖၮ葟ꂹ㌠⼗䆐超锄麩⦦᣶ݠ䍍틚ᣝࡴ虩ᳬḤ鼷殉埍䯢䆷ﬡ柃臈맰༘፩乗葺㠌⡏䰼ਈ沲႒죉둡犫鷼뉚餏䳸怹Ѿᘎ䟏蟝ꕄ⢍ᑦ訡갂ႎ텂䆠១銁酷巸昉ᖢ衿೨ꉷᵉꨆၢ揝찓釶鷜쿡ⴔϸ榤ࣾᄮ픷﫼蠫쀮焪岋᷋㬈鮈₼䜵݀⪰䡶ꁶ顊膚꒝㙽圚飝⍊ષ仰㪾쁠陫鯶勛満۹ᅓ栊㚟ꑯ툼튘浄㲃耀Ɛ撘꘯ຸ媳\udd42榋ॼ蕓ͱ慧ݜѺ䜟ė既⁅쳁덠蘪䛑⏑큰⛮㇔᠓촆惋橭猋ϙ퀢罈Јￒ㌂⻨ᒀꅤ厒륉苙鱨辺哋긤᧲Ṝ䁺ﻃ挞㾺鵯搮཯鮒嗂뻙瀒搝쀏䂶ἃϑ룰\uda20縼∤䩣뇐㺓遃ྜྷ軋ఇꂋ켢ᠣைﱠᷙ㕔诙⠖툭屒ᮞ妝Ꞌ쏰醅䡙ꎎ먈\udcf2Ƃ₼豠輥᮹呱ਦ଻쾝쁋䰒쁗诡캄훌翲䐈괔鷬䶣ꗋ␸쉵樮侹䃀욃ḅ검ꫀ⟐秘⨄୒଺酢螰쉢耼艭ᴫ䐖黈곡醲\ud9f5㺌벺ヶ땚ȱ⭇猇뢹\udc95脿⼳쨑䈲傉베吢零歎倱㏌㜆ማ猝ۋ䆈삓ꂩ၌鍨傈베鐣꼨郈㛺蘄ࢍꐅ剁䄿댨᪗양ṅ뎇纒볭ﵨｨ犤ᵠᆚݱ䏞솚瑒ꄧࣀ\uda39숤㚅炌噑䋥呡魰껸嚱\udc5d蔕䋅\ude4f歛葙숸㚉炌䪁խ굄ꡢ抝ݰⓋ棏쑛쬰碨磵艍ꄫ砳\udf41ﯡ笙뭴죗儩⢐龭Ⓤ틹凸즓쩴롭ᶇ⾝ě䄌◰ↀꖞ㗒⼌ḾְƑ䀗ⷪ걔∐ꬰ녖멋咥㐈䃄듌浠賠邪䘌冻箱䎕仰陟丫ῄ鄚멁伣鈣㝈咈䛿첁Ṣ嫫茙⇠\udc10娔鄔⢈\udd22刣띈梡୛∏֞⿭퇺錵墇⺒㩬鴆鎞㮂鐂쐠髲䜴犈ⷘඵꐫ喈ঋᔆᠡ쵖謤ꪍ䄠\udfc7흹፰跄ᰖҸ䐻앀╦牳ۈ䉜섫僥ᔁᛀ诬䖶⋹酬좾ড়䍄绍ӑậ̴䞌삒ᱛ嬗㙉揎틖뫒⃱멌둬娈鐺躐构ꛡ円⎍ᆇ㑈쑉촛戉篶䅹첑뤢ㅌᘀ⌘ⓔ膄蜶茮嵖\ude6f衒쑑꤆\udd08ᤓ㔣厽馜⣃⏴⩨퉜㣀ᑢ㵢ἆֆ胆䄄⌨㶖失ⴄ禿图Ṥৗ֭䈙⇈伦䡍戠풆墎㔢㘣춠쪞尸랗孤ꦕ⁴탢ॹ눐茦颗쀐僶΂\udf20⡈⾈ἾݥꍼߕӅ赲쉵䊕ⵅ鼤幉堘␦晢ᧁכ鸘䬫ⅈ諸ﳇ婳ᜆ\udb9a夜窂碊麣鸣枨▣㌞᭛촊ត෴䙺싞懩¸㞑窊碎麠帢댾솪㛾ỷ峉伲ꏳ\uda45奙쪝〧漤䉛똖ꌺ䪀壄⛚ᣴᡑ߻ᝎっꢱ橋ᶗ듞ꥎ᯶岐̹㓔㄁㱖ꆗ䊿蓖熾᥅蒕溙顢⑾㔌褔䵄ꉇ뗃帑械棽컚᫩ॢݏ본醤䣂樅ስꈃ桖\uda2a䊍먂唟欓ᐁ\ud980ꇥ熄㗡ᇏ㝅퀷쐙Ă얇埁ﳐ淏⁚᫴≑᙭嫕帍筼顚㯟気ꒊ廉ᤣ繨Ｔ匤珚ୄ洬덱饪硿奁쬇䐵ૉ姤ᤃ뽼㿞늖彴賞짉Ᏻ䘲䐂탌鄬ブ讨Სะ⎌酺硦꿏覆䤓⛣૆ಖზ箤姗ꌄ墀䔢ᎁὀ鐐呒Ⓞ㋷蝲䎅ℕ⊑䢥䢟ࠗ찛㩉캄௰䃭趠ﾓ㺊䋻䯄픰ㄧ覩肔㡙Ắ䒇䉏ᜦᒆᝨꈦ槯岠狔⊢ᠿ◠砅嵎䃏坁ޗ最ꤟ੅㚃ᔣ酈效魂멆谸䣺猤菨ᓇ牱₏佈㱅Ꚁ¢꼒⇪ⵡ馝ʼ㯎鄃퐓ꀍ\u0018突璎䦸褢婰컱ឬゆᨰꂝ⌇ꣷ䣳ꑣ쐓❀棠칰괘腊༜藫䵢䲦ꏆꠘ쵕舌덾Զ榑耊郢ꪹ\ud924퉂ᗋ㡖᚛䫳퓤磕쌞ಖ㈗۟ᨃ䙄꫁⡁ﴀ杖࿄㌙Ⴞᚳ଒뮐鷙ᙹꆗ熆洬ꚢ憒曈䲔顢ᑍ⑃쵶̧⁎蠓⌠살摢摃ᤌ餝茈뉆Ꞃ⽒졠\ud9f3ꉧ\udd0cᙰ癤ó⊉釴摒摓ᤒᨍ隅⥜넖烝⁬閁䌠鈢਋襫퐃∜욀㬃ퟍၐᑭ惈曘叜຅Zಆ䕠℣蓡ฦ죸㈹눩಍楅䌡㴃\uda7a쮻獛ⶍᰦ䑢⚌酘馭沤칻蒤뿞Ꮘ絔ۨ\uddbc縶蒈⽽颠첞ඦ\uda57ʧ쇏郉辵Ȩꋫ沋㙆↑ⶑაॻ뼇঑࢐㛇奎瑆憾検༆튪輍匡驤洲⺀൐ڝজ轢⌠鄓䢈鄓䯂盡ᓷ늇笨拤䚙ୌ衯ܮ䙾썝⛻꼠ႋ䜔很瀋\ud8b0䞈煀➀禡邇᭳蔨呦ˀ좵㈉爣뤓Ꙁ깄Ź낂箲䖺끁鿵荓拮郋⦰˒쵖謣\udc9f뷄箴뼆䚸뭜ഔᲊ⍅Q䓏ķꇮᘔཔѴ껏噦↵ᔐ琈맆ⴆ迈貘ℕ蜬碳쓜쓰숹炑л⊇攇㹇⦤䔔杍꺹\ude37茡৻杻䏌ᆫ鬇谯忣뼋㹅⾑ꀨ뺐协တ켊$ၥ\ud9d2꒡쩆➗后邠ᐼ䥠ᩰ㯤㨍ጆ軀悐㴠\udef8ヨ㞶\udee2䊋䆠惐挴場ሰ௔越좜ᖵଽ᳉砟㵥钓弇⁋᭖幰╬偨ꐨ뮪Ԋ㬆莘픠댍钬ℵ뉺颻쥅輕㩓惴~䡹㎗魥䐠ᇸ뇒尲幼퍼摀̊⢇썃贡\ude78틐翘ࡍ嶱츰軉葞큷⸘谂㘂흱꧜ꀰ̔烩ᣅᘺ䟽苡㱈\ud879呶놪꣇睋\ud832꣸Ḫꀋ䢽Ⓥ\udf45ᐺ䈱䚎酌全ꠕ꾎콛搛愈獨磈匑뛦ቂ륞࿤䈒ꆈঊ襟ఠੳ붏䈢\uda16꼈圃ࡁ䰀찴䔈⏤ᓝ޳Ҽ䝇䱙癯뽆ᨉ䨸鈆劋憢咣줦Ꟛ㸙蓢㭜ᾫ놂䓺쎈慵⣒鑫ംꔝĆ䪓䰤넖ࢥ⵷ᔮ애悖\udb40ᥰ鐡罷掋堸ہ텤꺐数䠌ቲ澠ꁰდ䰝됡પ됒ᘔ礷᪜埭ﭱ檣渡\udaa8ݠ炙㝕ࡹྯਖ䟱ﱭ칕郦搴ꠒ緶㷋ᲢႰꜨ꺪ཕࢹ₩턍ࠪ쁍䐕᥽茺观럀尴钋훹緡Ք嚪৊㎪裝Ǫꁵ䍑컙킯榩ᬁ桨륤ኳ颕ツ뫍瞝⯺葏胱偈ࡳ趈\udacaⅮℋ\ud829풂産蘁䠠ꘞ㪳⎩\nࡊ街䌒ꌽ䣍袖\udb0f뿔ᘭ䲊ꡱḍ苪ﲲ朝㾰ਹ䧈隍⢀๚ࢳ\ud992독숓ꖝ꜑잀\ud9c4沢⊀૸耥䟔䊉儞ꑓ༈䩂ಥ猠藢戉锺襪䤸阐頺Ⱓ≠굑硯젼戃䤃螄如癡憐꯽鯱퐹ᚨꟜ藨兑꒗뉚ᔉꊂ蓌曠뷓쐨ᠴˮ⾶߱씖፻ད蛒䈾ᄅ傑瞍黒ᝫꪎ喠᪢함욨뭤ⓚꅽ䗅諓¦䘴㉫需ᩄ誣㚕⋠넠틶膨ﵔ檭ࣕᆫ䊴螣䷂빢ᐛ蠭簘됊ꘄ㠂琀Ҩ霨䫘㗩ၟ닑蔮粠℧眎␞樲䊈媉邠ॐ猞ᆜ晨盤蠪桭ᐮ樷煦క븁ᜒꄜ媈邠ᚣꐨ얨땿Ꙅ㸗ꦕ앷ҋ썅䃓ﴎ漸Ⲕ蓎垀ૢ짬쭪㈚醨鳗䵸鬁뷚멧ୋ\udc07刀缁蒶熐룈䁄辅\udf75ᛆ䈽䘵쁏冼搝玻㝑ꐘ喷ᩅᛂㅡ摣記⹼矃蟣䅘좇꣣푧鸔坴ᬩး䐸⫮㕹䭼쾢鎖娐\ude43䴭ᒤ漅緪䒵䡲滄\ude5aﾻ⨌齚䡏蟻Ⴙᬒ薃釘좊缒⳯理鈁ⲑ臀뤨枔୰Ἲ⸶ᓊ趧凗걳댄癅챆쒺ূद隩㷔ᄣ嘪윒噧壌屧﹚줊ꑡᨱ撋놁⍆겑죑咈䆉铒◲맜肈톂梕鈙ᨽ撈㘦ꢫ⫺瀜ヿᓺ唗옗鐯惜簫렙圪㞣␎癀㊫緡얐믲ଐᰛ諊ၙ댊碴벛釚윃㑱栈촟癅㍆酀㨴⡝䃣ኰἀൿ獗볁\udd0dꦟᙇ脅碌跹嶑೑睤ጴ揙್ጌ褔殞ﳾ\ude25औ檠ઊᵂ辠㷒㔥垊䴎浐翴㜬欱烀䞨沣ﰬ鬢쐤⪇蓁近㡪႟͙뗈䓌䦱㜆죣䣣됨픤ꠊ軆䀩玤짾頓毫벰鯣蓔衞㠜ᥘ\u0005棤⨱娩ҋぅ䄢鴡ࢿ[鈯\ud816豂ꈕꉐꡈ⵳꺠䎎刣磡规灑펼堕ࡳ傈᭔䔯⣐逺᠕뼀浆㼢葑䰑߀쟈䖂⸅ᮯ㧸僶톁ᑃ둈䔑鲤嶑鈐痰䷒꾆声괔⧓ꃿ䣥ꩪᬞ⤴뾈ⴓ㸅\udb44ѐ໑섔掴䳽嶌ৎ蟽䖯櫘ಭ⹋㥎韠契펰췴廬⻑Ạ㇖փꉉ쐐聴㜶萄ｍÒ\udf3b膄꣤쉂伯๝褌䜒厁밎䨑ꐽⴖ╶ꓽ百汴柼᜝ᲇ䀧䙀ꏠ셿뽹ࡾ塆꟯ῷ湺㓽鏾골㬺⤎辎蠌玏唃娭Ȭ眕䳒きⰗ蓰╩姡葬澣༁\ud9d9ꛓ醙᧺栜န耓\ud904炀݃賐Ȃ‐뫼뀌㴋殮訙ꀛꍆ棆뮍⭜챏ᚣ杳ደ髛岩ا逑慴\uda37漵꜂䀯פ㚍깆輩ﴑ䚀鈭褗\udc8b湅䟫ꉆ框訏타ᚫꕦᣫ㨕딸ᙊ⅝ᖊ鹕伊ꏓ膈졂平聭紣㲀௢ᅂꨢ륁홨紈ಀᵀ෗蔗숶켯芯顗顊槆锂䥬헞䥦擥↹馵䦬ဤꤩ泇繼孊䡐碖봘㬰㐆ᅭࢾ懨妠ソᚳ䃙ꆗꎶ栏牊ລ궗ᘪኢ埙꾈ᾄ魥捱ࣣᵚ⡟ꅙꄗꉛ뉓騅稴䝢⤅柃梁ِ䃰࠼㹥ښ琿䕦偏톹鑗놋뻩\ud8e6ꍄ泽沿检䛐⪠䌬䐝넲甗똋䔂漂䊦퓢檃푀聰慬Ⳮ᪹놼肁ᱛၠ䜕疤ᇝ嵣ࣄ첣ᾢ猨柨⊭莱쥮釅槴뒵拃콵堙啂吏辣㡲ꏃﻠ᪙眲ⳌᄣྸÈǕ顜좤ᢺ氹ث첅䆉苩ⱑ蛰錳㵲㢞᫒䒐拜존ᣏ㈥جಪꛕ䔂䐥󤦕嚽ᩩ鵃ꈭ匁੓㦜훙䂬ꢫᐠ䗧읱惘驱萄ᠮ囫θ퀥抁중Ⓤ♌紲몋௩ⷥ҅냀㲸柸ೊࠗग़䉒ꊚꈶ級嚺꫈ﱩﲈ䴳Ꙉ땾獆ૐ넠请♇吐∫莌ㄥꐳ౹椒쌑壴즅岢럾ྗᅔ笨ⱕᙸอ⊘拋䠖ᢘ㰒锘销\ud898湜꓎璞長ʽ䲊ꐰ鋖秎憚⁅ℴꎋ᥃뚴梡⇄瓀䎵蝰ᣭ檔聍숽굽ꃓﰓઁ缍旆忂곂᧑ڠⶇ앐੺쒂ϖ懅聽6ꀜ堅吁攀ꆱ㳰噀ঐ☛ഗꠔ型ꑋ턃鄙亜ᬢݢᴛᦹ貦ᩘꡆٿȕޟ숯끃긶鶆鬐궀搁퍡䤀究٬猠⹻阨٦숫넆盘쁲줨컕권䭣ඕ痲멡Ặڈᶸ䟦욶Ħ聣걌쐝倍疊犁\u0000ᓪ效㷀 ᚎ倀ߝ᠀η였ū䵡胂氈쀽昐᠆렅ꠁ帀⩰䠠ᶁᘆ貮˼ꃆば䘪챀⛆딂邸봘ﺌ儶Შؘ࣬앴挀쒐⑦磖뢏屄渡⑱㊀峜瑌䦠Īթ䏱ɖꀧ灍㐔쀄炀鍣籣㣘芠ሗ࢔ߑ跎ǅ聥C聼㈟‖혋䵄媑圐失䷨㙌奮Γခ߸옵ť㇉耎倲␃鐈ꦍ一犀唱젠࿨❷ᶧ斦싩\udb1c扌胥氳豉貉来熋ꭠ\udc63鶀眘콠ᣎ쟘௖쇳画䧔绁䀨똀ࠛ遀㛁縁≣䓘ꢘꛏᭆ⨂䭸ݞ쁬䁵z聖똘砅⠀䀃䆱⪀犘ꦈ✆ᦙ쪜̌祊­ㄘ汜䡫Ⳑ╁亣欁╔䭴颾䔁잕傉쥲䁞㘽소錝䘢䍀䒱㽐⋐Ԫᩕ੫٫臕駛㇃␮챘줗댙㉃\ud8c4ऀั앬溝ꎦ⾧楖씀ϕ낆癞颖똓鬘㌒겕䌑䋘䚾䆘覝ꦧ᤭覡앴읕뷃ㆸࡤ䱘鬄퀎⦈簀ﱣ룘鞬␮ࡲᛵ趀ÜƊF聥呞㈦Ԅ栀患뤱퟼❈㠮Ỡࡏ㓔䄓悤샎谐퐎ሙ댛硥泇ýꀒퟦݍ⡔춞⨯⓪┐屳᥯斡刦톈柠؁씀ﱜᓌ䎶ഘࡀƼ앑ꃯㄞࡄ嬅ꎌ萇볆膰떀䖘㺦╀྅裥Ͽ臯㇄墺⠧⠌謚歷吀诌㗸ఋ㵾ᶻࣟ臶쁋㲤.ⱚ뀇謟倆츃뭤龘ꬌᥚ駢ௌ聒솕ꢜ႔ぷ頼\ude18錒聧˅甩\udd4c쥶㜶ᡱ邗肒㭝᠗ㆷ᣻茽옥猑㎲偘폄漘뉠Ṧ靳ᅱ覫捅ŭ㆝㬣豞鬗ꝡ囅콲ᥣ㴱왘䏆㕳ᤳ뜄銶ᦔﲳ㬄똕輖쬚曀䨁撥꼑嫕弃ㆾ鍺⇁搲놰ꦭ憰䪅㾔犌靱◠㋬邸洘뱮㱮᤮䘨Ȍa솆肒챚작먌醙ﴀꢱ࣌䨦㝸ʺ잪ȵƊ넜ꁸ搹埈ﵠ章緘았\udd32譖⫄诔|捍䃨颧宛帟舉힆쥐﫰烢Ƭ圛ᱵ蹓雵劭ᣰ誀\udf72茪푆댒ı캀₀캹ᷲ㜲䖕讋å拜聽聸\u0001嘧倎Ⰶ䰁딀쪀ៈ᥀⺠Ƹ謼ܪͧ¨뇅\udf40Б퀔欝₇᫆채龘Ꙉ៊Ἤ蛒蒞ࢇ䁲䁈筏숶稑ጔ禌賆핢ᤀ㑘ז⋓ᓿꅔ²9䂀_앀\u0003ꦸ䶄⭠칢\udcb1⺘쮌爨菋ሖ썤႙揆癏ᢹ锐蹜책斉\udc00䷁鋮Ṷݖ∾⩉軓ꈉ뀺녈屳걥혮ᬓ疈絣쓀퓀噰侭㱁ۯҩ۸ᩳ腒ࢿ교(ᘡ鬝钇Ⓞﮱ຀浀䗈␐᪍ˑ쟴耫抠肹쁦ⱷ‗逆覌별騀\udbd8洌㓜իࢦ䘘䊅䧩碠\ud891㘍嘸퀂\u0003䛆乣⹘펌罎쪭襱趰鏣掆皀尢汯꘽쇱蔈ᬢ䅘뽌䶖୍ⷰ躹틼壭汥㨣䜁炎ɉ䇓등˾ㇼ瓀艀䘩䚅覝茠耉쁟䀟ꀶᘭ㌗薉뵢쭣絠檀൒㑄͔貭裬ƕ僕놎J걸꿝趁禍髄耀ꆱ\uded3䳬䜨ကЙꠀ՗鐀̞䘀ƛᓶ၅\ud89e䀬턌꘧춌䠢ୢ刈ᘠ᧜鵖\udd4fभЄ胈ư젏䀽㰈똱굊ꞆỆ槠잱㩸䧬嗦㱛譐ͪŗ䆍䁒聼챪꘡＇㌅茫㷀夀눀唬祤鵋ᘑꖢ酯槈碚션放墣唣⹈䝬鹺罡箒㱶㿵蕆莌앪ēㇺ耊ⱳꪍ쐂ꢃᎀᗬ嫶㵰_䒴옻恷넭᰽젋耊嶏ⲛ䨉Ჱ蜘챬奛ᙳṱ謊쑀膮㇖氣Ɑ\udb16훇盅￈㿸Ĺ揹ྶ㷣ᄀ댌앑Ʀ녒飁䀵嘤消ﳆ正Ԁ⮘氲୑Ḷఄ艓⍟₻₡偐蠵瘰ܑ쨄䨁ࠀ਀ⷬ榦㶐̀Ѐ΁⨀赿著쑇嘝햌쒇꿀菥➊⡝峩딈駺䲯싫І煖ሀ鉬㌏Ἁⶈ⬎꽅止憄ᥐ埬䉦㝐ǽ譼욧p뇩频㮨힀꣆겱⁈⿄ֈ⣗菸藼䙡諿ᄣᣐ␩吜छ鈍䄠ߑ僀\ud94d᩠ɱᆰಧį싦䄫裌颚꘡뢃ꦎ渢䓣ஈ뒐⩂ڜ঩腸ʴ䊪ホ袾栰쐩쀘︌⤁➈艐繥곱ਐܟ쑞ⅅ臝烕\ud8f9蘬䚃鐄Ḁ뽣䱱귱湐ई዇៊̼쑽끦놙蠎䀘㘬\udb1e⛆铆둣౱∄䍎⤳ᅅ袱얦戵뇣갓䀯ꀔ悀䢃ﴀᣁ\uda00牰ḖẨᐢࣹ슑엥桤焏쑹ᱥ똣Ꝡ莎鳅⃣놱骶㨎↭蒹豳挓拽ㅄ敄뤘왚ᰅ䔀쌱ꈻ娼\u0012ɖഎޘ䌱悾豙娯慭ꍐ둀ࠀ腁佋ꐀ责ꉔ挲萅,᫊꘬걋朒掍ᧅ빢뾱ݠῬ眢鿻ᡀŞ쓩褻胱〨蠯؎⠉ゅ仆胢鈀瘸珎㺏۳詣삱煂氞鱵ะ﬒\ud98c曆厘蝌䇎㧓ᑳ輳悜ㅞ壥책츷ܖ瓔㶑ꬤ衱擀祊Ᶎ㾧ᶪ捪b¼ᡸ䰞☁\udc05潢괱諬忆㕵裔݅쑲脀hﺀE\u0002ﱠ\u0006䈠霙㎊℃㭀ωᎀᘖ壔श옂䆇솓け踫焝뢍鎊緀Ըꦬ秦㉓᥹踦刲넧ᢧ䱝똾猑⛄賭벱Ꙙ鉬堏\ud9cdꅍ賀䓮灩놋㭋豄嘴圝竄쳅锁₀ເၨ੡ࢨ۔戍Ǘ뀼అ䱮昹匐妋哅坣啱籀擜䜨ᕩැش쒪É惵㢪\udc72\u000b\u000f压\u0003ᩢ贱暘ꐀ֦⢷ᇽ͙왤蠹㣮丯ෆ爑賅ᣣ慱\uda80䚜壎㔳ᮅ趔쒦燩뢲堺㤣鮉䊃쩢猱䪘蕜疈؇Ჽ㘁퍫ౌ㐽ᘟ钧璇屎䬑㜉苸Ҥ餇㭽ᔮ㓛ፋ辱씟揩熔⁏챠㤎䒇怆䑊ᅰ㷐ᦸ㱢ᓠྐ腍쇗낖䠆ഀ₋휂匣Ⰵ馱楬奐៏༫违⇢㣘룮퀤긩㬕찄쏁뤁햱됸ꦜ內ᴪޯ셕ᇍ焺ш뀞Ć䣮媇⻆竣⮱험䜨ကࢯǛϋ⨀ëꌀ\u0010 \b翍瘻頏䖉䏆㠁\u0000郿銆῜侁ῷῠ䐈⌁뇇風챶곁㬑᥄瘁⇣厱\udc2c砞㴝׼Ɛᣁ焿ꬻ걢ḫ㬅Ȃ面瑸ఒš鋳鬶䧆惲ꭓ녱蘒ⱺश蚕䜗ﴉ圻錈統치뽜爎⁧憃賲애焼루똿∀ᑆ꘍맆異䃄ꅘ흌䉮⺛቉譤኶掺ਖ਼葏䘮愞ꈊ閂豀쒠Ἢꅸ鳂фȯၘ䚋쑞\ud880뱚阶䎈ൢ뵱嵊ᬼ戎㗋᫋蹵튺拱녁룧汘嬅켖譡늄￘ʸ뮜篆㹧橃軋잡偐䀑ꐿณ錋約ﲀ㭀㪠攋◬弐ջᕆ蛤Ƞ\u0014耫″흚잍ρ眕ᄲ㟏㍷ᅱ教ゲ㥓쨿炘챁ᘡꠇ왂䍢衈缄Ⲟ㴳ֽ᳸愍袾硑뱖\b霝嶌㯆溰䎠蠀๐⧞㝯ᤣ迁⌥臟삝〒ሧꌌ蒄濂ꇅ觢⤱恸鴀᭐ҿඨ߃⏺䄍肘룋Кꀞ圕包䫢䌰碸쥜绐Ἄ薥߃⁷Ƴ燲룘㊎愗혁\ud800臇᠁楱恘貼䥮㺫ᭅ读에9䂀\r곀9徆기\rר\u0005뺌\u0000ņ\u0000\u0000෎耀妓䀀ຼꀀᯧ퀀ྷċ琀c쨀Ɗ销ý䩆룵渱氞梏즄膀乁嬰ꇠ旐ɔᲹే詫왦⁭ㇻᣝ鱓⸦\udb1f鳅⸱恢❬姎∭襗赳恣䧳\ud868怨\udc6b⍆㇈힉ձꅣ樠Ҹꈄ珫ᒴÿ舁芝拰년렷鍘἖\ud803蟇菣儐郸씀㐾㣀ଏ辉菃噳格届㸵ᄆ辈ⷀꭢ뇱က洼睽耯⒚஥ꅀ鲯孙嚟븦ꮓԈ䪷泤▼᧯ᑂ䍻쒣肷Ⴟ쉍쐘넂墊ꎆ阠촀岘먜係࿯쇡Ŝ胆섖須\udc06萗Ή埅\uda63泱壘슼箦㇏ᰛ襶쑕煕碗ࡖ쉔\udf1c\udb15屢\uda74䶘齶⏴᱗ᜧ癁뇦\ud89c籸똧亀⚕퓂큡쯱勄Ỉᕾ㈆ഊ賊쓃ग‹耴怩䔛笟耆〃₀蠑ﭸ⽆≛朔֩Ό抭ປ녝줘Ɣꐧ嚤뛴㡜ѷ砱⦬౏與닸앥煵墀䱨❜圔했翄ᶱ儘Ḝ瀎㜸ਞ䉈r耇Ⴓ䀸\u0007⠙\u0001쨁丁텁⭀\udfc0⏖㖠ӠǊЂ͇냏墏碸ꀕच昁鿀겐ᡈ畦垥㰔Ҳเ䶡⅐኉郭굁괶쥐覯炫洈㻄됒䏵㲨ኪ♭䞂⢪墭뢼ꀖ\ude3a贀鰁㫆䮱겠랬夀㲰ᵰɗƺ腿煢\ud8a0뱞㸸㴔谀䘀婠ೠ㥘ᥒӓટ䏋䁾ɫ瀄⠀ꁌ一홈뻱ꥸ䓦㕟ᯫ觯쐆䀝籩帯弓ῆᯣ逸曦燼羧ᆯᙇ读왮뇉籠\u0012İ\t瑡쨆⮃က㥀ꠐ䬂嶻ᲇ᥹贘ꁑ逛搘쀁椆ꔃ✀⨄ㇶ⡷ᔃ퓠썘脘셙‴鸮耇뎶⠦慢㯘쥲箬瞠᰿ᵬ⋧提\ud84f댶ᦙ량귆֐冸ꡌ⍾䋡㘿鸱처冺䢕温҆鈺䄹ꒅ運椡⿣穱Ꞙ松⌛ᾳ蠫씸ዬ놪ᰎ屦ส챍莌磆峣휱䓝卼溆著ᾏ贀ⓞ扢\u001cꁄꠍ䄫␈\u0004幔\u0003珣\u0000㌁耀笳㺼寘䪠醅质⟄삢걜汔籓䄾㤏\u0012⡱退ᥴ᭹Řҕ腺k࠯砈됆⸓펇㇃㌐⺀泄䏀✱ൖ᥈鞄┑섑े쑤䉘簍ᔇ遌ˣꥣ멱鞸泾㞣ᕆ肂̴胄঍퀇챷ဗ貄㛆⋅ঁ⻱ꒄ蹐؈ʐ鳺썳荒ጹ䃑Ҏ倻ℾ邔ꮉ⏅嘔蕪਽紞*䜂삄꒒ጒ퐝爸⨺坍\n藅ῢ扠퀀⍐⿈ᎃſ襔̝扯䉰퀟섎ۃꐤ踁椉ᲄ췜摫蠐餺Ҥ樻䄊삏䀔\ud90e⠃䀂唠믱兩\udb6c暾㕠鮀띘┹ृ艮ุ没戤泩秣뜱ꆘ马洶⧅¨䘐茪თ葡똖䀗ₜ㚳ꗄ䭣ꮆ憄ꕂ⻖ሰ鹥蚌♉拨熃졇䠜錚栄ꡀ⢂貱鷰ꟸ奢ು⫷ᑰ䠴쓞녞耜ꀰ䱠\u001f꿒鼞⎊蠧ᗁ⻘⮠⠜䨶㧠麨ꂬ♌⁩㆐㣙\u0006ᰎ⠀调찃찒躄ꖂ玡㷋ᛠ䫥잜쥇熊悛姛㠒⁀륈ռ瀁⠮ᓱ≒쥲┑듆≪ഔ׎㱉꘦ᇈΚ沈㊾౦♶ɍ蘜ɫƻগ䐦ꄣ낐㆏⨃㘒笉ࢰ୐⠛ᇫᲁꐲ腴ᅢ듷\u0002騀섔箈遌껆\ud813톱笸狁◐骃蹶箺ሇ磮屔杯ꊓ筢䊸㾁㒷ᵺ숧쑲脀ꦍ\ud8c0?艠\u0016兘栀䀀ﬀỐ誀䀀㸿좾ⓐ঎ː⚟䀡窟ࠖ逩䐆䰉ᘀ㿄ೣ䧼鰘㲬亢ᔸʀ䥀˛\ud8c5\ud89fꀴᬅ\udf1b詁룡㭡ꡀ阈ⷀ⤑㮠ଟ覎ਰ槉勄㕘쁧⨪疁䔣㏓ﻭ⏶疨臫莠觸仨৴ᆍ쁠恕ﱪ脡゜鞎必䃱籀™枷単ࡄ䥨ዄ\ud8a0尦ȴ欍肇᫂뚴㊂祸釂䚾Ɒ鿟謫오肶া壟‾遀팔ᗇ蜁\ud912஄흂盓别ၛ헦꫃ꢁ儐帿༯喏﹂탧饓ꬰ押祳蒞㵏᷌Ɠ왎熍젛ᱱꄶ邭恉忆⛢䀀饄ꤼ䩶㹗ᾷ诤☫䒖ȓ鄿暂\ud881ȓ鷰\ude80簆㵈᷺༡҂胰궭 ӆꀵ丰盀ꨧ攓禀촸\udca2孎㫷ᓲ씏ɯ3Ѻꠊ㐊舆갇ဣ绢찈ᘄ㊊㰍ȩ譠䞰⊘ᄩ쁆=낃튂撁鈐䧠闤灄⺁௭`䅃ǝﲵќ툕䘆ଁ䶐뗠\ude04㿜征ဏᐐ䝆䎂ź쁡Ц耤䄜㈈眆龀䠑韠䔤f♩ᩰ҈葒ʔ惢࡭顾汒䄈嬐㶈奢\udb10㶈䩔ྫྷ㡜៘跁خꠗⴟ㢻ꀳ耺ㄻ\ud885豏軁ⷱヂ畘৾㥐鶽豮肠Ď‐ࠂ﨨젟뀊\udf12⁆㯣◘殰羼檞㸹ଠڕ욧扳ࣲ룙\u0003䄲愋蟅燰뺰嵀⒞⮘鮋趃⬣ò룃䀷鍔墘告運룈泂慈濇ཱྀ䡯ꢱ\ud901⓶ޯເ憢롈ꇇ᠓꽘쌠ዼ㭠䰟Ꮜ䢇얷Á쒸ꐽ혺圛汈瘤䬓遀勄ಱ㸹ܬ䵄䀫Ᏸ좢쒒쉘鸲汈\u0001\u0000胆耀ᒽ䀀ԫꔾ　༗ꠀ߷銎☀´쌀û䚀P앀\u0006뚷㸫鼘\u0006Ɗ踤㨓ᘉ⁄퇂丶ℨɗ軲➸ቼ녦墸锱ꚗ꺊澏믊㗢脉ै䛒᷉ӼͰ蚦䇭둬恭恬栞ℿ趋箋ꡈ푠乒赠ྫྷᨑᦄ䐥猛ቲ쓶餹倃漛ꡎ䍣\udde2검莼種⅏ወٖ삒Á邿⁂屓︦閮됧汲澙⡄＾㑞एᆧ晃Ђ秵棋鉣ꉡ\ude3d嘋帧罣ܖ寄ﺢ罞㰀靼䡀˧Ᏻ襓䓜籑鄧匠㱎䈣༒≘ꏄ\udf3c≚ဈ镭軯쒲঺쉾븳삒겐氥Ṇ⅄蠐ᡑ㘷ᢸ䱊Ȟ抉঩碠䉸瘉끃컀ꇨﴔ囘㜼ᅤ慗§膃Ꭴ࢐쒹Ȍㄭ좐끎ȧꯣ沸\udab5␑⟈飔ϲ╗ኛѴव퉌ྦధ\udbe8＠鈄灢䲁ਘ鼠䎗胷ጒ䃪墠䉍ᨈ舎℠映塰嬨ᰬ፸ۘ亖쑥䇡聓ꐧ챡瘺쐉\udd88ฦꗢ➉ꑸ됢䵶ⶨ॔­울喘뇕뢎Ḩ禨Ő㰑版ނ㔢梏꼓上蝖ퟸᣛ㵺갎㱛➹儭輓찁밦㎱꘤Ꝭ։㭄骭賮얾ጾ쑥䰼뀌䔇崁쒁왡⋚아팢嫎㞌膜䆉❧ᇢ䥹쑼\udb9c桚螁ᦱ\ud854Ⅎ唟⭁詇쑅쟚Ď⥐뇤쓅䉩︥傐᠃馁ᮀム⠀䲨ⶠঘ騆셦☕揅胬쓷턳瀌鰆逃缁뤔˄ꉜ憉➍蜘仾➯觪詡逷䤽뀉간一隱ى䯈\udcbc崉ⵟᝧ谹씕㆖刨ታ鸦࢛ɏ☃⋸챸ހ卼忼↸駹諰荨䄼ᐤ㐨쌄ꘇ龄勂龉曄ꁌ怀м퀀׷ꠀܤ훧였Ƒﰳ覀\u000bࣵ⌆ఋ枇돀传ꥀ칸ⵙ꓉╻ᙔΙ胞;$\ud866月脦☄삈ⷄ蠓⢉ 倘⭰௬蜡荄̘悱쀭候】聡蛆\u0001펉耀ซ๐㥘Δࠀί킥⑲肘聘剋‘쀇耀࣢괱咤퐂瞔॓Ị䳭쓱ी䓕鉣脳弝뉌봉湸끕⋜即Ꮒ䨠뉏胈ଙﱽ㘰좞뾉ᤥӭŉ㙸浆ࠩ㇏ช俑⒕Ꮔ\ud8a1鱼昬真ஊ췆⋢㞉⢸베ᨮ⋫ဆ䙥⟂鏑䀄뢤剪㌐䮎鈧뻹됺꺚ᥜ딎飑似螅切寮룜ﴹᬌ顢䈂밡漈쩰䕀ࢠᇰ謘䦔욳挻॥䁍쀬᥅倌⎏픦餒둒ะ衺빝鿧Ἒ揕팺支璓阣䜧썄ﶌ따懁⭀鿬等⧟ᩊ䖵⟞᎓䤭᱔퉇’䂖㉋必㍣䁉树┇៧襡⑗ዃ熗㢤푚碘毅뇥썉㞄⏔呩⇰辩䍅␁ 왷꠳鰖者ꠂᴁ㕃妐끠㕄헂奡⾈્説➕℀Ø䪯ⓦ퉌\u0010\f眨\u0004ô\u0002꣪\u0000뤽䌄㧰㠲ౠ耖蒘∹膬ㄆ㢶≝ℰ퀎᠁쀀缠᫈㄂缑㞘ࠤ䶽怴䆽ɱ瘽풖ᇳ콢죵뀁晀躵䮯菱⋏酐쓸৲䈩威纂䒙钃倥鲒텠넰䞀㎌ᐌࡘ޺Zꆦ샤ᡵ創ₗ竃̧꽣玀稤셒堉⧐駤䤮▬ዻ㣨ቇ脲咚⇋넭敉䡄鷀נ屴銴ឨ쀾鍆ࣆ큧퉔\ud915ඎㄥᴀ㝘Რ䀀ÜꀀɎ倀ۺ栀Ӏ呎♡ረ视䓙艅똥鍮⸄ᙀ쫑℀俠峼㠾ᴊˆ࿓┃즠㉓ე䏀䏆敆窩\udb62䧭勐Ꚛ艐䁜㈍㬧뢕Ⓙ᤯嘥ꎈ疏턂䠒캱犘ｨ࠾㯉궜·웢ৗ쐦ⱖ渻退각餁ꂁ궞領⢌᐀ࢗᡈ䥋쐚銁য怄䀍ᨏȬ쳢₋剁╠田宸Ƒ㼠鞏貙➝拢쀡撏籾ᤜⲘᾌ謤璒拉榸虐ə㘌ꁂ࿤銮↫놕撎倠\u0015쌷揄눓ꋉ䴸聬孮ṐǈåƤƒ쥒老割줨炘屈愧겒큉긄䜙㊸鉍販ᡉⵍ牃艺꤫↩灁砂ᷠ ᫀ⏁࿰逈䧋왶鎇ॅ쓦㉿倌咘䶊邏ఄ퇼ဵᵱ㹰骂䵴⟹줦䒹艎࢞L\u0001帆\u0001ꝍら䱸￰ઠΔౝ諣읳磀\u0000Წ\ud932撛♏喃怀唀瑤\ude40ᣅ࿽쌙趨艾錸褿꒹䀏ᄠಙ\udd88ሧ⎓쪀ⴠ暲䘹⛵莼乞驴頿銠陚픹\udf43#콠嗙棊逆晒髓䴏ᑂ䅟⃏죴2ꐻ頎Ȍꢅࠢ間磸꜉㪊ᙬ衶䦸₝鈞ࣘ酧퐷ꈌも备砀威￈０壂㧙⎧᠈䳼엄鄽傋표갉̙ꠎ鲁䊁㫉㉤槁㭵豺약憞넍VӪ山ℾ㒕偋荣ౣ\udf58兣眢䷙ㆄ醲伊쟶鋖즃꒟䉫⣈䜫ꛇﭣ犐궿ᣌ䪭銴郼䮭숅鎠\ud816혡쐃ꌚ蛃뜤瀀ꃉ戞㯡ཅ聯誹聏\udbb4衙葥耖ꔠⲛ쇌楧ﳈ㨴냉婴ῢ扊兜鸘䅗╆ᇕ줾顟褙氍≁ﵙ좐\uda50⟐䣜Ӡ 錍袕茴耹䃈䁳耱ꠔඉ盁몃ධ܉晄῞ⲋщ왼쐏鏏塙뢟젾䶅ﱏ洤㐚㕏溾㍻邽躴䥄惃\uda38ၫ隘忔⽂ꚳᘓࠒ深戄ﭼ汹㩀锾䢤⟷鍅s汈蘆义㐦繢荐졠໋₄ࢲٴ새芌ꂚ飋㐭퉅ั\ude49ठ좑寉ਤ໲䌙⮴铆䫷▱錹焻Ⓣ쉞줹䜦쳢鯢⺴તꗂ䘉⌬鸦왛ꨉᅐ】耖﬘鄉欌㝦ﬤ텉⡀㉀ួಃӴ䊏䅡ѻ캵鸥撐脦誓윉頒圙╙♹焫㈐짦氐倎㜞ᖎ尧︒ԉ毤혂릞齈戛埾ࡔ䠎ﱥꨳ紝쑊き都针蜀婓悒曠ಪ胒䵦♴鍶癑न⸱먁ꅋ七ꨁ娉ꖒ㋲穤岬鬿诐ꑖ鈚聕꒣੼〄슑᠀潢巢Є쫐◛Ⴢ酐åȸ労⧭壡겏\u0017ʜ⑀₥밀蠩썒禢∀਌ཿ葿섓ᄅ袝ቯ䘬쎋퀁\u0000蹙耀થ湼䍮　Ű頀̂卬☤匇\u0006鄋䊝鮈伓\udeec䧤醌睆むࡑ䴨ꆣê‑耲詃渹墐Ⲑ锃绥嘤鑬⛕ᑪ弍蝐䐿㢟棷蠝゜\udd80鞃︡姠믰漣룄Ἥա腽늈叓䦿撫뉂\ud92d撛\udf8f묤蛢╉佤\udb49ᱟ页⏂䩈厠劊蓊錄䔶－ᅎ騂쑒砐ᘔ퓧ά㽙耘쟡∤솏⁚】ሐ␄\udd18횥㱓ш켔ꑜ⯅㑜鯜䧾╥銴ꃂ7縉〄 熸뫠ˢ紉ⵢ銰伂▗Ꮨ짬ᓎ㉓\ud930齂ǀ᪸ؒዘ긑䎂哱㰨䙾䮷쑈ቴ⧎똦ﲚ뼥㾓汴摀촫ẞ蜄␀ꃪ勶퐅발䴍쌓⛊ބ擢᫊ⱓ듉ꖄ껲剅➼飛趿☏鋇즓ⓩɕ琒堏ᒧ\udf93꧶䨐⇔⮴ùேѫ쌵碍䠉䌃∆ꋁ꿀ꢘ偷☌ⷴ\u0002饶䱠ꟍ鍡⤢ꓞ퉼渷\udc9c襏嬥謹㛉㫢妆吼鲪䰋얕鉿覕ᓽ걍䠛冁瀀ଥቓ캱嗐❒䇖㷒飿踬얕ꋠ¬㌎騠볆⹵\udc33죸冤驎䖖ꢟᛠ䒒䷻╵鍗논꓁᱃쬓鐀钂㫅똒봩袤\udf4a䙥⏛浗膔ꗕ⧋큅䩽긩윖ﱅ燆瑁\udc71仍㖜奥◇ᦣ蒬꓿ᅄ퇱钚ᱟ\ud93d光馍㠥㊒溠Ⲥݮ⭻៱䲑➋錹⧱彐ꂆﾉ엊딒਋띱㪸婢毩Ⳑ䰒䔣ꟿ鍣ㆣ룷昳傞\ud94b딥癒ᵉ∄뚊夘䝜騯͆샼䂀肃䁷뀋吅︋벅ᶁ⎓휩イ췊欩㔔餁亻☭鏖⥬ᓱ剂Գ芟뉉︸塥뛉㍎⮡⃳ᇛ瘣슑ꃮ硛ꠑ렟焋䉌㒧઒堩⚔霂妥◲釁付꒼㤏擁䒾੻쓟궏쉉煠⽀联ࠕ⪏ۘ䥞쒗ﱷ네긂퇆뇹쫣儐늀䔂勹⴯፻觾╰ꀶ籗㸰\u0002隘\u0006\u0003這㇣ꢩ䵤\ud9b2倡㶀蠸芛⛖ࡇ₵ѭ砵舒褏ᨁ₦阒⣉蚤ㆎ㓔陣輵✡놣쥖ꒀ᱇ㄨ誒ᾍ阦\udb12ىᑔ퓬漕㖾⎹什魐根ôᨭള㐡逥蘡䔀抩粔鿼成ꆅ幅⁐肧ꅮꠇ밪蔉ᡉ唦㩒핉䩧⮼க㹉ۥ䣠聹叧娆钡剳ԧ뒒왋䨲셒ỉ嬔ꫢ喥べꦉ佫捦䍐褄汦겔잍䲧㈒ﴩ덤掹㱛蹵誣䍕錻胸搜쩚鲒ꀃﯲ惁闰耈槸͢೟ࢎÛ菲懌⋉촆衑斧胢₲ฉ鄚垩㴊閩䯠曳❘駊꧇壏䩭ꪝᪧಓᘩ췃ยp守諚힒䋡䄁ቀ蓾ꐰ숁躀䂠㐒㒄ନዅ▲鬥䪞⚨历聪恣੖蔮频퉎荢ؔ쭒眠ᨆŕ譨⟼颩넞氚兀谢潰⦨驒瀮䁲饲䌢Ჷ샷☾匠䧏铘ꩫኖ䙡Დ뼺淤虿ጩ覺ꛘ删煞ᒺ㉣픧覇骥焐풨䭔븢Ầ♌鍵佰ꐵļ⤛쓈牱蠏ꬕ眆뢧ע\udae0ᤄ㙖㙁᎕辐䓴懆鍘襰ꁜ牷袟祈絢ƒ☊睩㢸靶䬆Ꙭ刡꧱哏汄ꉔ\udf1f俄㢦䔓㋱嫤鲼繕⃄镈⎦ꕤ္塨뀮嘳㔺䲖镉\u0003哢躀朄踢䜵㟴鏄䠽怾ǉꦼ耟ꀷ⠖暭籄騦픒礱㆚㥈᯦ሆފ膴‷쇪ꃹၚ屒渓캆艇⮀ᔄ⤰⭚ᶠ臸䳎ࣩቿ৺䓀쐈餤悄煮頢䦓ꘈ\ud988ް᡾୸蘐ɔ苖憖ࠫ䠵舆섘ﲆ㕁\ud823쟠ﾐ뵈΂⊍ᾢ蜁蔸↘삦僣䠃뉵섘灅㬥㰑瑚꼄带㪸Ȉ૳䃘䇝烇咜牾딫袘浊觉䁤䠠࣊鉙蹆ʚ⦣툢⒌\uda52ꉃⴕ돨ձ贬횢⴮됈吒៛腴艱邇炻怮氹瞋\ud9d8犁\u0000翑铸듢怀Ꮋ倀\u001dڛ逺ꖀ梆ý렕∍窚㮂〦쿢ꨉ粀㭢粮㿒फ豖쟶厰줕쩊씨튕Ո珅≒⢔毜餃蝜䢑퇃厊䠠䉸쐝෇퍶㟂厀ᤐ殠旘㡍ඉ֎䤫눁녓聘豾쉲锢虁封䆰潘㎰⟪䂱◺騏豖얧鉼ᑈ뙸蜺䮍୍ధS欅땒搰獣ᭃ횊䙌㒡䃑臂‴桺렦渆䔄鼁⠁祒ᴩ拤꿪䗙㊻ᤉ焹걦橫Ҍꇴ塀樽ထኰ䫤㷴逆샨왠퉀\ud808룤㘄ᬟڔ䀁뵡얁衩廸鿕뒮㒢蔤䳃懍ﶁꥰ钰≫꘱\udb1cⵌ῅앒㛉‴흦鉕㷣ᥫ搸│ቝ꠰8䀛䘄⭆堀궁笀뉘竴ሹ⹓ᡣ䰖┃쁱焺聳␥㜉썏䷀데ﰴ쵪栁㽆鮽䲧였Ɩﶞ䦀\u0018镀\b걠\u0001⻃琢⇰먥㚰꺉ꇐᮢ䠾䟺餅䲊ꔰ鍬榫擳䩿뤺ⶌ椋਑墈硉袢᱊䚘⒌䏢亓압ሂ䧒\ud8b8뀊쀐㼘ⱌ菆ꈡ檊剶ⴼ鬾⊦얭㥴곞ꬢ咝쉈䌙멥↩\udb99ﻘ嚮慊纍㲨܏訙꘩槃ᢤḼꁁ⦧쩩䘄≒彍⎔ࠀ҃鐀Ĉऱғ협渳㄄ࡏ蓂嫁槐䨤⥐ᴅ˓;舚?ꧥ剐媒뾎쥋ᕱ⊈﫹⧜㦠ùԀ┝懐䌹⠕谐\ud8e4螴校惁遀㵊敶㠖驤䬣쐑刹䂀o&抦ᄹ꜖蠣눁㥀⇐幀㖵㊦鄕䰖Ꝼ鏙熰ᒍ艸㔾ઑ쉍ⷈ粸晶⡔邙⟑⼓肊€㴡楱䐨Ĳ蘆咔춎ᒤᅒ쩸ꦠ㸙˰銏¥ꞣ鍦袲鄉鄿嬅த짖㐙ܼ\udec6ม輇཮毙➆塤¾뀛ﱖ⠃颕裂閤蟣敩ᆀᩂ搙㧼鞏噽䉶ၳ恩\ud81f愜娅䜂鰙ȓ០动敄㻩ˆݏ䜥䌷ꂨ¥ꁌ婗丹늓ॊꦧ틒饩Ẅ陚倍㰷ἂ仔髰卼넿铰≒ꤹ⚐榊蔥㮀칼幱㿦饡䧾┣銡䧏飻蔯﬑ﴇ썲ᙹ魄䭛㸯ᐏ࣑䎂⚠銬䤳ᑨ鹃鮚辈䂓ధ寅Ā\udb78뎼勱㨍衛乂̖툷覥듁롑┠㫓鉀꺴쇂⤁䂺౲Ѭ™{逮簉娞⊕굌㯅⑓蔐庀灌眾㛩Ǜ䫉ꐯሀ‱㕺숼낄뭋氣ۓ䙾襍標Ƹ辌줫⛢몘ᥨ\udc77ᅺ㼗ꋄ龷鐧伓睩魸ǭ➶麻䦞⑶틄ि뒴牋䠋퀄䮊Ф鼀顰旜賠ỵӱ䖸胫膢楳擰ꩀ딶쭈놐앒䖩겴\ud8da濮彸ꋣ䬦ͱऎअ뒒䩧뚒㞍\udbc4뺰ઈ㪈ℰ㔵㛢魄.Ↄ焥쑔鱹焝╉ꎤ垓⽸ꋢ㉎㒸蚓袮⍟ኺ놑聯퉎怞圓ꢁ䊲᱀鵉\udd38㉄ᬖ鯶䨄✜ŵ䡈〔됛谄ࢅꙆ掁䷀䖈ꦴ닜剥㼨氧伶꓁\u001cꁫ\uda32攳钟ಇ鐂毠썩璴퐺摭⨈鯤䱻⑰錉⨄ꩄ≯阿鑈煍䃡䔒Ꚏ즳ᴉվ䆔⳥街烦哅惸ᦊᡋ轔ᜅ锓ٱ੔闊䓮㋇ᆙ褤ꔉ퍓耢璪⩻ఐ\ud801❌쳩昴ꉄ䔆ᵟࣦ͒≱䄠⃨ᡊ鄖᚞螎ᩃ磠絒罈㧄␚рબ蕓蝈䅜⦦ⓢ橧⠚㲜䑏㠀✀ᨉ喠篊櫅㣒鿽䮀ꘀ툭⤾蓒蔤窅Ꚓ蕍氰䃒ᶱ䍫漪傍〖鈣䳌䌍敲䐭䠁崳䢌坉鎦蛓꾉묻㔒鷕㤗ᗪëꗏžჇ哏䦩픱ꈋ鐂嵓歉孴鑪綅㟻ỗ䡪\u001d펇椳㴏넅׈쿓ꡈ嚜ৢᝩ㰜쌓嚣ᅦ쐖蠶䡔퀿䧕梏쾀⪁햘ǩ譄恺䫑᣷؏低脝刺榹਴ⱕᨐ횓\udb49㖤ꏒ㰐軄胼壅᜻᠊ꋦ쟻\ud859璌ᄞ靏鄧䓲蕍칤ᴖጳ蕺鄣䆢ᔰ゚⧌⥒\ud881뱓똓ẓྌ➤\uddf1恤뙺昮㋎銇䦀ꚺ኶䥶㓨≨딼㜞쭋뭑휒懔赸竾㙎鋙䨄␉赛僚‌琵挙璃᥀඀뢴뤲搠Ӡӏ軆Ⴤጀ_\u001a猦籡䴭梟Ԁ\uda27堑뚉Ⳕ\uda2c䷫ᒊ䁟䀠ϊ椲ͼ㈣뀍倊ꦉඤ㮓勱摸뭺䜨က̗⭳䪣쟜펹त\ud827驌㈤뵁ꨃ\ud832郔뾄ॲ兓隗蠩䁇珘ၨ鑑䃺듄턯쒖轋랦ᷩ\udb34꠼䡾ⷞ铳䱻ꘉ馥꒰ꩣᤣ좟콏Ȧ퓒i톴솺捍㏛᝝◰鋭⦕咓䀓堘\udb4c憁갡砡喠ᚸhỉ鈝ଥ住஛팬࢛䒛ȷ꙯계얂满鍘ꌬ哖̊ᴵ蒩丵쒑셏瀥뀘퉹冉∡㑃嶐⽩톘ꊂ寁⬋፿迮ꛘꤑ└산욞ㄯ溑潨త㠎㰠٪蓨䞊ﲪ煐㴳艉䄿讎㑍槆⇒耩叴늒੫ત輿䶩⅍ና灣Ҵ艓䤓ₚ퉁젧㩈敔䳌ཉᭊ௲\u001f쉧ゆ䢝飑鈏昢撏\ud98f홢⑨᷀係醉ᅸ߻蓺愿悜䡉ꁦ뀑Ⱋ切뤃畃袐䃐㌀૒њϼڪ䚉⃋㆗큙⑮堮䤒㘊戄⤢꾁\udd70뒴빺務⍢齣䤗Ꙝ磭\udd67㩶婁㝏닆⍓墉流㪨騃ꐼ臛䢎残븜જ蝎肧藩癴蜚斥ℛ⥢⟘⟪숾짠䓿㱥䔳퉥뱍仇\ude00쪨⍀⼑㋰駇褺옮낲聴倁‐耋뎲꺁⸁礀䗴셍鹥줞꩚႘卡Շ靖ᱠ夡췑ፇ鎡耰켝㼱뺘㵐㦪ᇒ҆ʛ茖셊灤푐묙脁ჩ錤켆暞⛄颣ꉐ敋恔ᥢ㠵م謄嚓쩂蛬਀䝸儈⋵Ñ࣒Ӗ쉬\ud913⧄\u0003㪠\u0000嵐\u0005\u0001絊揆允往뾤館弻฀ଶ䷠敨㊟⥵㒁멃䴻貞뮢\udb24⛓쐙뚔섊娉㙀䦁䧻Ⓐ剋氡쩅头횟ᲄ똤恁䡩銸뱖駫ࢁᕂ֚Ƣ鈉⃥刵\ud81fﴋ䘀詠六淀ಂ労䳏䧹쪊ꃱ퀵⡜樬瘠䁑ყ㩩襀斤醪殥㿌阵䪺ꞝ扏檻೿籾쌵ᄊ﵋͠趡踙擤냉⥌薨撝᧧砨笢儊覍\u0007\ud923샑㈀ค䲢⟞⯞首䳼욚䁋ࢯ䁮ࠛ䔗┌⤂ 蠢䍘⑲筐ყ◭փ憁鍡ᤤ哛扐⠏\ud893ꕎ迅ꃓ뚊흴픪僐ẘ鹕㌾놅Ã碵ਖ਼픬퉌퐧㈳鼱㻠瑴㬣㐟ᶥ䵇욕卸ゼ資扚社煭헂⏩ﲔ렾䨉࿴Ⓑ♔⨥馂賟풲穀Ԣ뺔뙌ﬤ懓Й塴鶂䖮銗豲乯ꕅƎ⤾襧⌥⢏裏䨣햀砐靸䙭⟜ࠀ܍㐀ƽ졿ጀ< x絜\uda4d씡ゟ摍꧈炨ᚉ∄斢窱嵦镐万앍ß꧱졧穮촻倏ᲆ옳풱揜妢䂁ࡀ袴䴐₭ነ牶茲憛彎顤⢀驩排杊鉁馀誁꙾挗桵逤䐆Ț鈉縐䈁ꠡ裀ὺ廎퀀࡝᠀ݎų魑A隀\u0007祖俫覠᫣␄凴丄骩騁⯭㈯捥㱟袟瘗䴲ꢟ讧䭢杠妌팚渽⼱鈟蠬柝扅\u0011Ⓔ㩠丮㢂ᎊ丣蓣궒靸쳌曫૜雛跬ꕚ抾䀻왵ꌮ놑ド꾦懒捩㬄誃ᑊ鉚鳦⃬摘죃즅Ә贱ꤤ朔ꕏ要깒䃉㛜盥㛖銬中凰錙㰗⸸ࣟ쏎汤䉊檀ﾂꔊዕᔻ䍡齯ꆎ℄袌瑐鱲焂✐❌쉦᱁낙蚸훺倰ߠߘ쇥쎛〨೛蠑ᠻ栜憉䎉⑧恓忢ᆸ⑺ԯ२䝀荘腅ܭᒂᚍ稏丕쉑룂躒嚋∞闭䁆앙䛧巟楸铎\udc7d茼䂐몧䠓누멄緒㉦⋼鰨쥀ʊ㉬覷耆䄼욕쥈⪤頓ⲙ뼠劊Ԗ㛉锨Ĕ擪`䲛聡뱃뮋憖\uda4dᖧ꙱㼱o⌝ᒊ֊Ԙʘ䇛\udce9⡳驟\ude2fꀍ졊뉧礲贀ݬ篘ᬀΔݤ캔\u0005㌹䁁䲄\u0007ᘻ꺛﵎ꦦۢᬙ၌뫺憾㣊쳽떫웹捈ⲇᒃ챢풋쒍Ⓧ줲Ɉ詌ꔔ൘౗蔫쌵䠪鴠䉝℈訂⢀鑀渐ᲤĘ྄ᙫذ즴斁㏺賗㱷ᤦ〤ᴦⰲ鍩꺘嚝ⓐ໔ا쒲ኰ\u0017꓀9醞기\b⭩侎ⱥ塒邸筌ມ⻇꼜芌ɳዱ煐碕昳㗀垅饁滋⊀႘ᙞ鐄켏⟾냊耆哏锭᪚孍씀ᩉﶴ蛢෾⛩鹈俰䃧핕ॏ䳊⩊똷혂䍍伤鿓때Ꝋ厥Ꭷ褙䈕ᅬ줆另蓀驣顊﯑땍靌噚ᠠ풄婂㴡ƺ๠ꚶ匠㠲\ud8fd퉞나\u0001꛳蜦\u0001ব垄훂砺⓼退雔惈ꃑї蒜ꉬ崹馘뤀津漒Ἁﯘ쒺ὡ⊋ᙒ؛쒹Ó짆稅㪷䄋籆咕ᨅ랣\ud924䅜碽ኌ伉䚞쒖읍폾⦳璹橥瘩Კ鶌䴥媓料倸\udec2䯡ⷳᒬ졮₹Ź೐橥匡톙Ӊ츓舴怴띆曓㋣ኛ䦶ꒀŦ⁷퀶쐃됅㴃ﶀ㹠ⰰ䶏⋁蔡᪙頙֦撼ǩ馋∾鄀행媂㕡餐땦샓␼ꀖ幟䪴䙿僡␈쑋帅\ud88d㱟㍀\uddc4㛺匣妩﨔묊傣⿉齤젪斈ሥᤍ쐩䙩\udd2b적畉ῒ襱獌퀦箳㰉駬캪撫⒁葬贱ق嬚Ӊ塥뤳勱춘ꓜჄᩌꏔ䐉奄ႈ䐊మ鄎爄踇鎂ﾁ␰ⴀܢᰖᷰ苤䐿쇭搼袀栃尾戇좏㞇ԑ蘠穸ǆ㘣㤨螈쭊−㊲衑䠺儌ꪖ暑ﺀ锐睰\ud944䝢㘔ьൔ䘼_쇂栐\ud803進ꢊ푅婀솀䴈曈࢔ᣑᒦӜ菒䏡裉䡮♀㔎츅宀䙁䣀਀䉘㊕Ġ霷䥃⮧㏵墈C嘩鄄햎㹈认ਲ਼⥀㝴芢⍳㼩雁셮暽넬ဧ瓳꩹\udd29碔䩉횥髩ꓔ鿬湓ↅ郤츶ꔞ녛駄䒓멏蔳릞睌ﾥꙢ\uda71圫ᢃ꣡ዴࢺؠ䏸ၛ逥♋ᩯ崩蒒뙌ṧ௓ᴙǤ뮴뮶\ude61閉䦘㢷틄馘⒃剒㤨ꪝ䚄줂ਲ톩ꈄ猠წЄ쳠ᯈ댲ᢊⲉ숊謡趉轢펂縔䩠軔㴲઎杀职肱ዿ壥ꓚᙴ礦뒖챌녦뜁쌨\udb16效ຢନĮ앣㉧ꋰ脑ᤉ뺐뙍곑쓓쐹柄籦⸗⊷宠䍼Ꞵꞥꧦ㉺서送쨄ꔁᮠᲠ㬖䜨ǅ魈ٟⲗ⁯簼𓼀\uda34쀂繣지ﴀᗢ㐸ᄔઍ茫菓怵⁂堢剛蔴䌉Ѕ䤂锳썩홴脆事⯙飓䥚詄떎䧠鈩ጵ玥閈끤᨝黎鞔䃀ᶃⱀ鷠챖Ȼᤑ聜Ќ䰃솛橌䀁䲲옱Ɣ馞詵\udc14읗林㧜퉋ጭꀧ\ud880씤๓俢緥撩ｌ཈쫷삶퀺夲顸퀭ጴꢓ慎륤膰룄⽖ℱ៕詌䗥觼덛⤺퓔꙳Ḇ꒘聏蝚忣투둠㖵㶵귱換觘幁좞ࢗ䍊싐䉊⬵땴\udb3d嶬䊡㊘陿赔❳ኯ쳼ꉀ즜᳏⪃䠁ꀈ\udc00ш႖ᓝ߱蕱䙶쁻㉰겂戏꬏搇☣2渆倐ⲍ롌ֶ謌䀏般ꁈ쐕䐞ㄋ怆咃Ⳁ껁\udf88\ude30䦜ጱ̐髌䋄⑳ၱড়쑨᠖鐘쨈뵃侁ଐ࢐Ը䕢⒠Ẫӛ䟠⍁샜⻌ᡶ尶넘줃阆뜂氁ఘ퐘䮜⥾⭿።肯웯裻尛ᴸ쫊吥㊲ꌀⲬ赂湑㗙鼴젞昭㊪饍賽鉏༑螌蕍뫱ꖩↄ왈႞ᤄ࣐̓숈뇓造ᑬ熣ᔵ⦖ঈ\u0001툩耀燸讦佦삵鈧蘭摉奀䳈剌똺\ud998ꢀ䏱ᣌ﹆渜訮鸻諑ꙞᏁ饛쓵⩔댦錓\udac8줃쫢㠀ﶬ꽼婹⽗構鑅᪵ꄜ鴶恝鱦챰蜢瘸艦㻦䠵㫆驩䦳ꚰ鎚\ud842ೞ屢ᔬ잆\ud8cb먳嘙ꐔ煺ᲆȕ䓈菙ﵤ삷㈠਍鰉瓈䱤㔑虠ꘞ⯦埄۹鰔䓙늵፣₻쑙蠣ꈙ弇앆㷈瘐ᰨࡖ榋⬂鯶䰥᩟㋼血泙耭⢊㏷ꪐ旉≀Ŝ୐须ᡀ⾘⍝셑⫅騇熢릚赌딥Კ찬쥆嬋♑顱Δ旊掐肊貹汎瘰퀏偏闆ꌳ遀昔䲙㶨ѩ轣曔ě놀\u00058늧ᔰ\u000bӌ㵥壒벉򛄆䗫⪯ᬂꔅ删銹楓앸♿鸩醖웍摥㭡뎱繤싆再⾍郐䡯➘邘;됄䘏㫈ꇀ๣ⳙ阤ᬶ䶉ọ鏍ꓼ윌⃙偙桒刊ㄒࠇ匁蜊먀材覬ﻦ燫⟜驺젝✭㋗㇈ᓀ챾씯삞蕊ꅧ䠒ﵤ鬦䒁⺍鳜쨪晣鉧餆ꓙ⩗礬쒚昂럄늙䮬Ė搄হ雁옢┹㋮萿공ﱕꙍ헍娣틪䗬⓪ࡊ䉽✕衲┘ꡳ桖了䳫籱錼ﲘ䥏㉥﷢鋙լ鼦橛ぅ麖쩲斌兼ᤣ簺蒯먎儬础愣榁藀\udfd8㐫蝾∊镧䲯ꗶ鏂\ud97e뙾줸璕懓쎤︤蜄쮼垥㞅鴞䰀ʞ䦀h索뙓㘡ẙ닉蘒䞓帔좖杉⬲霒첵ⓨ툝聩긞쫙엏ꫠᯢ郸᧢醼ᦴ隷썮쉕맆䄏ࡇ恩됂\udb2c뛋氥횓㷤㭴ꌊ矛⊪鰜칉莞⃣끁꠹툊瀍됎\udbc7㙣齓먊▄㋂ա᭢쵘䖬ℕ褙養沍ᙚᴣ䎏㋉卦꫱鎶㛙⭇켖첻쒯抍ㆸ䒼≍\ude21\u0007瞉\udbc5跣뢙➼㟐᜺৒Ǽ뫀Çケၤ蠠㌣㱌ΥலĤ쎼伂鋈邫䬣ꕙÓ줊᝼좖떇띄ᬤ눰ᘁ쑬ค鍻釓슒ꂰ⪓덧ꃤ숭逖낍籎ﮠ䒉엘굶懭㐩鉬제꛾닫䁨瀥蠘辄顃㣁吜뻬豼{⛐萞첇䉔厁餋책ꤷ溓Ⳍః䌳㍩㶴ᥐᵻᚌǔ╍댜ธ鸐ꚬ\uda4b䍢쉑螰쫈᭎Ҕ−冦輢ឧ՚㈟⦊沾멳ⴵ㖓뛍괳媸꛸꺁㰓⽓걒쾢꓋팙駕\ud8b4䬸ܐ賏\uda81䊙흌\udb52䙻ℙ隊䵟焑䄗めf〳쀟ﴊ膀鲁ᬥ褑箸淄Ảࣷɻ茽슆ꆉᥦⳓ≣焢꬏晄镁닄띘᩼㕸ῼ而캊⣣즓艌댩༗ب앦朩멌⊦粧❣顪錋褵❅퍇奴Ⳓ\uda7a锷捌ȅ컄둰龩\ud9c0磤㳫㖴駮쳾ꞯꦧӀ\u0014Ნ㤰\u0004ᐓ뵌\u0001\u0000ﰳ♞꯬菜ۻⴘ־쨚싓닿ꥂ풏時쬸禙㎴䊧醰\udb19蜔唋╻ခ챓옫揳㇔桦將鬓악篃뷡㻰砰ᾼሠᒻ#䤩擕느饀貁鉈⌭䀇㫄敁糰斠乬䏣㬽鿯ᣦ줼쐀ꥌᜇ驘ৄ枦종뗰뚔麜䥬䬶⠤鄡챖ǝ抋᤻䲱༓崷䎔趍䛆쭓镱梷㘎紘΃鷷藻샰牦姫泺왲鬭蒟杈\udb26찳괩蘬᪇ḉ錭䩃斬㋑䧵a頼易ꐋ윂⛁䗁햀⦘猬͹⚁阒䞠晄鄑郟砿Ԧ⎗䃈褢〳ሹ셬ꏖ力┵鐼쭍朼成␣筓籕蚐\udeccヤ\ude62硙刁Ⲹඐ켰ዑ䦇硆뀒ᨆ贈譋鐡⟐偐䐺綦鲍蹮딒㤷렟嵢댔굗虅裓ృ뱉篴뤆奁㣖饐亅╌狀\ud835Ჟ٧⬸力㇎ꠧ밓㊠謜\ud9a2ⴓ㴻쉺茨姇灍簊縐䬑ม迃⛀蜜㰇Ᏻᜆںο䁞⠂逫䰢簆\udaea紃ᘂ摳毙萜秫㦝鷆䬲팤ꤥꥇ먓٫꘷퍮ᆣ꺲츄璱야氀뺖⺽锛䡯曁Ꮜ녽ᔾ㉯阻䶔ৌ룆კ⢬즒童✫ᰨϊ욛ꗥÅ蒺蹭儷纗υ씀∜殥㜓鸨߄㤧\ud829Ⳕﮋ᳏￣䓉悕滌ಳ⳸靠涻꒯\u000b\ud8f6쩆ģ஀ԓ쫆䶒ዉ얄톎≘ᠸ辒̎⃇쁺情*㠍봩䚁瘧유\udd89阈屜檣♄迯軦⑪㏥燙쀷Ꙑ넬͍⧍쩲殺죢ኧ⇃韀췯웾叭ᧄ᲼蹏㢏❆ȕ䂧助⤴⛫ᔸ馜䫧옷揃襑쓀;ᆴ焮㢟죏≪㊳橉㓄卉㆘鳌⛇鏙親鳱扺ꜹꂑ闅笓涉雄뵎梱ㆃ鑩쮊䃈犑艶큵缚쩦韣僰㨶ϐ⮍℔춯읧ℇೲ)㠴瘋霊ࢳꐡ럄爙慌쪆曃⢅鲐䤄肨邭၍큇렯븂렇茁߉瞓⬉塞栛ࢭ鎔졶쌠脠à⁮♅⨋Ȁ⪃吀氀\udab9䣨͍֔Є쥅柠珊饨ⓞ┣㬥쎗ꃊᮧ䖳ጻ毎ℝ⮳錷䩦쟚棞밸∺鲝孝ᖪ⤗ഓ狵贂Ⴈꡮ鯌鑤쫞쒙㈯쥄铩ɿ霙ⶒ㛈翃칳ᅀ驀摆烏᥄誢䈜酇㧚⑒ꉰ᜷貊׋糄徒₹讜㶮⩸豓讞↔ꀊ儃칄洮톕뛏ꦦ㞲⛢穞⨅㝬釮찑ꚛ㏯㥈䲥쩗ﬤ疕鮈쉧꫁댱玸ꦄᩛⶃ聙줧買쑌夓蔟완섣᠉襈撼䪲ꠛ赧ᮅ즞⏡爗袄岢剬꘲낒榋\ud840曣擙뤔쀀ɹ볩㪽ҲĀ슼䄢炘䠛젷ਖ파㍴晦幓鱜髜眗Ɑ雁샾錔ᆽꥥџ\ud825䄀㪚坊℁諠磐윀嬠⮠ᡦ찡蜉肧䃆峙ﱟ\ude26瘂⻆䨙Ჹꔄ彪埀Ὶ釂肍晀爁楌\ud8cb뱨圣鐈\u0002匦\u0001̢㓉婤䵻⺝际쪘摑牸줈䒢蹁⪞ঔ᳏靥덒㮩뿒䦓➚鰆䬊끭構洆↞瀮퉓누呹݉Ė語❇酊⓶䐜혞턟㖂坎탣겠⻨᭱ᾳڔפ腍쀊䡣ࡎ칡︧迂콊㖤⚲教塘探ؒமǵ藞ၙ顰堾婓؀嚛ᑆ薤┑僴㡂ᘞ麴䅺⊚⃼좱࠾〗턇桃뻀蠀ᘠꘞ᭄᜞ᔉޕϽ䍐肶萀㠰ㄗ蘇聇ءἔ醈煨呢℔̘蟱蛆⃰㎫\ud93d璂๚ᴶ궂秎ⲳ෱曜䞱ꚛ㿈霄쾋旹﷨䳛ᐫꪯᑝꙌᗂﾑⶨ蜔ᬫ됨᎟ྫ䣇ꕭ獢쳎噋ﴧ迁宊萁က훔쇺兡䑫鶚엚⇦뀎裲㒟섏閈ࡄᕠ舐牐㯬䭥㢋露짐暞獔\ud986쉅ｘ嬧奤秓\udf69⣾珂梳ㇰ鵸䭥本怹姻겑望쒏ꋏ䄣ꗣ謹㸸੶⡊轔섯소낡청尉岄\udc12渚ࡃ퀃䈑愈픀тⷤঁனԃꋋᄬ䃂ꐵ蠒ꈁ뎁ꠡ퐑멈竅暂⭁ώೈ䂕䂛肸逶⠫ꤨ䀑ꂍ\uda81瓃袒ʄ塈ܸ葐菈䜔⌮쇘࢓멒䔬ꄊꔇ㨇తꘓ唈榄赂ᕊ᭐讨䅶쇩őႀἓ䈲鐊馕䡂乤შ厙貄㐖備鱳ொ쀄 놁ࣂ걒ꉩ妑硍뙤늲켙ጸ䒐᏿քì膾ꆺჿ⑂䀎ఆ㍅싈K㈒䖙Ꝁ⛂岳㳚闊ũ쓈뎛똨걷䀨搝윊㊂뻪殠᧐ᨌ\udac6噇☓魧乖玛᧋Ⳡ抸︶☮\udec8\ud966뙙嚤ꬆ廋㛁闂й昸㉎多蓗م쬸荎ͣ惓᝱葠㮠ɤ䟅쯺뀗㧽岽꤂ꢠʈ尣ꊔﷰ䳎ᮻᇵ隇㱛脃콑ꕀ뇈Xṑꠖ\u0005무䍤搳랩ႀ㣢怀Ɖ倀ร敏趎❳6㣮♟\uda07逈┅阡꿁쳐\udc10Ȱ㌞ұ෿䴡ۅ\udc9c밵∇뙍ꕈ窳疈\udeac荢ᾫ㍜酡찰妀\u001b༰왠\u0013ﭕ㢝㣎蜒먹ꈞዶᗄ屲鋦⁸꧴壻䛑綆漝結飥표⌹룖痾㕝鯑謪ń䀎ᤞ쒦๚ꜷẛْ쳧᠁箙⣜늦䤗㸚郩쩧杣犢\ud957鱳㔁\udb38ృᮉㅥȒ酀賂䱐⮖ᢁ܈螦섧셙瀎퐊虝Ｇ⏊絙겔⨖媏⩗᧣쮓믇⁼秀ṮꜻἙᙱ異ᶀ﹘鶸䁖཮ൎ躵쭑ꕃ㎈礿癗崸㦑鈃㖁䪠蒰쭐䇄ᐸൌĦŨ战玪熏摫牐ᬋڔ㹌㵣爒ເ吂懷≨釚쮌┦꧋퓁\udc0d省뵏᷀䆁鬐Q爨៮஼ꖊٳ窂䉤\ud87d걹㘠䶅憦ꛠ롩ᦸⳜἍ㜷ح䕾숖࢟ꑼᠴ벍ޅ佁Ǡᾨ콨⥲О઼轺䒝썎끳롴࠾䰒䄎螇䅂퉣냰롸⩔Ğᢑᬇ螃쏽肐瑔㰒븍巃ꮁ㝰僘ᚢί㹝黓즙퉰槏飈㘑\u0015鮛掠퉋숄罟赇ᵐᏅ諱䠤칋犑䇇\uddef友淀癁﹘嶸⁖㯇₫鄔䬉爢禓㬔嘈\udb93際ꡆᰓﺙ략ែᯡᣵ੎싼⇷艥祝偮―ጅ垑嗤炠仙쾸ݭ㣓὆䩸晧䌣奡Ⳕ癌礨銗婉䜦⮲媹ᠢ䶢ꬥ霗췈퇉퉴뤖婿錺묅᱗ɲ\u0013춙ꌤ쒮幭≤鬿輺쟚峇홀䀋긏䶁㝃蛁捆๔ॏ促郺쯊猏㦘\udc87㘳涟ꋏ\udb65湢ዘ⚦幫⥥ڷ蝀쉭栻砲딜ᮈ႘뵅쀁␀眤İ᪸奉꧑蘛킮㈄㤮钡๟ꔤ䎟ṋধ쫢㔹꧀㊞礍㜉逬鄯劇⪌뱱঳趀啍\udb42弉ၘ\udb61ᕵ丆❻㸰鴁츱⑛鋒榇퓓꼭ᮜ냏ᗥ捲䠹빀眎戥蘧魖ꕲ夌筕밋ꀜ랞暄귦ꋸꕄ뻞䶑⣆頻춶⑲㏟꦳奞젒眭邊鷌杳澹⁌ﯮ匉ㄒ鎑챴爎䦪卙幜컁믁澌郸≀쵼徉͌蕣⏕錸Ꮟᥦ쓋ᦜ䪃䄝䋍훤⼉ۜ究㦙鵉謪ǫ猑﹢쳹屋錱麜ᯏ豥鬲呹䳌풚䵡⺰阣詣엻폸ꦟ颋ఉ땄ᴎ튠佡蟀⣄ᛇ㙿ᆳ侼⑑炙\udcea㹈輶괭﯍搠ꝲ㤈㆞廕鲬䉵斫ᅝ妀糼깮废믎췦䫲逩儼筛ᓄ䮶䶙骩妪쐗噆넚̬ᙤ㣳ꍙ딤땂欫㍐顑䡆晒Ᏽऴ蒎䀎怖栄뫉ੳ筈殈높㨥뀰鮖臈៴ᚶꕼṟဍ쾗瓋퐤爓瓊㹼麞挡⤲遴쬐⓲ቇÁ搒強ࡎႃ㒠煐恸≐⎨Ⴝݲ䊯∽⃮\ud93d鳀\ude71㬠밠疄鯠펰䭼᚟⌷鄛䫍㥋Ⳏ윶꺕톖崷ࡓ吸嶌먜緞ᯊϰ蓍쁓怛䀵 䧎\udd27頳羹묬蒠䀏㫸萃촂ĸ㍀秧⳷ٮ컂ω齃Ϣ팹翔᣼挧⏬ⴍ捝픻쳵唾⊖䝚쭃୕蠋揸戁饺䐶嶔郟བྷ춬舵粬뙎ⴸ쒓럈귆ᅲȈ耀ᇭೢ怀ˍ䶰鎷쥰敭糇鈻賗邃鷌ꉁ蔈餱纠◞⛵蒑䬄였Ʒ路泐칷\udf2e亓틊圃쎁黀䶬ˀᨠඥ૳욦䁝ℭ餤铱㹁Ἢ箘淌津곲蕮䰅㶯黂伍쒄榓䲣瓟Ɽ桞জ퓎ᝋ쏳龜裼ꅂඹጦ␗ௐ蔐쳽┕ἶﲐ븣卐顨럄略畉觡⡙鄧졧燨ﳫ晦뼪辚袄津㸳⦙碄ㅖ℡ቕ詈䙑牭㥮쳐뙥တꮔ듏蓦遈ﭡ\udf04液屏⻵阽쭭ꟾ튿槳쓥癧ିᾘ畊䛊≂㿘੕賀䱇꟒눕\ud900瓯\uda5f뼰ﺞ쫎㾥틳蠤≼煩Ჺ;ꆢ叱鄞꠫퓾쭀Ԅꉔ羧姏䏆뿀朠ᓐᆌᣔᰝ׵虁舍Ľ࠻峓䈍爂䄆充旁먑⬀ᎃྔɡᇬ෸ꅌ⋭姓ࡖꡘ뱸帿ゅដⰠ䬈㛬Ի㻝鑘䖝ꐶႧ\u000b뒖숲햌Ʉ踂㫒笈⺴臂᫊࿸鐼䵂∀鈰裀⒯䈩䀗킁尀䜀ᯀ諩솄䪜熉❚馺옵逹䃀ꀭ혎\ude2eꖘ\udb89姥習ᦸ㤨ᄰࠦ䄳๜ݾ²䄥\udcffๅ孌ᙧ븗췈濔셼䤎牠ꑆ钏茑Ꚁ頯ᓂ㓪ᙬﺄᦓﻍ劤䌲鏙蜐ᡦ橻⒒醞쬪ꇠĂ禫泍ْ欵芔䇏০Ỳꐞ༭窀䅯㶭趲ꍳꛥⅻ\ud949铌ņ綜Ქ斒㪠녴Ḵ၂ᢶҰ㘁芸ှ蓹䙝©텪ᇥ翧௠㿹拸濾櫨ຉ⃈脆ᇁ릠쑰截㼸쒒歉ꎉ희诒敟‷飇쨄⓭䄆ꂐ恦ᐾ娍褄뀅䢂냀᭹樤싚樽✳鵣敆w禙벥湁페椲ꮉﻌ헮␍㻟䰍젆Ↄ犵倐\udcb0戎礼ᩮ쭰뛨䵴끟㓞㈲詃쑷접롭窖碪ތ茩鮖轋〖插Ⰵ⬁一ബ騛䧘腉壤값숥⬈횪☴ꅸᐞ厝ᆞ逃䧓⑛㆑짾ꐿ਎뤽ᬍ숤轏ﵠ敀焹粬儥㚗鱭昊낓烑蹲혀龁俁寰\udc58ὌӨ=䷟藯슧偵ﰤ옇蘃쿀륀诰【勼Ռʿಘ䒐䄉拈壜墆ﰸ阹뼍\ude06ᒂ࿠矀⏸煸ᭊ౺ϡϮꡉ堡\uda05⬒㼆詌￁쥁㶐돐Ẩ➪Ἤ胖ƈ䍣酑奍ˡ乬뜆鎔᠀뚤璒楩䄼\ud996䛛ⴓ鞧죫牟릭穃٧蜽椡볥듳騅풜횁寛ⲏꍴ䇺ᇾ륏䐑䦦✩麒䥍䞧珓╱ᒫ彘ݰ֣軏佬ઌ﷋鑼鵆䵮筴\udc38\ud8f0牴旿݂酗鵟醵쵇ꜚ팀熛岬穻㴴遜ꞌꐔӳ㥙㶙ത㟗⻨蟵챺∃牬խ粻ž鼸聐䮠辰暲꼹랬ꖆ柙⑂鑂쬨댌䄨隘\u0001᲌\u0002愩ꊓ 蹤\u001cሠ๊༹䙉膝䀫‿Ѭ鹃ᜥᤨ糏풣ἳ\udc88ﭨ㏦漇⮽齶체曠૯뤟Ჴ㩖謬ྔ䀨瀗꦳琤鋔뾻ׯ➽鐦쮓⚉늪夞ᓖ멃픪ꖔ\udcce禦繣耨⌀琘㨠ᶤ⺀읈쀺邎耰칵ᬮ薓엋ᑧ↱宙갬猛㟶黔Ɵ䠙댾\ud9c8뢇ꩣ䤿⦛狎͘ㄴ篡ࢽ驇䐴⵫擽\udb7d䦥帥ဩ뜪⾭겖琖뤐侙꼢㗱㪰储춺꒽돮꧆⁆셔怑錔㮤耡怈㕐呰ⵂ轛꾈Ⲥ쟏⤌飠鉽ℳ堏砀秡봀׀᭾縀묣齞췈猂褮扽艒嬀徑⒐鋑㯁ꮂ鉘㫠븀賔ȥ◟礊냑豠\u0003\f쾌\u0001맪尓퐅\udc4cﶴ⒐仪੎聶花腤⃬\f氟㉒ꊘ뤃\udc16豢稱뮂魲绠볡ܒ⑚臝ËⰜ耢༽梪苢㞹哔צ዆輐쒳䉫ཥ狄槢哴筙ꩤ䈂ႅ뤠綹㷰㾷㪝鸤췻❒㲵ᰏ㨺괤ኖ㷋蒏ﮓ獹頴⁶㞯ڬ䲡⽣쿃爍樂듂ᩄЃ㕌퐗㶹\udedc롂ᾷ⡫Ј䴜싿솷䣡聇⠁⸋䪆鶅떪ྉ₅抷む儫졔ᒰ㴥擲깪✴뢝䀩錦გ㥀떄솲䄟⮏ᢸ쩇朩ਤ立♨簏ἂ隂㪡⏠羄낐혢簀똽騌쬝晚鎐Ր쳔Ŋ笮ᦛ竀ꀁ䢱䎴왎䡪ቕ佖쳲쯹a㰒퉳鴚屮꒞త\udd33⹴㵊㐂췖ၮ(蛀Ѐ΃ᨀNÒ犀Y╮籠\r꧐\bi搬餥下튅뀀ỉᏱ㮅䰔ⶇ쁜惂薈騌⥊졖ࠪ烥؊亜黻\u0001騏邖삮ꯁ㎧粊᱊⬨႑ᘆᮀ隀鮐鶈堸堾ᨀ࿑䈜䈔폮觎Чꉽἃ삋ￋ䷦뭲豜잶澿䬨醟丵ꛫJ넧穎촤㼟㯆㉲ቊኝ謲䄳ꯋ叩ၰﰤ蓰ҋ劃촔ꭰ瀣찠ẉ⸄枢痐ꋰ刖쪼ᛂ牯Վﲖ왧鸼聚숩歳霹䔀䬰᧓Ễഉର䉱䄋삽怵ቛ킫颛齉ᦧ紊焀䜨ကබꠟ丏ꙋ聛₶≮䠆븋弋镃Ѐ䣡⇊嶔讘壇䇦ᓫ蔇ᴐ\ud82e䌶\udd81䀹ꅤ轢缴ᤙ饬丁Ɛ判ဠ帶嘫焙갌鸀궃ⅈ䍠꒼穮ミ鿽쭩▭줠㳫ﱞ\udf32䚅阗쭣ᠹོ劰ꇩ鱥앖ᔨጙ㦴沁꺞╧嫣ꏳꉸ졄溥纾உ㲻袲㟄ᒳ㳍혬낫⚔쏎㩥攅홴흂畽⹨彠⸪爥듰苫ⱷ髉黅᧠ﴠꐀ匼ᨬჿܬʷ玧놆硶᠁炨롞枅⸗⌋胹桴痠및醌⬠᥏礌丸㹘浊髉쐴ԑ料ႶẾ㰰鉞藫酈♜⸭ঘ狏ᵦꋢ鷙Ḽ顆栾⬑艣䨻ꦩʖ踿輸夦\udc17⽣苉꧘蹆䫰ꜗᚼ⮝枑匷蕏䳮扑⤻鶑쨄퇥棳\u0000煲耀⹽ส纏ⰸ隊亟茶ꁜᅏ吮䀃昉벀絃ꠋ鈉「꺒㰃⾤蒀컹엄ୂ妲ಋ艺ጷꚙ偉⿂ᅣ꤉챘礖ⷳᕎ乛櫄쒼撧꼲\udb30抗∦솗∰梄䌸꿻୐ꅿ⢄É׈膛kh恤㰁䈉좣휋ﴅ໼롎戅⍳ᘞ싱਀䃁肺\udf9a\ud949볇Ꮲᢱ䑘쟌䬖◳ᨾ佢잇냔䧰⊲牣ᘤ䑒舫拇쓁콜崂郞垻㟊錅츁ᗀ㈅怈೾鈙붚ᮟ㑅蛥⡡뀘䑮劓ⷦℝ阐땵㳕ᕥ笊롉焲앐죘Ĕ賜\ude41眠빿᪏侼ℯ௽⤎녏챴㔄理朄蜠殺凐㈊ᴬ\u001f칧誠㦥䅐Ἡ葖⯎愗ꌋ塅踂㎀ꄭ蒡䧥ꑆ腏惺⊔戡袽ᢌ截옣隠뗩閄鵺怀ᮀ\udd26驠⭱ᙣ툼䕀᳒ʷꄀﾟ㿥ؐ஖峬ꚺ矐ĸǼ䭅✎脍堯⠇ง픡泆뾁؁읶偉ⶤ崄섭ꔍ૤ꤪꤒ㩒묻뚙ꡉ廄敁왅㝴겡惠뛇侞슃࢒␞鄎亍᥍梳䃋勱䕔䭞⪾挟⶟鬴⹮ᜆਠ辰뒡頶\ud93d춃簗쥔ᛀ䏾䁡ӿ酹䶼ந쐫쐐옛䘘籂픃鼑壩餲烈ኰ颜䧴ጀ亜哮籕ꀂ穈丗舊ኀ䷂둡䭰ꤤ壮㚑箏᥄\udca6⹅ㄱ쾝䱏ꤥ팒挹ⴤ룎妰뛗阊⫇ꓦ牼礚鳃빍ℵᦛٕ銃\udd32喅靖嫈뒾ᯣℴ遐Ⲓ㩍䔿遛烉跂탑쇊㑌쾑檈ꦛᖴ⳼씃샮髌\udc1b​忭売趃詹钢酢玱㤳餬䳔␩֩\ud8c6兔൙塘菇欸菢Ὲꢵ\n⪤Ű⇗砸밄쐝ᖌ鞂앣쩃侹梬ɀ቞ጕ衻쑃Ꞝ諭㧠䓀셥좾桖鰬㟥㡅㹬濊洶⠐鉮݉䅆焂쁌逝皓萏順ᾠ駧ﺰ鈩우ᶖ䜀ʭ鲷쭩✈댮\ud89c碪陰퀑瀏帠Б륀ᨀ幮䣻㨨呬⯾討奟\ud8e0Ṿ梳澖皦摭侹ᗷ⼯ෞܹ¨遬逶࡮ᐊ簆톁埃䖅髸浼ἰꁘ偯莫復빧栝숄像럂꠳鷰ୋ㏟໒췷솂뉉礂᳊텒\udf26솖氭괗귳ⶅ郼뜆愀Π嚋ퟛ覈뷟갦訮焽茇詊ⅳ襒璭醮浴粄睫隠莚Ǝᅂ탱\udc9bꅩ愪ꮖ硏꟦⤋漉랬㩾䊐ꢏ鼫轁ᛮ㰟ك貍ꁅ읱㢋䃰Ӹ\udb84삣ࡓ䫕쐈俆莺맂桱퀤␄㢂调ㄆ펐㬡კ㓼핎䴦㽟鄆ⵄ䆲⇸ꋺ般眧㔀銁ꏲⱼ簹㙬鬥仵ᜦ돽䖩슧繯듅侁鰭㷧硲簹⬌퀮Ễਗ਼ফ莝˛ℤ쁻☼႐玁⩀ǀ黰嵰凤㶈܏ௌͦ犕፺ㅨ䋬Ⅸ옲ᦚﶄἃ䝄ꨂᒘ뚀謦⡠ₒ犪⥺拚詎颾錟꘮ᦊ鋩⑂ꅾɞ鹯⣄ᝯ岸扉夔鮛鷄๕籂雊當❌埸⦨ꐠƹ\u0014筌繥邫豐䀪쨊ᚅ瞂펱႘꯴䓸ⷡᛕች㺸볕\udc0fↃ眅뮆◦矙뽤邚尨Őఒ䮆Ý놸饤౧ᰈ鐞訍뜅쒂༠萰੘⟢᫡⮯芇ꚣ揼ꒀ咿봛鴫앟杁능ﴙę㎰∞泏⮧颳젡ꗬₕ拘5墡᠍׊臛⻠բ쉞目औ兲⭅ᕜ許蕎㓥䅂嬐짌寉巧貓봅귪溵㸈ࡀ\u0010Θ鈖앋芍⠽缹킄\udfc8䯀럳㴈삕⍈ᐴ蕡螜ꋵ ꉱ栟\u0002턄䝉鶂뮲㬀╀擌嘣ᧂ鏬䨃ᙑ讔뤴᳏Ⅻἡ떞ঌ숧珣\u0000੩耀㘥ノ筭⟟闛伣ꐬ說ठ툩\udace仩ษ刖凳⣅槤﹡㪧\uda04꯲阵「ຢ籋倬⪒ఌ譴䷡⫝亄䛾殡᧬凨䇑䈰௔藻鳐䅣蜧표ৌ萖珲蝉쥷䁫ഗ⾯靺쥤\ud80dꁯ怕𚈐윃梇ႁ뺒嶼뼲佯㘼鸛쬌箳扙䧅ᓭ䙇㥊\uddc4⒠柰楾泭᝹龘䤜ꉢ쭸諨熎㠀汵﨏ࠁ蟠烠䦐䙆侻ݜ啵辆쒓憊⦛抅ꙏᢥⱜ嗎㷧炒륩桔ﺾ娉㟃饻쥿㨍씣硐躲뢢漄䩏෦썣꺱﫢둠⦇㋈匣춢İ釡䂬⑹\u0005䬏⸆껓踉罸ꍌ䙀ᒲ膨Ĥ犭㄀峾뙓븺䂞逸灧㜁鬅珘ꉪ巩⑁㏋ㆂ졤푑ಣ骣缌흌㚆஋洹\udc62䁨꾌巠䫂Ꮏ爄⤁쳗ⅱ\ud8a5粝阮\udd25R霠梨ⅸꎄ艞⢔剾批E昅球⑶᠃蹠ؠ혂醑䉛⊼刏躯ᔮ୕壿萨鐆꬘ࢍ꫄䴒귤偅ꚮḹ\u0005٠ꃠマ䣴顺∫ꤗᔆ⮆䱀눶ⲬೞŪ鮍䷢₭厰衇\u0005怞ᄈᨋᄄᲢ䨰刢ᨄ๝ྈʢ⁖쀃 䐩尞Ԥ䢁딅ࢤ䤐ꌰ剄旴਩᪅౼ۀ芥袋瓼멆鄈꺛ᩔⵢる䕹豮岠ꨐ厛츛⪑熗賸\udc89鶦纖讞ꐬ䥉︑띀迢ꀢᚫƍో呦柡렒퉑ᜌ炝㥏ￆഩ願త햦ᎀꍒ텲鱷䢬ᙈ뎴⥗咋텸꿈႘뚄珹읁鑐ꂌ䠂鉦ƴࣀע膶ባㄺዩ䙞蒢籄\udee5㥀ͦ㔰ҋ㍂锢쫥ɛ勠²ⳋ\uda0d탂၈⤍㿑增ㄬ媌Ȿ誒䔟钶䚫笥᎙ḭﲥඬ攱馘鋼✓㎷ᥤ⫼攱剹䧦颮♣媊Ҍᄭ脢葊၈︸냎䣮▋陪䶁ᑋ㈲┮꓂\udc56暑癢哢瞘圖쳚Ⱁ⨞蓻ȸꐒ끪⡤퐖賵⅐ℴ\udd0c܆늢寐⠬㢼ᙬଫϡ蝞㬞섈⃛衉ᰶ밟‏柴᷀Ą뿀䖠籐၁Ҡ苟Ɲ\u0003샭쀴后嬸쒞퐅㠤ᴳꜙᣢ蝁碨뿀⤋숬䯂ከ밥ꡕ偈齧妊揙㑔쐁峰ꇿʀ⨭ꛃ㈂䤧ዛ꙳䠍㲟봴딒䡸⯤剩啱⁪郵䡭녂譡飢拪鍘᱐㔿骛濎芥㸁㠥뙂뢉寥⦽郲폮衷ਹ\ud976钐ᒅҦ䢍䄯鈡큊쮅\udba4呕↝闁⬗ᓺኡꦜऀ乻뼧㡟澤驋䤐ꠥ牄㚊ʑᣣҎ䷙\ud871珧פ苋м爗\u0006鮍穤ຳ⸥儢툑䪀ᤏ蒛ȬĊ偼耞萉᠘ꀉ愄殦ꥳ豀蒴쀀⃇ꀀͭ\udce9阙조鑷㎼◺ዋ멕霿鉗鶋ꥁ墐䔥엖棯Ⳝ攁틎扒詟‏꜀볍땥惤㽼鳨Ⴑ楘띌骋쥏΢,幔Ѕ꾝搯柤퉋尹隔ꜚ熟㷣᭕숻᝱㋚ₓ퀚蠪㠝稉踂\uda81Ⰰ⥐棢攑緐땼鷽콁Ɥ訩祠汭ᩔ\ud8af䚕\udacd担⮲ݩ㿘햑坂鈻쌙⎻儼瀁擐♕䁳쒉◩읤〒韈Ɏ湭狑竫ᬠ䋹袬鐷ᆣ즥듥⹋㌵謗䠄ᝤ눀㩅홷㑞焼̗鐙⥃삆䮛蚀዆∈ҥ袎Ī䐫액椠䀒꘢⠄떈耘ꋱ曊䃵\uda9e血詵ꀞ氈ꫂ\udc83욁钙᣾Ҭ芿趵珢醥籃캆媙㾌他킗阋ᰥ蚒溅⎘靘⨰ꞷ㊱耜Œ⒭涞㸪䬔꜋菅籢팑౿ओ霳낌ᒹ੼\ud869ዱ渊됗毈ﲖ㑀懱ᶀ泱䠨굶鮳똧왘Iꦭ瓶\udb26꾗σ⹁Źꁸ瀼Ṳᐗ鼠⭝꓃抧胝I쥪漦䪗䗉첖豓탱や㲠╄ᔃޓ׷䎱⁖⁁눏酌꘶풘씬쬓픙ﻄ똉滯⎟餙ⷥ읆䪊㦀鲔襇ұ䔨פ臡腹㑒\ud8b7豟舆ꕙꂣ쭋⇾ꉅ驵킍힊窡亥뜳鶙튌썔놱䝏≬奋컩鍄ꕞ聴치縻冉┫渃᯳䏀偠椦߾௿ȴ蜦耱ꆕ㤔긱䔩ꊜ얈⾡쬀쮀纀῁䰶㻏൶Èꝳꗈ\n耞䔰자\ud830㗑흰ꗪྱ覢鿈⁖旰쑄텂剫洽ꌛ昭攁룲訩贔튊䛶ㄪ埨Ɛ励 钧＀ᔮ訁饠ϰ׎ᾪਯ膰舷ⅱॢꊉ䥊蜙䤬텦變贴뒱狐붭趙쓸쐉꣓˳ܼ삧㼄뀭槧譱뼙㾫⥀㸙ངÿ苍애脏堁䩍财橙ퟍ\udc7d致鋔숦①됬厑⸱❾㈹䁙桳䱁ᒱ櫆镣켱\udc4c\ud940⍔ੑఁ䛞䉿ㆠ瀾툝裀䎒蠨ᤤȋ⤹랬䉚軔붰޵⣶⑽䫆iጳ梉鍤颕챓芔萱ꘪ䛕ᳱ\udb1f췶ጵ奶䩄┤幅ꥆ縙橝龄堗յ輠꽄ឮ䟑ᷫ錝ʺ릏詑║哔公䒲੔鈫ឥ䖭佹ꦫ಑斓䪚廴䍺耾뤕⊋ꈫ㴠麚ྌ좕䙳ภ⁀似㑄೜閭䤵ꔚ扵֌䄱⨄䨪㎥攠斥䁌ꁂ共冤ыŢ삃酘墟녃쀤찇ᰌ⩴嬱耝덌㽎෋ᠰ㲯վ砀꠿镟칂䂵쑜⴮ᘦ譋╱ꉑ榺婚唨Èᛝ䯅╉峼딾Ⱉ聇䀣监췀ꡘ笢⁔뒐颗칦灟֚⥒聬⥡㒺ᴮ㔃蝋〈凒\udf84ਫ㰬圦䲄였ǁ㐲⥾䋩⥡侐鈯䔕手Сᮧⰴ嗽쪯䝠䲒ᰶ쁆脤뒚 鉑陙៥ࡸ警㎂㴿ඍꠈ췓ᙴ戰蕵ᓛ혷鼾㩚ᔪ킥臓㼱삀Ꮸโ਑ః蘜䂄m჌䡒訷䟄ᖋ箇բ㻠케쾸㋱䃑㧻᭓軸˔蕍㣹鹻㐌骚騫쨁ȋ亱Ҭ꫆鞍&ᑍ쏘ᇬ픋㲮츛⒮뜟궄縴蘒엽ꊅ鿬퐦屻Ⱉ邔⢝枞謓淋勋漼刊၆ꢠ䠡ꘀᤡࠬዖᄚ䚳쭩䪏ꕱ䋟濍\udc02鵋ꄅ錻ቒ⫡\udc7fᵁ튗Ɡ移롵続ᴆ\udf65𤋮©䚄‪䔞ᐊ餏腴荋ꇭ쁤ⰎЋ\ude80㤀뾀᧠嗂錼⦢ᢸ內蓡鞓䁇녚硱鸟伈ង픧ʒᳰ悤鱰㌆ᔃ๛Ź쐱焔뢶㰪\uda48꼍잂堉婠曖八㌷ɚ첓쁺ǃ奰蜵⬑⨁ૂ\ude94ܐ应윂Ờೠ帿蒸ᖩ퇃藂㓪빩儹㜜偎䘁洀穢ᦒ◸걪彎쳁铰䪜⇁討䁇為컏몔썣喥듄뎂棈ঐ೗䷸䉀袎Ճ腘︂頫ꇄ줁鎠뀴婑ᕑન贱ٯ臈怚₃결楚⭍ၛṋ熕풓榉ꪄ꼙猥胝諦ⶢ텽洐⋉씋廙䒠⤧望晰삜吼ѐ㶟䂣恳콽쌜₧㳟\udc17䬩馔앉抦珣㉩䣬贪瞓墊鶩쨀ሮ遾㋲\ud8b5葚ઠ촼䍅컏➽舔봄醴Ⲟ❅ᖺ䲨穀更粘柫\uda92鸨䈨ꄁ∐ỏჀ鑬夃춲锖䭰槔벇⥡ᔶ晕ꕈ쳦郒娸䟆䶤Ꞔᣌ짰믴쪎禟렡饏᳍ઃ麀䠘婔ㆁ昆ऀ໓͂脭섀䖗쑕⌘椋뚇霙匳㡤ς종ឧᎡ䖰ꊫ䀒㬯ᙕ䨯唔䙐匹ຨ믠鉗+㉎쀾\ud869䀩谂렇蠆㢂ꔱ黀츺䨬뵸躋⻞ 惷衘㸎Ҋ笆䎇X趹睤诉䛁ჭ蟕꒛솏ꨴ૘퇕⒪扻貪ꙟ䱎椦∀쥅ܬ詑嗋㿟ᵊ⣕ᛒ謢즴닆艽Ⲹٝ㐪᜔侊妥\udc12茾伸譚쓠疂易狕Օ멤䢨㩟竉ꗆ⨔⦈᪬㚫⺘螪쪊ᚄ댞ຎ㳦噎⬥작ⳍ韡\udcf9既怤럨存씣ꣁ撗帢ꊄ冮䳦ￋ껩㯎ൖ穴喞☤嶧춰ᑢ䭙ꖕ틟䉧ឆ橛᤮霕㫋崱䑬똶凧졋䪙餑닦䉜弹ඁ韎ߒນ梤ᒐኒҕԞ苝䁑聲⑅䰻漿鱟铉竊ꦈ媬\uda62⺫ⓙන첈䈇獑ࠡ\udc8c䈸眻ႂ嘫雧金㦉豦手㯉ꖈ썁铄䫏奅닔䩃邦듅댬ᾨ\udc85殴\udf7a䬟✸頀̫픙ﯕ╱Т籛霁荄㮶ϕ뿸暩㭃돐ᅲ順⼃ᕉ뤺ﲭ\ud968㸧癝죋鎹ⶊ\udd44讲稡఻閈䐚锸쨘良⋚\ude71긞弢ꊄ⡀鴐⡈㇉ੰ㓍࿂葏苚℗࣋萒젠ⓔ嬔㔫疗焲岰嗤悘Ѵ੨ࠍ䕄ʰ䅃䢽幾ᒾさ柇ᝊ螚쾆梍⼳藺䰫⊍䫩番牿沅唕삚믡梀Ｅ㚼ꮪ嵩ㄉ䚅⮺쨣奎㥬᜗痄芘ᇋ빸◂㥉ᒎ嵫\u0017ᗦ쭚虜䋤녵겡做컋ꆲ黳꫸├볖嚡łࣝ쿔₷犍ࡋ├邩꺚옫ᇇߓ瀐檀ⱆ͐਀о츺ꐁ쯵륀犥⅐䤾搁言㞱쾄婹㤚䕁ꃺ衫袨碖네蔚慒鵃懓헱ﲂ顤턾塜ꮰ逬䷳靅쨕饣饽ꜥ晕㸨씔䉵継嬲骥脌ꤎ婶⧅鑠琛륬쩇㥡ꄘ킆詋㪠\udb10ꠐ㬀֨Ѫ觉舷Ή腒恚籪簭㸀 〃뺡쳐ꨎᩈ⒒౮彏蒛锳㦌첡襮䘖ἃ踀馁뀠椬ႊↀወ崞캨苅ା◿튉ɏ쒭Z鐨쪀枳怀\udca3Ⴠ谓삾↲〘ᤵ瑼ॺ葐⊔쇢궳刬遺쬲\ud929委ꗻ驀Ⰺ쒡卪饙拃๻倌쒕眬瘀《緘惲䊬㱵苉놅惍ࣳ硖ᘢ⬙漈盦摭꽹૞盞Ƿ鳷蕄晩郪ᦧ硆虅\ude03㪌믂Փ셔\ude00㏞ˌ顦䤇삙鋡⁦擫趴ꔶ꼇⥈毃ᙒ⬀셙䝞෫Ꮧ茣荚ぱ밒뢼漊긭惤쾁\ud839剐与嶇㎐૝䳭玄㦱ॷἎꁍ洒攢㍸淮䃎⡻울轋옹㠊珏刺갣䱶唸䎙紪뚥ꊓ变ᔔ炨⼘ു໰·ť83耞㞸⭨輫蕠ꏋᛰ䢬砙瑐ꍜ囩䨺잢ੋꖲ苂\ud959鲡桚⼑床랲餥௢딘膆嬧虡鐩旊砺댼粩號➅憕⧠㡥臒郞䍜놏飅䳝恌쬀L榀Bﵮ⩼㈊⌍籆拆⎒緘쳴촪刾⏦媈蘔Cֺꊕ粬ꪊ㏶៣꤂弌Ω俹㜁双䑳刢勁絰葭쉽鼨疜륍拦㳊健餂富ꆾ勥⹯靻ӊ良ꀌꪏꊒಪ穄⬀ⷄوྚ։䏠ꃆ炳퀃\ud943Ἦ⫥뜋⼹⭂ﮑ滌ꈫᬵ镯ƙ膋륒萲鈕娘鈗׊ꁱ\udafc莼䷫᷇鸖艽悩刊 Ꮞꂪ造衱ᅀ垠굜駖쭨还橕૜ⲏ㥰紨ሦ玄 䗊였䏬특砑ぞ騟ⶤ镕駑⁳\ud97c鬓ḭꭋ㿊┈◜舵㥷㫸退ꪕ의膀ᖗ蒂륚⤢\ud801甃鉠㗠팀寠戈槌ᒦ൦ϧ᝕ॱ␰ధ吆崌鉄ρ꒑䌥㍂䧫㟮喃⸛⫕㉎Ӈⓘ㹼嬨႒툁鿢ܰ㌀伐塜᷀ཹ膅ꈀꖈ⨒䢒ઽ\udc34芠\uddcc룏刕梥겠⾧䠁χṆ愥⃧鍲샪國ផހ㨉遤Ｙ絬댦卸됫魑͓\u0016䦊耖踭ᤰஓ᧌鏇虐\udd49쬜ꥬ恂뻫ሐ곖Ƅ⭡䳆셦吚⅗祏Ы귀ㅀᇫడ忞쳥ͥ㊓Ր\u0003혇⠙Љ勈◆Ĳ珥ꪆ楼࿨鱐\u0006❜䂁褱ш襁褧ੜ灈갤団충卤躲攰귄媝轫⒥鉂姯꒢褳킯﹘቏喀鎋蘕绒왎漵\ud81eꔂ᬴ࠁ擛岵劃ⷎጣॄ࢓筠ꄄ⚅䑁֡崐䄆✇쩌劫凜ᒻឨ镎옗뎅渂샦僟㴏ᆟ蓃˦⃣ꁴ찡萋輇간⋋龐暄㥖□᎕ࢪ쎴⎖뎍꘳뙫󘩟洗튠ꯉ쫤죂᪹☰轞伬쪈犕숚뎢ᰡ⢳✈鼋⒴ۡḨӈȃ䂼怸숬\udb28ໍ㰡ⶲ呾䧒摩㻰茚䮝✾ꆵ禯葌젪꼻栏ꯋͥ콬騶畩〬鑑司呚ပ堶葠䕹ﲩ蒞褭㎗ါ෱Ḽ斌趥⊶孍趒ꝭ௡〛怜舽᠜렆挄\ude41傡‸阐燣غ著⣄ᎇ㩸롴Ḳ㌰슑댩⇡\ud9f2⹒洛㝴鄎憄걌Ķ℮䀭堖쑫嘵넊笕嗏씖抳啥톜虢椨뽨๊⠰销쬙㥳℺Г틣䞗挘๊稖㰘둯¸桮☶晣쪝ᖈ穠瀘딉\ud886櫇튂ഐ㳠콢ر⟘蔧ۆ╂녨肦鲐Ꜣ㢈꧎踢꒓ꉉ姄㢒湱É餂䉫胭䁃⁃酑먇Ⰱ뽅ꋋ㞈ʲ\udde2ᾣ೔呼䂵ᚒ섁䗖ꊫ腓³㸣絀寀娒笢ᠰᶾ๔삔呕㎥ᖓ勃籤㊄哊鈪݃癥븜뱢抺賘襪쒶⃚끭衔Ⲙ챷ꊥ噙匫櫋婉\udab2躒戝㶛隻åb늩覦颉楩䊠᢮昦䈪ȥ쬢ᛳ⛈讼쾲₼儗颬␌렖ꠃ౩䋠裠痈⡄స嫫⷏雦䨙僧飂셃猴궘싉Ⱇᙹᣙ먒꿉啠ꭶ卉躓鞣匩ꤎ싦๽䲧ඈ\udfc1衄木ࡑ岎玙Ⴜ龋쬙ჿ厝붫ꐲ峎蕁꘯榚쳏ѕ鍒ẩ铔됎刻⛩齸丢囱⭓넊싹홲깙褭䒦蘊ꢂꞼ頫輈ꇛ↼쪲⍯㍬衻첐╀骅恒征킣갊튠鬂鷩箌蠓ᯨѧ苔燤뒎\ud97d鿇Є쩣㜀賰ל稺૖隊틺ɴ請ぺ䀔䊿昈鸀σ潂窡쀑渫ືྷ䧿贁褂駘和錚ᴀ薊ᶏ揎쫆ꈊ郒蕱ꃐტ֛讕ꓒᏩ觉Ⳓ줏\udca2㉗㊹㩬ピ趦巂ꗀ骥ⷊ艩⫖ץ╡ﴎ誚믋쾗푲ᳺ⼄㞂͵㏠賝䰊雉鈲ꂨ牼ﬕ⩑쏧掓\ud889㱲朵㺫鯝䣠́鍚闤癍ἷ燯巠׽鋬䎣烝⻚躍谘Ⓦ円炬碥牷ꪭ甾ꥑ溧簐꧐⥜ꚺ瀹㐜鸎䪭앃鉡즌㹇᢭評旇≋⼅៲袶䘰눫櫶䫙閂ꥳ夜劢ဃ씅舉栆ᔢ瀁\ud9e0ᚐ䲒⟩ᓄේ⒂Ϡᄈࣤ밒șč展閈ẗ︊䄤蚊氳ⴐ䵄ΖȾ뀨椄ꨌ뜑沂哯삧ꙇ̨罼厹ᚁ⚕褱䎗⾫鐧䕰ࠠ쪫‘㊴ກಮ슀꽈䭐幤㗴Ҭण脊⇏₩‏誄詓崶⩓䀇얦\u0000힕\u0000璩媒쀀㉼怀ᓑ幍郍ⶺ噼狎ᔲ諦왚墠䉜ᖍ瀔ෲ踩툌ᰲꐪ夽쩆哤臕ђ褽깩턐瑇鵲푙㝊鑡巒뭭韆⽦閖쫉耲쬛㥒⦝ᐂ힦鰒㓉耀㈽䀀⦹뜾　ݺ頀È첿枿쑎奄扂皁ᚃ뮩액㐙錄渤쇝瀉㼁࿆䳭⥱ᛴ퉨㧤당屴괹鑘鰀블젠㎒㯂煪阹嚪⾎咇饉쫝㊒ꌵ㥖詊ꎂ旡䭠朘ΘᆡĮʚÉ쪃깹턔䢕瑃ꧤ벱ꭰ竜់ಕᵀʭ솼녫热쫇묝믊뉕ⅰ⼉ࠠ継䀑ⱙ屬ꢖ唇诎ᖬ⋎똺எ뢙䀭\udc56௳孾ꫲ鴭\ud857Ꟈ숐闿酽ꌻﶄផ㾈璠ꟲ睵嶼䷨۽⾅ۮӿ耥䇀ₚꠟ蕓抰碊\ud8a9ḣ\uddd3있７ᑖ垢륖匚좖鞤⭣㦁誻앭椸搅꧁\udbc7ﺓ딀\udc64坊曠ή邌ŀĮ뎬꤂刊剝쯆拂쑨薡싲ञ꒼宯ऩ⽌觼䁎Щ瀙/ꀃ∄䬅我픱춊ꇢ᭢ꗹ姘깒ꯅ㤪颀9⨁⿨ʨ䬇耆ǜ┉䫳橌搌՛ⷅ谁둢蟘ꋊꌹ塤꭬啫⪖埬錱䗶늭饺鬢ꮔ蔫蚸鉒䂀⪘ꈄ栊ꐈ2䢁困꩐÷쫴踱̤ꘊ䃍焠倲㱈춡灗㫳ᥐ䳷鏮郎ꧏ걳螾期湔⭓춐㠬딂探阿邗诉☇ꬦⴳⓉ蕺鄉咺ў뇉飤鉓☠욠䚈㦊띄驴̵韠⯷㄁㊛奏\ude9d著녉䊦©\udc69屼遮ᔀ᪖ົܵ䄠倫恏뢐䐫㐌輜抨…颪렀\ud9a2뾠ਧః䃢䄠撸釈᧮␪ٲ䄥膞恥㠙୬ď辠ꐊ垀⪞喡퍀盧쪑ᕾ䜪╚疗㉋뢙郠⯐範铢๶ϗ聦\nⱫ䁳驥䄲낙凈ﾦ堁衊䭓⪥嶒䝠柤邸ᦣ૪ᙗ誠ﺗȯ鿇樉退ༀ↸ꟶ挆똰⥈㵳Ꙉ餋䕉謯菁\udf51㡄ؚ⬜鶕糇⊴鰢撾聠ﰥ㠇刃ᬂ뿂呭᳄渣縱焟ᵱ诈剩ﳛ䉯茦뢊㣁㼮處䖋ゅ㎰⯅批㴉阉舙얚쪁ई╱搱ﰚ稃꤀㫩먉\ud8caᯌ燥糝㑴䫲ꬒ₟⫋ﰕ−撛톏蕗缪퇉쎀㶩癴묲啴ꢱꔛ⨛薒䫣\ud97c唼ꎢ责瓤倪ᖕ苼\udce9槁　ྎ袙陧ጓ覀Q荀+抷䟇م㮁鷂ゼ韗魣鋦ꋌ釣\ud9a5ꁪꤽ悋⁄牦ⶐ눨겥싉攡⒲僥⥇▪\u0013聪䊜奆动腖뢮汥㣒쏅ൌḰ밖嫠䑺\u0007臿₡补砊冈待ᤤ襋쵕혠⻜尡확儋졯숪꬗炪㲣幅ꪣ度觌젗㺠₈鿢࿸금迾⣇鐬꩘ꕢ碡襂ꌍﶄᨁ絁뭀৹蝸݅ѱⷂ靯刈ꔭ璯੘謫䩥윬䥊⚪ꂈ\udfe2\ud822Ὸꀂω⪨✑⨀ꔅ貃๹꼷꿨ᬯ풗낲败泄蠞䝪궅闚꡺옲牎铀渶伴撝섑䞑셈巸䣂濜믫\udae9娅ⱦ靏⬧앒䪎ቴᒳ筪\udece॓섳\udce9ᐁ│㻑㕀葴䣐⌢쌧镬ꪤ䪸聙谪\udc57뱢舌Ꜥ먜縤࿄ࠥ䍥舻ꁞ怂鬀獋\uda24ꠑຉᎢ珗䐹٧ꌴ适鑀鬍䔆쒛但呣쟒艘쀑穽㉡崭覟䠗퀆椟䋰ﱤ⌲ᆝ磋ꬦ敀稘လꐥ嵂들埂⬜普냽\u001b驇䌽螜Ὃ遠㌙춚惍ⵑ铴컭ǡꮯᤑ౒⥹⦕鼃崃ᯠ맰㳸İแ㵪娪ͣ摃㌭视슧Ꙟ䊿㥞욬叅뤀\udf36Ȝ卙㙸剷⻸锥୾◨ʚ䌄骿\udf15⚭嘖䟣꩹꘴齢缴ʉ堨К㲑沷괭蚈虅\udedb潩賁⡃᧖ඟ࿆꺒餉꫹祋핓ࢱ䅘ጩᯙ樸\udeccꞼ쎛ꇅ㿏ᐈ䧴Ϥ䁟袕|蠉㐓⒏̀ꑃ宀襉쉬䎤ॵ裔⩪ᘀà吺藝䊂啧朸饟⻨䂳ꥠ倬ዉ倱铗䣊錀\rꙑ撕耴༰\u0000ນ闌\u0002䭸딊耀⨹᪵恛࣐ฉ裾⒝㌀1\uda80\u0004⌂셍謶趗旎쉗◉炕龒꜊䬛㕝錏⣫址蔧芢Ⅲ耛写䐫֨皃몬৯絮౞诽䐒ꅹ펉䁊띆ꈡ媥ꢌ쒃樠삳ⲅ㲊Ⳛꎤ駖꫍윞ଈ蕧芢㱣䪿ⶊ쪩攪鐕朎䄽♗ᣤ鴞Ⓗ閽⩔〷䀏\ude16ﰋ歔Ђ긐㸀悴ᏍὌ\udcd5韌䊵昋ၲ¶겼㄂햟챆땤⎫㓩馪躅窐넍魛쥱聡₦堨偊㠯♝琀ꢦ衹怕ᆉ濑㡀厽섰ꆐꝇ䋸煸嗁ᡈ륎㿄ኊ䍥냙䤟⪓᝛⺍鐚Ꭶꦿ㋝ᑀ誮䅙欬뾔璫䂜⎌ᣀ耧㹙岶云坞끹핑닭ᩧ鼥ꎊ㕎勥剢孥겄뛙犺렾鶕佌ꖮ뇱䐏儋列呅⨣拋᣹③\ud9fc婻㩰堉⺾⋝ꬃ耒ꀡ뀗혍\uda00ⷀ䤪쫥빪袕氊薳⽺꺲쒁ꦹꕳ塃畾搓璉呁﹧⥲ﯙ놂릵價㼝肀Ѐʛ娀J댐䋝ꨊ⺢쌀ἡ쌀酠䌆ຊᣪ麄ꭆ꜖ੁ㒥芖ᙀᒲ끚웋⨂観淕땪訬䱺망媧蠭슙ꭅ䒫Έ\udedf摅儋㈋ꂴ⨮ᦚ都濷䫪ₓ䆪惋첁ꈶ對标\ud941샠쳘㸔㡜ץغ٫菾脮핼퓧牳圢骜昩ྪ鞙組ᗦ惑᪎酇⹂咍䩲櫋物ﰜ骑赍ꢲ瓹ᰒ鯕䡠뿍嚑悑囜⯫ꔙ탞핻樓䒬⽔ㆲ\udb99䱬꜉䄒ꦫ顱Ē吉뎍劅邌鎦ꠞ럂臄ᤁ㠔䌊؝㢨᰹꾖ꚶ懨酰ᦆ⑲̣艡Ȥ멕唫坕촪ꯕ榃⛽儇췘⑰誄엁ᨛꥶﲹங偈團ᙉ㴼ꀊ瘃㽄螀쥀풘郕↏䋍镼茻救䆯䙤忣Ꙫ\udcfd6䐷왃〈珞规瓴⒄১裔፥쭋젵芈ㄑ㎃宗즈曲±ꃌ遀萻䀎┉⯘埁⑱썪⃖࡫ݎؚ윁⋈⨭无勶镝ꪽ괱ᑲ眱뮊\udca4◯⌃咛菇膆ᇐ䢬ѥ\ud815圆ᴅ螡㷣ࡈ꽸엸㯞㢿គ䔠⟐ቨ䢔Ӻሣझ籒쉄\udf17낑诅尤Ḓ㷅⭠ࣱ䨑₼勄䣺찐䠓礳\ude4f鄣랒鑈ﶜ렮窉ѳ関䘰⌭邫졖沫ር鬶쒀鉧碐撙縤礦恉ᠤ艠ꢐ唤里ᖩ⑋Ց貸枈᫄Ģଁ䍘怤ࣖ㜓〞ʐ䞩ÿ偣ࡎ␍Ѕ瘆曂䴖ꋰ䳩혠吂糏⒡寡⸄ᗘ䩄ૺ芰兔ᜏ騙ᜲ⦆刲绉븛\udf96䞭왤䯫ጴ곍梎䅝確捚놯栔蘪⦙མ犢\u000b⪨褐؁旕ᇴ唹磄㙞窸浜讈ｗ訲䯕\udfeaﰥ欛㎅⡖ᐢ솘㧸搌晚礶ꙍ㯊਒備ઢ꿪ᬖ鵷鉂ኧ覙턺ԁ틢鹻倏Ꜫイɫ絠垾≉姮꼳霺㏯햧벊茼撩馚覮౦溱꩙퇤쀀ᆁꀀᘓ䆵黼ⷹꃒ큰职\udc03栗ʃ詁掤ꊐￌ쪢ဋ㚨訂쿔䯈蠸ዟ퐞ҷ㷊ⵕ⑓봀Ӑ䆠Ḃ믍偕쿄퐸௩▲䫫蕀ࠇ晜ꔫ樊煥雪ꑪ䤥♓厛赥ᑝ→䛂髬॥ᄌ卓䑀棧褐ꉐ㷄䙸∉Ժ䆿윂䋼ꂾ๹銼ᢺᒠ畝冷몧ἀ蚚뽼俌뛇䗰꜀ፗ䠥铡\ud90a褖㾐꣭⼷ꪩ͑ꬄ᩿墁䗵勩ྜྷ䨸℗厸젥퓽╿\ud92dŞ咇ӆ猫\u0000葖耀畵ߡ爸넸钞과알a‶䡕ꐷଁ؄쳃鱘㛉䓍慵ⓠ芙꼸⋔⯔녈⊞䂘耇᱁ﰪꚕ徠붂創⽥囏⬫ꔄ㥾儠⽍卙肈㢦漑㍛琱㉤鬈ⲗ柹儗貛糵飹촜͘趈呴岧띒歹۔色睵⹤鐴긃┦鏋㢳뀞쵥咹끓줴瓜뜈쒊\uddc2ᤢ됉傟ꔶ胹퇸뇯푣ᐸ씓娂☇睖䜵聑ㅰ鴚敧⹵埅당릂夛쵦酓롅⑗嬵ᇂ늖冦⓴钎첫Ⓘ냓䥢畿뤰ရ撣츧ଊ㹊ꪂ䶱㜮᧟颴꘯⍋䕊勒狫幈蜮뒗ᘁ㴥濊㝥웉瓪咄ጺ鶰䗘℻㓛ꦽ䪯퉧甠㒫㚥Ɠ擉希郼搾ⳍ頁ꡰ䖙씱偤霷ঀ冪矡\udee9眙䙬誝㨕᤿\udc92Ꞵꩈꙡጀp犲波쵝ศ첊섁ށ젠戬禢㚼Ѷƽτힽꬂ旣高倬ᒠ귍\ud995偲첪蠵ᱤṾƝ䫘⏖䁘땈뱿ᚯ\ud89a뼭䑃ꇬ丼㪌랏়苑鞴⨍䦐鹂\uda0b劏濍ᇲ鈒舨橬膭拡ݴ鲿쟆接晚ኙ笿̬夕ｐ꤉䩲䓠ዽ偛ⵜ啥⮔ᔦ椗嵞꠫뙗ᢓᙅᲠ匂㲜Ἂ鐒䷢脍넬薘拇栮儂㐥쾇砃냁撂ݠᖰ၎핆嗇艨ꁨ쩂딂硧梛縌恙\udf84瑁ꘅ┦䴬犂䦯聣쒄觐텑咩䕤늴썛唁쁅簉壘蜬毚ꡳ嚉쳚풘櫊땱⩿㚲ﭓ驝숨큖繣鼐澨স⼜ᩴ༤߃소䧵쀬恥륲⚲т〯濃谊믰獚\uda14ၜ⦡챂៫䤄⣾쑨ᵡ᠍⼌眖ᣒ膈۸લ瑒밚噓⨤꟔䬓耯ဲ乖逈敋衕履᳄懄ܫᖍ꯾呑Č㤙ዣ䱣缷⦑藁⛖럅羄盄瓅掱֜֘굶⍛▄ᖚʯ걩頕\uda05☃䔂푠䥨饰吤ᙚØ含啞⣳뤲᰺訲Ḿ礿둭컦똳㎭꯸맲⁔॔밳黎ꡅ哿⪿ᕁ誀ᕕ䄱硟꧌㟦馳\udda5仄\ude36䆬딳鮋衎吻፽찿㉱격乙節曔㬑㌕⻄᳅椬꭛富䶶⓮쨝襙쪱扥ⲳ员矍㛖贈춵流祝策㉓姩컞ꒆ爓觉쓂奠\u0000䣁굝쾉蔖饫浕莒缼騥埏젡쥫犫껹렏鹱減宄əȒ憈㷐叼ホὭǀ莰∁삻ꁩ饗茯퀏좬縧｢걕ඃᄸ社\udb5c侣㇢⨑률᩠層㚕ᒋ谪涷綥鋲㑩⦪먍豇䦮풬訧夅媱\ud972⚴╝꾋샖梅ꀴ瑼ꥑ兔譹盙󄠯켫窔酈밥蹋銕큀೚䓤묶龜俔䬔⃼실ॡᄍɚ︩㬖醫쮅쇚荌忟⇪騑葲吅쪅樈ꩉ猱ࡄ殉鳥᫢㿼〬饞᩸邟ᑚ䣅⎒៶ꬫֶ번繃悠ﭕ⇎佊輤绔ݞǵŰɸ쇾䅱킟們噈ٜﭔ脨∢ꁋ袈✊䉶ꏭ埖쏪ℒ檧㗆鱼ꕟ⪮嵛២쳇츊恵䚚줜樉ৃ如䕰퓠醐糎㩳າ\uda0c섡롫灈쏬籂ꪠ麊Ƿ엻祠犅兩钤홞辊迆㬓銙㐼멼匾≦埏託얢錧ꀢࠏ閲逖㒠ﬁ㼁ቁጠ⺚苞輒驤䍊ѿૐጕ讦䔺ﹳ阵朚艊羂ꩀ騕첰䂟୽ꋬ穽粺䝟鲭釖揢딙鲬魕楖ꒇ加ꤷ앬쮹榶媛ർ檡\udd80@隁ীꅰ枠㟄ᕂ႕쎎과쐿쇁炩뀶戎\uda08恠䩁둠Ԕ蹢稐뺳্辨荈Ŵ퇽䁢굈伬╗瑩\udad5坊䄼躪섉狶ꢩ孓픀ဒ疠Ѥ鵐ጷ㩜侌禥䖋㑹⥒쯱慽\ud886⟥ோ낡䒅萡鰱㤕햅變恡⤑皈䪥㙢쇩氲꒿౓궺옞논\u000f⥜⼳༉㮠淥⋳╨駭䨨깻嚳⯛៬ሶ馽⫆딶캡ភ뎨뜃⋳ﰅ癤첯ᮼ變쬚铏㍵灈䒋鉀䌽윝᭣਌㷘튵홒惶뢲峳⤞햨钾肴媿﹘첬쒚钮抔⦊䭠ᯰ૤̇ĄҶ䌯䇧纕䪻甆\ud990﵏ה으댄Ӫ䋁᤺銍䇵㮦ꨜ떘ᙃ먌嶊⁇纒蚀蚀掬珫И䋢茵毙ꦜ媺깑㤧譜㒭ퟦ틪ઈ麰㓌瑄Ӊ鋋걵ᑢ羚剤쁊Ꞔᰯ鸧ㆣꉸﲘ裸⑩㟮䳊廵厎ꗌᄓꦋД꧐蝔⊫᝕퓪ⲵ즎吊篙㍓弛衸唐肥ꂟ젉뀓쨅豀ᯃꍡ燠鳜唞䕸꬈鬝곢ꕤ팀Þ횘䒋\uda49觇ᖀ띵ĸ易ﳰ䒬ㇵ䠀႓ଈƚˋ샧ꂿ聤뀹蚆ญ㡃鹦穐渥଒낼㋄눯ө胺暊둊적꙯팾㐭ਔ⏠⊅⣸᜵弚ꎟࠦ귧셀㋫䁂˷﹨븋ﾑ⾇ပ러늀绬챼㘾Ƚ鞏螽ͬœ쁘适耪㠞焌딀ꟃ䛥䬐熹䌾੮坺ݵ쉌銲뇊櫟傡㶚眨퍗鷋뚹钺팢偎꭫幵곜클䪬디ˣى꺪䆑ㆫ娃Ằ軥誀᯾䵋㯂驛䯯┥ଈ0쳮湵⿎澥\ud929涨ꮼᫀゕ᭨鈗輑瓎ଚ᠍苶ⴎ䅌傣䯊䀖➳⥂肒䎢놩痵홹甄걿㰷꺯㰅\uda2d韂ᗰ΢␲뤴墷줶᝖謀祇ꊋ慽梪\ud855럌륦嬰캤殮㭐ӯ魤铛㍬僫갎娜ꄰހ飁刲檰料绤幉凱為ꣃ媉⢂⛔痩싟畸倚쨇圮⍔防薅쇒㠽佨빟࿚⩗싎褌唄㲎扙쬭솔䞮⪖뙒薢얜ɀஔ释أ햢鈸Úࡧᰔ먏ᦆ뀃飈誰⟿벜๕锌䑕搵夈쐗ힼᢈ摉隢\udf10삀䊾亩ࠩ褽詡抩┤䕬欴㙛פֿꕔ➓㾕乼룖妬ꔯ鉾꧝悾⫏㊸홍䊼홖Ԭ㶗\udd2a鉅蹴酓᪂땐偔꼳慄뗒饓㵂ꬦᢁ枯蘢ꪳ뢙쮐Ḹ\\ᖊŪ줗쏶恭绥ꅉ℥絘焆ඔ匿픉ぺ銫❮뢟ϛ꬧쏶镫꫱敀悤㦮潧ꖊ⡵ﻪ唏㣢帀伟擪Ꭾ⚶ṙ黎椃巊텉ꌈ桘ᢐᵅએ耊⁮ƣ⁂끏〓謪澁\udbaa⟃盫䧰綺鐨⪰䄉⽏䒯䓍ꈛ⌋\udd85愭媥ᗠ㘵ퟌ肌꧝爌뿷圻ꢂ̥૗覩䋵堸\udebe潘ꪔ⢥\udbf9䦄⻾婡১ົ⪅홱訕㕗뙒ꚺ⸨鈛嵪餥듘隑悈뙸鰊٧䆝䂀R1ᩝ븉준☐ᝂ⃺褨⩎꺇ᰂ䟊᧎胝₮职䀾䀐㬂ဃ㟃刊짝刞ᓘ躭䴭⌡ꪲ㧾撵鲼뼂也柉餖⮲핶䒭㙤偻䵭Ⓤ担\uda77梆閎ꀃꕣ濡ᥘ篸㓍皵㿵誔쯩퐲掖祾ነ䅋Ắ⽑떭汒拘异橞ꗖ僣谿掙啤ꪋﰸ⌆❓꜃觗\u0011ት怄࿌ࡴꔀ躝⩁ꁇ䪰࣑틋옮ꌕ놌棆偠꜔ꢊ懌آ鳿草膿勵㠟钷！C簔㒱怈ᮂ萂൬ༀ蔿㔆圐ᄩ锉倊颲䱓䁁錗퀐嫀軞提녧匌굥Ư⪅६㌏춛᳄瀧䨰靖Ẵ憅㣵㨀쌀⢬虉姥齃啇岳\u0007ᘡ⽁턀瑔䛤ŕ鱧鍋ភ푯ô객ﰓ⬗咢㑀䅤䴑遙퍄擨⪾뽰ˌ쬩ᓭላ諾ଲ梂苍忕셪羉䜺ﭾ䰾꾌宍죮錜鍸骮ꕩ簥狌慦԰荃䧘ќ眚鴊鬢俉⟺臇㒘愾窤浙蒯ꍦ籪⛕ڒꦵ䄒녲൒⤝퉥㇭䁰ͻ∈鵀伡뒠ᨐẔ„ਪɿ蛺͎ᄕ祐㓡虼\udac7黈뚷∀ោ囖簠拸뙛ŝ謠¯覝掍䰹㨞⠐脋ಆ捂訡瀠벱殊涩譫货䆠㟉퇨ൊ琦͹ట븡㠄脠\udc41ꓠǙ欣ခഔ䗓ꉢ홞ꢊ푴䜜尊횅㓐에৮띉ᏸ聾쁤挈ᮙᡀ퀁䘸膻謂ģ聪ᶸ蘺雥獴野韧긘♜䬟롁粄賱ﮇꁌ盜闒ㆻ˸釗ꂡ焭쬄점㳮㔮⌜杞춫ᆠ亊栚餘ꈆ\udd03笣ᝄ均䩢膃ᄦ⁔ꁁ怊鰙ꀁ■劉밌獞销ᱸ蕓芅튠犂夁焅騖誏ኒ渡ꦣ骑ﰼ㾎኎ଢ଼ᭊ㠣ᴜ輳諴䇖‹퀭툘у퀅廁㟨儆鷺ⱁ뽾肐湊鏭Ƨ竘爮贸⁊帉á揹華咨㋏魆눠\uddbf䆈㗯퇢ക䪫쑔ꜩⰌ̀斀㣑─舨䆔㌶ῢ謑槎⋞왣\ud901ᮋ్ꉱﳙ‴屪☢㣉Ს㇀\udf84甃ӛ毦഍琥荳崕惚館蹅幡郑䒰⎢ྌ臼˝聡ヶ䀩뀇矔䷀끬殣Ⱊ嫨欆㞛茠䩗☥䥜져ᅩ贑鄃缁罃礈㩙뀌斖빺ӝ᚜轷М䏲慁恏ᐚɪ↠庁衮ឣ戛妠휺吗๰鈝迿╭嬿栁琝䌊뾧䶗䷧㰉뭸＝ꂜ鰦ٗҧ젣ᙚ趽蓰\uddfbꀹ浿栈떫䀆虐﵁﷐㱃稡ꡞ薈洗ꌚ㒄砄⢤팬몆胋ꠑ㶫෽。뒼嵑돺ⶼᖀ젡֕ꠋ큯ꡅ昨鴙攄뤍ﴘ뛙ئ锜蘚̄ౢ菡聃肭ダᵙ昖ꆡ妅ڃ퐴ꬰ潄筮潋벛邉犊ᆿ\ud9ad䓲鰽प⪙న堖ḹ嫌ꁆ즒砒驤钆▄ꃲㄎ걇묻沄㷝⎌陣樛ᇰຆ☌퐳ꂎ䕶렌壩3䉉謌༄쒀閣룖䑲岨澮\ud8c1塢엌㟬至෦Ⱪ疻䨥퐖頠ⶀヰ㗸ᐐఠ෮8蝦᪌堭䠪썙謐냐髹烌몮䱷㰤䲝஭뇥偕蝛ࡈ↑妦锂俙⽮ꌶₕ㠈즂䒻ቑ詞Ӂ숵ོ딫焟蜅ᜁ쐀폠ꖰ䶔ᙀ᥻๳잸江ꈞᩗ蛵兀㈭Ꮜ픡텊㔬죘듌嬣⋾镳ఝሮ爖栎햅ꂧ\udf35榇茤劷ɇ圣ϑ쾨鉑㲂ܵ⤆肁䁛ㄪ聜\ud84e␏䄃䃐뽀㰷⿑輍毴஠∼嬯詛쯍䗡⋉㵨辘䲏䞂⎣ᑅ燃怶樈摆ဠ࿺腟죄慢ネ㪃፹Ͳ筺ꠛ㗰츛绨ੜR誈삢㕡삨跆餖ꆋ堌ퟃᎉㅬ刱꜖䨍ɞ陈劝䭧놿츺㱁唹ꪜ㱦姘㸡ᇆ嵎෗覞䨼襘宜᫶⋤칦嶥翜\udd1a쑭∴焛턘屆㉁㞲ख艌苚핍ဟᠯﴜ푥腄諸菑⒢ኀ㐵м賛ܦ芿䆮恩\ud9b4䜒\uda09퓄눴沍﵌䱟資鍳辊ˆ琱呞尲缮爬\uddcb쵑蚑㤑䀔坓ૈ\udbd4얲㐍㆝鄎댭↣㲀형㑲눹勱爤ﲲ吰酬萴℁玮被䉍셚Ꞗ醸ᠥ䶡즋朠ꖠ後敔̦ᐞྖ腑쮽씃놃酲༣䵖℣蒤촲鳉渪岜쿾㻧᧍杔殰㮭Ͼ纳낕䚣푩ﱣ딛８ၐ꼞넒쇟൅蒽⊹ඹ꠱䷨\ud871盀猑쨨ᨆ念注ᖨ\udbf8샪㘧Ɔھ혤ण죋쳧䮒㽉묌踣䍳㬕膼韤솓䂞䪂頦ꘄࢢ힜『⃐וּ쵬谉⤫꫸願ꞟꓮ錜顉䁱ꅫ塠鼇ॄ情\udfc3㼴깆럸㥉ರࢤ䞟艭腯Â\udd70꘿錋ꨁ勤珖祦ȷᣅ࿱컳斨쥏푮ุ놪O렠齑਋짵\ude29὆肦8툔쇁舑ᮓ㢰ꀢ톇ざ鵣\ude41躌चᰐ㽰䳽뚞䗑폹趶谡捃ꌃ㸊ⱨ蛑뛂㕆⩿Ḹ讶ŀʭ쀅ჴ଍ʹ놰壟棂溃쬛鴘碩壱ጊ逸Ꙣꌮ䠁䌔\udcbd셣焕伍졣몱鐄䒅팲팙冑Ⰲ굖顉䏺灗쥋갎驒ᖛＪ쟐テ뾙⾈ୀĤᲆদ䔙䄣ꁛ桪ণ윟鰩颧陳쯨⿪ぬ蟷㴑倇㔿突욝킏䏈ࣚ皎溆脛蛔蟈⡀㡙┾०Ӗ쁓怴ഡ웆옸熥놅ᱮ؆鯼\udd78먚嗭१頃诇굑੽\ud909⩆츇誨癥쎩蜚鬘ᇆ훆㑱깕䂧咇Ϛ쁔䰸\uda15㬇뢂賋එٮԚꭷͶᔂ༧唵䧉鳑䉮먪槂檲惡⿺췒⎓㠯艨탞瞊䓃賦跧豙磛磂銥ણ↢㭆겪ࠆ̈聴氍䆴僫⫽큩쀇籩뱢⼛Ӣ᠏劑೿ḇ蛸޺퇭⢻抴尚圧ஒ䜛裇쑡婁鈊瑔僒⼔ᑨ蟴椖爆됟숟鄑厎ᕋ鄣뻓㍤㗵㬕殛䛭嗦㟷᫚㔈⚂䘲স醆艭驥솃ὑ㗈連絘隈\ud8a0桢㒨ᨡ\udccc䚍͍঩Ӕ䣅䄶鈰졤圂柬鸆⌅ᒎꞄ襗▏璤尶䜊뺏夒忀꼃\udae3焐ﭴ㡘⋡᳨ಉΨ艣ϬകＧ䞼ἴṇ䆣轫퓵庺᭬⤡䫂鈴᧨温ᵦ瑳溇ꦅ儵᷐㑍ꝴሱ鯝\udb49懈榐㝭᭪悿㄂\ud98c渀췂지㐍쨦蜓懝ᵄ퉷䉦բﶚ誹ᄷ᪨炟覫䌡忳觉㴦ꝼ訞̋䋍颼썘䎚ꆰꀾꤺ蠓؜響蛦嬠撛鞘\ud926뗦ṉ녘퓺袀쒹ᮾ⁙怿䨇搒蚏㸄ꌃ攴࿘蔦ꪈ♉ꕹ莒潞怈捝♏쉨彅σ﷙ꮩ某쫼ᘴ樈㞍⛦웧蒵⏣급昨逜鮒ᓌ鹑脶逸䥬䯦⠖䖢ꐍ䛏提\udc55櫻댁먇崌먁蔆ΑᲠ喐仿넛偏䢽膑䛛걷幑ⱝ殕弤폇嘁치↬议㌅蜘䆛䎐≕먥胶䵝瑏ࠑ즯꺀墈組㶁쇹⯁ꙁཙ薒ਆ惻7ၟ荁﬋흀㤶ﲛ竨✦顿걆颅꤮ꃟ鋇䑫䙄슛ꞙ᪠ᚊ뼺Ⓛ澘噸ᒶǵ߻腆⋱푾홄Ꚉ⠉⦡年䩮繢甃濵檊浽㯵谴䬔☎殺琇縗ㄛ윚텫噳태﷾ힰ暜⮐\ud852毤荑ꁕ悭괻ࠪ匈Ḍ⡩ꔵ\udf31䥍迌੓攰ࠫ櫸휆ሾ鵕䚈䈘쪡\udfd3㌣ò㺵쵴䟷啻깸뵅诈ӎ茈悳톺ⱇ戡㨢㐯혳폐䒙爢瘪㱠黧亦䋄勶砰䅎욦瑨爤哔莴ﮍᬍڨୈ⁒ҭ䤫˕ᯍ䶚Ⱛ华謝Ԉ䎐뢸䍼叓癅ᾪ荄Ⓑ钽턴壩砱轍\ud87e醸㰐딵梱굍밎룪♋䦕윈膙ᮬ颶䰲ဒഄໄ섴냭࢟慩⃔㳇鉈銩젮ᴳ즃䌦︫鄑汗剚쨨칍ཀ닐怩꩎毧䑄衑跮䛴捗醫ᣛ\ud901夰鋀㖦ﬦ㵩겒ඳꔡ覑焬မ渂쭄砮䜻틍⼮䅀\udcf1硄ᥴ훿֭㐹ー₧弣僧इ녆罀邀แÐ先⺣呿⚒濗竭塕꘧䩝⬄䚉ꋂ஧烨ﴴⷂ胂ݣ⸳ἥᚠ䃯䶧螣ﺂ﩯⤴낛⩍氦볐␄ᾠܨտǖ\u001a෈耍ͱﴞ٨뾣㺚䌨첯ᝌ䕨쒗⒠狰ॷ뫍䩯┦뢓՟记缰뺴ಘ鼘㙸ᅶᓉ荠苡拰ﰩ酃풘ꀖ颅辖ᕒ⠥媔稐々⤯᪝肌趄韐\udd5c愹웈弗棔☬찤守딲䍐ⱦ㬙볉蠐豸㑝鰦ᆐ텿ꠋ咖㒬澆꾂좑Ꞡⓐ濣猙꣉蛆淇聱騬飶薣頡芰⌳ᴔ忬쨉电៌鋥愈웚恼ㄘ䋟ః嘊뇏훭蘡➻蓽㭄䀡ᤗ虬钙濕쏱㣫泗詜쌐\uda42從䉨䴃ᆍ鎈㬉뺈\udca0椚ꍰ鯔൲ڷ蘍戅ꀍ冠᪰⏂掖\u000e7匐侾亮⺘⤖ꔨ繍望陪簱્搬깣惏ᑁ喪蜉莕Ư⁚态퐹吘䌌℈諣嵦ꔖ⽙땅袆渂㜡鬻쓁ꛦ썘榭냙ᩮ椵좱㫍訬ẳ䪋ᡃӳ杋䄞ಢᨇᄢ鏑竊੦͉唅轢ᰞ枌ᅛꭟ쓪ᮄҳɑꤰ츄⼅ꃉሃ곓ﳫ⧖헏Ώ鰶坨䗗ꁹ㭧⃰飆栢\ud996ꘌ筀튽\udebaၝ㺾찹昪⍵烈ࢺ쇨袻뒘肮唱ᗩ歱ȍ롌匌࿙냰濶椢抵驡♏욚鼶爄輂狅쎃뙁☠䚨္Ө\uddf6栢懽鮈飮䢢貙蠣튡䓳⮣ᶎዼ洐烅⡝쵅㔿▪\udea8쒲먪ꈞ芅坅׀旬邡ȼϕ㗕虰\ude17䩰㐷\udc1b陝ᰱଵᮖׄ邥䐓뚙闸㗔楩㝁ᰃ肝ᗝ˳騪瀸䐠릶꺌陨븨仠⢀ㅘ煬᜔菇ӱ菴Áꛠ\ud81a鳙坅휴헐췁꛿稉㗩袽橍썭饷͈谀繣ⴰ肕鏯܊汖젱਌௖늃ݱࡣ塸髅䵯〉荚ᦶꃙ虩㡂\uddc0烍爆ꨀౡᠼ\udf21蔏㝔쁷჌坒鬶㜗쇏﬌ጃ㑍ࣤ촎欭ᐏߝᅜꙪ냚䍴䷀鴭꥚振튧섪ๅꤌ㽼儩⛼鷄曋ਮ᠍빫㣔茄㳔ꃂ켷뛜☘慐ȵ摃ᙋ৅ל艀ᔽ囌꛲፹ꕀ濦噅਋ነᡸ寢ㅥ㥴㩖愇⦼瀓硝ﰺ♘䌔糒嚇ἴ쐰ꟍ栆睝ᗌ↴ᤞ氛䐗᮶曵簓퐓ఎ邆梠郀矠ഃ廹ꈡ聾溈扏鮙캦ｊ늀䡙ᐄ㉬땉㑱㔴촉ᚊ麸鷚죷躂恣惢邔ဏԟ岍㓅졄昫ಂ䕽⃯⒋片㕡긙ᦝ銑⹭ֈ벹﷑﯀哙ꓨ\udf8e殕舺⃩끥ꀹ뀺䐕ﵭ鲄肶섰怭ࡌ羘ም䴓⎄ꖟ䃘䳽㢇鼨ꬱ༛ợ첩꿵걿؋泬ং\udf04쎀딡㆒ভⱒᠶ\u0016␖鵠㡺যᒾᛙ峼\udc0b͔냚塲ᛎ阢薷ꖀ湩Ե亚쮠₈䷠⊂૤ͫǱ醦촲ᛶ阼薫ꖄ꜂傶簩㋜굖ᚎᗶ釀ⶍ늊ᭃᩬ吵爡䤑䅍ᢣ퐰륔⑼칙˳㪄艊䇒採ꥥ꣍㜦芒妰褕但　槨猄ᗤխ頠讣ꐃꄒⵋ⁡䖱麅\uda36窣ꏍ쁣恺⢢ुޤֲ聃ꔠ냽偑笂䖦麋酪팢ꑛ劀偿໛Ƙ釬曳톭疷昜ᒩ㺆ꀟⅴ덗䤛﨩罃⾟驭뙪婠艐\udaed赙蚔췣㨳ꉅ錌磻꿰㨶ዮ觫揬悑慰纝⑻숲Ҍ屪琁鰁䨨顰ℴữ䲱泬憬婻ᢪ聾옰覥Ꝏ院줺戈楜ꛩ汮Ⲗ飂䕗╮뎬ꭣ贪榕悋돏ꥮ젹भ䤏ᐥ亗㦅綑詵ㄡ璚츣놇㌂걛笘ﶌó䶽ᔾ虢­臥䇲蚐ၗ舴坆裖詠ꗁธ䆨仞ሥƠ泽셵쀱ⴙ䭶紅つ\udc6a撱儔䎊ဓ෥茏ࣃ䯔퇴톷鳴ꢽ袕ࢊ풣払㦓⛱쇶⣕ዒ䶊謜쭁鞨䛕⣎ᰃ൦狼瀞鱪蛡価剛폨墖곺⸥늂ፎꞵ쓦ぞ꫹豇倪䬅\udd0aチꀥ橚ᓐ嵋兣Ò훵ઔ料鮆ǟ傛炒\udf41黆郣닃禪摏ຮ㸄톩Ⱅ쇌㊀揯Ⅿࢍᡎ전⤄懃룡၈蟈俆ݎᄼƠ樴뚩䁍ⶅ豽䭮쀵퉥䥲汈ก뗜ྲꑶ脾쁲⃜덠袆䀹赓됷㱔勂쫃ꁁἠ﵇ખл蘸\ud841氠鄙쐫黋퍂촞뜞汃摧漣窨湴䌂⾉⪪ꓗ䲩펹ଽ饆뢄჋\ude00瘈奭⥠陛⨠斖驷㹳芹쿘㙎魭萃ꡘ〒ﰍ養韄䟂㩁胀ⱆ뻋煋ࢲ홒쇗̎嬿烟愝悜靡䠷鉹鼨뤂㑒瀎ݜ頥䂸꒔ﮧ\udcf0䣤䱸刎騚覂鈂穁佢ఄ梪痣儑뗖᥾洠똗᫘䶸䱋␄\ud814妆ႀꀁ黐開ΰ䷥늉轹涢拹䶥턹䋫亗ࡀ㉯鼑㦉ㅞꅁʿ肌顲ᅂ䌂뗞婶ꀏ隺☜혫Ⳃ簱䟑\udda4⏍癚䝷䲆ે枔꧈ӝᆹ捪섺㧒속찁끢럠ᣀ珰㚉䒁襞蝘もL囻ثᖮ逕㏈գ⹍恛ڙꣀ㨡䍟ཱུ牣瀇苙ꃢ┑織犀륦б㯵넓㭈仅ꭨ팞淾←끤ၴ偸᰿脓곗煀퀶煛᢭瘌ᘫ掃ɍ졫倅ᠩ뱢㴇\udc93㶉꘤ꨊ㕕䐕㨟ㄖᨄ᫊ӹ͍莡耍൧㵤㊘䤑說Å繛ꛍ忢⛃桩떰턚棬㘭驜귢ⱷ⭔謋쫐杦빲ṝ\ude6c산뢫㩜譩ᐄ૬铅ꩅ⪑ᘕ℆⫙⋄ꏌꨑ또뮠ᢋ\ude84수◐鎃嵟౯則꼖⍋쎦纓渚๞Ꞧ袦㲰ذ苞薊拱酽ꀜ֗㢝㕀慪鲴뤛趀꣆輣䘱믈\udd8c湩㝝Ģ飭嚘ꘜ匛꫒㜊ﶇ䂕ꅪ긵珈ꗐᣳ觑擴㔙뀈硁홳ㆵᕇឦ轩ฉ↍譃ᡣ䁫妃켌殌풿ꨄ帼욮鲈烛鐃畬ᶛ劚ꚭ浖❕븩菕湈⑃䆳낇ざ昷눃⤀⮲粙운ꍜ䷲껌\ud816䎔℈퍝آ뵓ḽ剎瞛ǀ\ud8f3늋舞垰뻴栄㉲팂襲㝾֮″꠽?⼴턁쎁缵駱뺭쳌徫笳\u001a\udddc詮㗛쒻扛蕓䤠煙킠蒑쐓翉莼௢琫穇ᢚ폵湖䇽娹項登屭봙媬ꐄ瞡嵉ㆄ焃ꆛ骧踫랎뭮뵰꘩ۿ\udb23鹜ᨔꐄ赕ꖤ䙮㈷㿇ق츙씃珢娇⃲졹舄鋙츁閣䘝⁈糖ﭺ₵맞舭浊峊㸃옐摺嶜噊ᰥ鋉虘텸쬿ः뚥캎鉭栖됵쒅괮汤ऊ涅禂䗁癉ߨ⅔തʷ\ud978훽쩴\ud803滎惞瑆㖭蓞퀂晀䄚쭘뾘ᠣ旴鸈\udbdf䐎됏킻逡훴瞒썋響ጣ껛\uda03͜䴜᪩ㅎ铟ꓘ⍸ȣ䂭쐌紉∍鵮ᾣݼᰍ쯓൯錊蟣艽藕ႆ燱ᨌ\uda7b咕谡綂ꓢ赆쌒ᕽʛྌ䚯茎耛섇⍏㨢瓗ᵬꘋ扄␰筀Ỷ៺ର܉臶怴ඣ효堸뺅㵯轔捦뷁న놈\uda28誺ဘ킚Ւ証⸱́彃Ẵퟑ➭䏫燙ꢮ얖さʁ\ud9f3蓜䉘估椥厅輓췤贜ዸ兙鰴䟡஝蛧讙庙䁣⌻瘅箂⠁퇴ᨁ䎦繱돲\udd7e溛㗶慍෮클瀒탚訓䃛㖘瀶鵦∍ꮲ삂儱꣩㽘त緑⡎鄕蕳冋笭䐶\ud81b皳Ć힬숞栗꣬滇ḛ條赎癥䒇絉續꼽呞ᛉ걱ቨ䮒늫壬䱯匁댈洞橢ଐ繿ފ뮉춁Է桎ӝ㉐✪⪞⫄슥㼘荬뛑庾䁋깸郢䆜⥊㐵㇯惍䰅᭙戝ꍬ桮᪴캛㲍飆鼣丱땚ଣ榱뚕ì浒㜝쭯㦚䩨뙡齊塍⻁摆㴱ⱻ隽⸑桟腶ᢏ큲ﰂ䄍豃즋ᚂ␼呫瘹봚\udcac洂㖟ワ췣顥同먙ﳐ땒覷ঠ扭܌碛燃፼ᩯ䲒튁郪访涌ꥭ凃쌉Ꮉ찢ᵊ਼ꛬ䶽촟눆ꁏ\ud911簼剟贋䎙\ud889༴搵䧂齮῟㚍笁ࢦ\udfb0쎉딜ㄒ涒㣙䘗爟ᆌ܀⭀脐팀ퟴ渳奚Ⰳ왨ꟸㆣ䡴쉔괟㗀샭믥䀈곮貆륀濢⺎鬳澔怬\uda95ᣋ㚕ꍧ䂗ຖ㩬䠅↚芭ᨆ诸ϐẄ૨䇠ꋯᆗ⃤ͅ춾曘ꣂ妴ꨰ쑵㋹ᡞ岹⇥횺퀮џ㘓ㄶ觝勛꒎뙡䙁ᇆ᳀⡶ૺઈ乡듛㆑涏孓댍ᔊꕬ\uda37隣앍堶ญꋐ훿Ѹ\u0010\udb17䷇젤孝댇ᛘ䖷⩸贞簨鏇尰䤇ꆖ腂胇澯샥褂抡视ꊑଠ喑⺑凵ᤓਣڶ뚮䎜㫓獒簃툅꺀⒐䑬䴯䉽耹腉쁾暜뒵䂣곭뫲霶맜컺볕瞃蹎큫膵㐗ᅈ崙⸋＇㼚꭬鞡旨媶롯ύꀽᕾ欒䙀酪悍桰蠺ఞ円⚢҃鱚ᵭ袦⚭깞覄ᘋꐿࠥ銁板Ԑ㔓⹀ᣂ཰洁䯤턜㈋ᔅ蠱ʡ쩠놠᪄뱌紌撋厣ᮢ더쭁âꇅ㇦倏廹檕긘ب拢ⷆ蚘莫䠈❁뇃樰샠덐暓戋ശ\udafcÍ둠뇳械医왘퓀ྦྷᎈࡘ靸⠩ⲩ㒹䦾橣梁ü姐扁僴踛涪鐎魯䅢蹡ꢖ蘒Დᩎװꉒ愩酋꣋谹켪䦁뭪滛咘넱豟蘓꓋슾팯利꒳舑荊頥樦悒ꀅ庲᷃䞩凖ⱛ⚎띺⍣괙㛯쭰氄脁礂⸩뒠뱩ᄬ掐㍉꡵ྻ汒戞\uda54飃ࠛ턥哋ࡁ붧氱쐅㞖芑犃v䟩줷눬㪺コꂨ䡻\ud817ꌉｎ넆㲃홴ꦦ͖藫溱ꀲ\ud8d6ӿ쌇ぁ조큌݋ໞ쎷북뺌怢軼荄귈ꔵ狇Ȝ櫣詷熰랓ㅆ\uda25퇚热麌☻侣ႎ\udc25浽儎莸瓢\udb60䴹勝鞙쁍源貈ꥢηⰋ싋氳渁嫀汲頺表餀薀ጁຸ뙆ึ뜣娱맆\ude35桝㖐ƴ䰽㭡匐컘뎆㑩ʘ⺴졂▏㸜傩⣝쑖楶엖葋퀷⁆졪웷㕅⟯妴䄿戩ቜ⍾礍焾׭虧鸱㋑홶\udd3b䅓Î\udc54삲멡\udaa3ᡡ\ud865騥簕ऋ老襁嬨䠑処샓窄\udfd2\ud821£뜆宨隺㭶嶦ㆇ靯豢ᗚꪡ奉甶蛊χ⿐ᔥ裎㓳꫽紉㴣팡❮␚ⵑ⓾亩茽蚸扳ჟ飧曢䋕㔠겜葌샣襩埼찠Ṑ᲻汣Ἦ킘쏵˵将䐔쁞歅戆䡀庀圙䀥ꮼ倾茟䀻럇톎욚弜뿭㌍荅괃嬼䃆ག许║섎栈줄ṕꄻ뒜졨䈢ᶪ㶚ા㣦觯ű႒\udbad涒ࢧꀍ귤隹ʹ紟滗ὂ㮶⟐얨筡壠聣႕⮰〙㘡桡샹쌅꼕炈曈蹢栁孚쉰嚠ଖཡޮ쑾늚ᦀም岳䤌撛⧃र쌨㇌掊洲떉ꄥ᭠툀ꐱ쁏㶮㦋㑇㚆⧹갎﹖됛恕ꌆ\udcd2溩㜭郰ࠟ怮ࠃ䦴듇㪲뎵珛⎘쓶飦᤽ꅂฯꄺ۷ᡚ렩Ꙑ焆끖⋄ꐩ䉼৪ᓉʤ߷썕腯悽య뾌톾\uda26뎍㞷됰ⷭ崌死倴ᣮꝥ듓㗣粬優왞蠭料ᄃ鍬缷䤀ᦜ꿦뚆㦽뎡蕯檔礿͍︧汕∮度ၪ骹馡噉㧎視៥싥䣀น꼩ూ輧끢楋뉹ꞌ朄憮ᤰ쑉聮ύᅻ\ude96\ud847頽괔ᝫ狸泂㿲罎⑕饸쓷♍椄驺Ⴔ誘벛Ꙁ䗣鐚䫭韙럲퀇栂뜁\udb80굠监☥綢䦃彮鉢㜛籭絭鄱薇׎␍酬ᣎࣆ屭悺킞鶍ᅬ틘秡噶ﭴս뱉赟檒懗\uda1b즭∁㐎鰇쓀ቡ▁账뮶鯻眓Ỿ풩ѿ딉ㅼ啯紻覠⫕뜌：ｭ羖쀻怕ꐎ툅波拟\uda78頏☯⮓樨뇙㊤꬙佃囹貍蟎≹킯喐淎깑༎䉏䋍꾥㖁審쀢弪ᣉǛ鎚쌊ʩࢧ褩隭棝썀\ud841硣孉ࠖﭻ朝⺁톫䍔ɽᆞ᡽否塒◍뒣ೢ偝弚渣䁘莛妐≤ꗩ㋜顅\udc30áﭤꈢ㦇㭀嬁咈뚘㚒鄡ᙸ聓潠瘼ジᵌໄ⺩뿋䆮ጙ唘䋦ꖤ蘖싍ꌄ閮ⳛ萣ꛠ\udb17殊眅죇ႃꨰ籔Ͼᠪ꼫治ꮔᬧ솕ڝ讇ণⳔ쑮쬵者切漀䜇漣ׁ퀨쁿셤䡚ⳤ±莙\ude1aࢦ쾠飰붒֐蹸止⏊꾔檲뤳৳୯ꌷⰩ읍鄦묲垲ﺲ毑簱៽죷抽ᒵ寘㩂ᴼ豧ݿ⌐冉⎉⮃ꑡ騘⽴ᨰǎཐ֢漿ڿꈋ꺖ꢻ企ᮃ䫏ಣ쳒핌䊚繢凄뗩酥꿀ꇨ倈茜跟뛧⍽墑Ⰶ䝀ꅀ䆀\uda00⾐⮀ဠ൴Ơ汨甽킻胚恖蝻\udd12ⓖᑨ꣠멤憤覦擉ば踔ܙ낶砼ﵣﱻ\udb22襦쎹ꇓ냫箣됻뿭侀垑㠧햽䙴웲膒䅿倀ꌮ뀍∍沖쁴搼悹냌⾇䈳១\udc8c쁠ꓭ봅湇뜦ﭫ뉀롭왤웨롔Ĕ俶祮⬥齂䬼ෘᥠ裴熱ጽ鄍쒜臬桪욷୘혀磖ꉢ✔Ūꇰ捼㬑顿ມఛ퓟\udd48᫕尩툘\ud98e扺ྨ꼀顸쳝⃟婈ᢶ頇ᨒ钅캁褀仑쀇汹ꚠ톆澨㔧骚ො躍؟⎻䆈⣪辷⿚⅀鲉呩ᑕ谩䪗⚧థ뙾퉨ﶙҎ↬풌箴엸Ĉ蒠侙ॲ啎\udb93㐆ၳ⎱쳗ॄꄽ쑜함̋㦅ᑊ攝벎괆£띁肌ギꢛ\udb6aᣵమ뀠㘿⯂탁쮅歕￬汿㚽裲杚妕◸ᳱ\uda53箧▻ᇒ톊ặ⟃ꚍ匦贋搙녢݄致瘴ㇽᴇᨐ筻\uded1㾚쇶뤃穣꺡輬藴瞘㦳ᵘ넑ꪂ꫑㐐員媉Ŕ솤쬞ྱ\udc04ᒼ❮臛頑衤谉稁ꔆ宲묝뉰ệ坳ᾱ\udbdc슮醴ꆢݞ얭髙ﮂ鞵풛旭꼐祻獉롱퇜여睷〇ᴾ㛅摉쎍Ñ앫瘥窴奼浖袨餰 ◰ݿ鷏跃噅℡᥎믅ῢ늴폄镊豷⛶羳軾ⵏᓱ䑤촦㚮䁙ꦡ薂\udb46 낰\ud858铠∮勄㴰ί淍㞲᯿雯呕鶤⫒ᩩ氷蚛\udb0dՈ䖳翣ꦅ萄㭰ᰌ棓圚뢆⡂펔젓ꥸ쀎竖ᣰ䄵䞵劜ሆ렘둜娅쎾ᢚ㶡厗⿳숅렔䂍⏮꾺⿧ឡ捞䀀鷌ⰿ뼰Ꭳ薇\ud9ca鬠\uda11銰࿐྄ᅩਿڬ䞤灖顂仵꘨鎫榁ⓩ឴읛㾶竬ᮾϏ舠舾琳䦺䧖듁ቶ洱쒝崦퍿ꯈ鿆䯜曟錳萵床ﰤ퉒硑ᭃⳡ娴鈤ˌ饎铑교줚ᎈ㏙尐䚈Ꮝ䯁\udb73➔䠝\udf8e봄뽴ᤱ艳蟔삒텘怀灭ꀋ琝諙읏੶꘰ꊝᦌ墧娸霱폯淝U\uda83ⵔ盐쭭ᶢ㋐詵꘱ꊝ馌ᖀׅ쎌⭃ꄬፐ\udaa2걼唔脈厘곏詆뽛ꓔ긊\uda15㝭Ꮴ䈒튍즸ਦ∌笠墁杻仂蕡岂䩞⯀喽䘄濏ꈗ퇞・바栙紘凖⽭ᑴቚ疭쒖꡻夥꣚퍯䏏ꋤ悦鷅ꝫĆㄘࡤ砺瀨냮稅᮸爐躧⩘Ⓟ\ud870蒓쐻朶赻䀒槙洆驴韐\ud946픍ꭒ⏭芳훦ᆴ閔䊑\uda76册ⵖ蘷붉뼺᝾␃걅뤮῝˃腦䁉怚뀀蠢က娉븆燓↝Ᏼᡧ瓽ḙ휿䓷딈艒쵯訰⍢疷촌鵮舷⥢爆琳ꩾ蜌ꄟ宣쁞ꚑ萩釛详딊⾉뼜腅Ⴙꫬ⠡ዛ愈孹ⴞ裻㲃﹍䝤ܘ輙錁뢲晄냈釜≰ხ袈ࢊ첇艬倽긤ẅ蔇ޢ䏑ǀ擙↡뵧瀐ᅳ觉層牿菉路ᴲꨉʘ헥Ⅱש䌊◊ퟁꭋ嫽䴤皕❆쎧悈熃각憝؀沰ᑀ᪝\ud81e聾V男䂕鷐\ud930ӓ詇梕ⶱ보旴瘕撹♩閫賈棔ꎫ귲캰稗뎴ᨌ곩螢䣢姨ⴰὌ⯘ᗠ蒎荱釜ᵴ杣뀆騅㧞콇乵珐뎝䅰ᜨ脂䆭拟㢫嘀̞㆝힁⥫莇鐻≞垱贑럦蓱ά臱⁻᣾耠䃜鳫枡ꜻ㧨駎쑅됇䡯䶺銓褡࣪ᰁ쩲鄛\ude5a飉읥梱匘쁂蹐椋罋ᥰ߂藹ʳ聆塣ⱏ錳쒞ꄕ꺌젻ⲑឩ᡿অꤪೄ舧ǝ性鍗똂Ď볪ᥡ漻﯀↠鐼⎔ꄉ힚诏衧谋밳脘ﺟ㲕嵬ᬵ\udf3a٘ᯎ㏳됢߁獿䛔㷥⫺㰋⒢붊ᛂ㺲兄׼䖶敎懁㴠倚闾ৰ悸ㄵ烃됧ᰐ阷꤅ⵇ䄻瘭뺖뽫缾ᵒ関䷒됤쀬郈ሶ迕솃苨⇀艱庉噦䂮某ᏸꚬ䚘ᰮ躗䋮셷렰祠ࡰ⼃덁渫긭劑Ș먞ꩄ憚뙜ꈧ쁱㊔뼭눤扽⭼〳὚௓䝧₀顺젦谘ጕ䌎ፄ溛ꔺ䳌磦駈┅ꢜ퍁洧㟐嫙恓鐝ᝨጏ透ꋫ滸머雡緯ⶑ嵁⵪ጡ끰サᑫ℟瑋寊元恳衄\ude3b⾍ᠢ⭨郉訨辳ꇆは䖣ᴞ唡䈑隞휬\udd44珛㣩혮⺋뻅턄웠릪ᨵ⶗쑌됉봇䊎嘁솁璱鶠\ud930栆謲亘폛꒚ᠡ衭ᨽㄼ筈䭚㾋ꇔ喸︚틒戋堆㙱퉂荺\udaea끮䪾⌀㛟춲擇ᯐ亅更䊗施ᬦܢ吇扣泈쫺房㶦뢜үડ櫢ɚ璑勚㖜湋롥큒ꌔ믥ꂿ棦劤瀓䂀ࠠ鸞ᘰ䨤㩲譯栒뚆譛䲱褾㌈䳅㥶錱౮愀調ᔕ귁政৛环㢕䅖쌒ϟꤗ솩굽궝风군憅멲\ud848뒒㨉귤軛靡쮰馂狩♠တ܍ﴑ၃ֳ쩹퐌⑾ဇᗰ⛉肾฼斚䋓勂懃枠ጰꍰ౐ᯪ᦬ᬲ࢑邒ᖿ㚳䡯ፘ꣜ど̓严㈔铋⬯⭋믒\udc42瞤熌⵳薪崙慭빴ኺ쒮욖ᤫꛐꡉ䇽凐丈킆轔笰饭楑띫喝ꡅڿ营矔끉嵍ⱈ꼛\udf46鱗홢볁ᴠ鹴⎠⨬䀙蒚µê\udb5c䉹ﾆ\udc28藞ꕮ̚䒎\udc6b䇢Ἒ홈락き嵿䱰쨠㌂퐆䌣濣ڒ䯰尅⦑聱䈖쬑戍醽㣪Ჶ撚뢘쫎싕짉ꠤ怞⍅ᆩ鱓慪∙㌩禃瑺鰎❑ꮧ櫯視諸惁㰽撂擤ᒡख़۳ꆾ₳邑灠릴㑏ꆳ⑳⁘ᖮ頖㕫븅艻棈落몜갇끑䐝涹㟦癧㛚䶎ာ狗琋ൂଂ솭疗ᵿ⁓堜뎀螂鏓꟠ꩰ㋸쯚汊戃䢂쓃놟㛎塄⚪佱⊇ꪛ핁긧쎢않煉淝᠂䃰ࣔ潖͙酝ꀼ骰都̂嚋뤻洈䐭鞮෫괱ݺꃛ㭦ᶋ횥ꝑ▯嫚듬㚴剚菨힮탺㯫ꈾ蒿淜琑钬褵伲嚝倒됣蒊떅깜次䁘랮욄⊩쑖ᬪꑯ盶긊썘來潱ͥ\udbdc䩵㻔耽ꖕΛⲁᒊᰰ\uddaa땿䘠挅첅ౡ땑߰㢥ᨣ晓뀲\ud947椌듑\udbc3⵲ڳ객᮸ㆈ웯ౠ생朞玍⬃犀☨䱩恝⒚創د皠砒ꚥϬ蓼蒂ᇊ竹镵ୁ퇋끭馢瀞㲘傚쭤띭︁↌㗾ጛꈱ莑轮ዙ沥㧖琻鈊臒ﰍ⪀ሃ诀猈嚮둉屡藴ᩜ큎媼ᵸ킗荽᜙븉鸕锔定ጠ┕讝ێ蝦ꈹ몜齤紳檇⩎ᥥ⿐䄤込曦㵱ಅ赁毋殸੹뮔몐୹༔쿦竵ꁱ똪㖣湾铼埜唪ᅬ\udd76琇㝣鴙췒䀘偀ㅀ怐戀塆㐔ূؘ蚶䥨⸂뜂\ude96ঽ﵊찧㘲ࣱ\udee4塲ს၂预\udcca厠醐鬭鷢㛺\udb9dᴲᆌ훩董塀\udaddࢌ殶贈䊄\udecf瞵甒\uda63춾໴덣ᆫⳒ쑬歵䈰嫝䭮ݛ룑ꋕ숕劃됰嚊䴦ႊ㎈޷暸皻䟴ᄆ༼ᖴேնꉢ急僾何坿琏㺀餃筷蠱㻝刌䬈ᜈ쏭䢍到Щ鯌哲♕㔁ぇ᪒涋ඔᡸ夤ꚗ䦾䆆檶萺믽왢軴㍝䆫ೕ⣭쌶붺쐘Ὦ줆㟛뙨찠⓻ᇻ딝઴찱蚂辏￣ੑ闙⦂ꖌ㚑䕣ᷣΐ膬捖䂅ᰑ꒺搳裡涶᮴傝尕玖桵Ⅸ姌䯍吊⢻ᱝ㉄籅繝殄⧘捷釛늝鱮骻䑥겱褛斃γ뮫ᠨ푪제\ude5eࡇ撡웡㈘。ﻐ헭ᄥᆮ䔔䔣鏟娝사睕挓鷙풢뎷\ude41졘໴ᑨᕉ։譂쎭璼㪧욓⛈쾑夒癑鬵蕚邝୦뼣去걚苮掻뫞碮ส溎⯄\udaa0㉩娑긕骤籖ᚋŀ蜪홂윏癐냝\udd34ⰷ鸛ᧉ\ud8d6혍蚹숺̸䴲׋㤯໶鏻㘴獎䐉\uda80⩆苛㝄鷒祡貸얺㝨ᡉ柎됺㨤崱䀲⎹膕ꝉ␥嶛꺨膄ꕆ㸹馋䐚韵㔍嶏鴧攳ࠠᨎ뼏⨁菂든꬀반ᢔぉꀃࣞꂷ믽惝ꁖ衧뵇捐琱༾㩛與萺榉ᦥ縣㛪箶溌\udee8宣澺誀줄霖ಘᡭ譸ۿ芖‖‾⠒ލᨫ莌躧㑩㌣ⅲ磮䜼꼟Ơ䱣㗆ᦒ᱐ꫝ㝑\udf4e⋝䩭罵뢰㿝鸬濷哬찆䆭櫽皰鮦쵎퍇鈱쐇昁鼁裉헖伐█᯻뷅觾慔䵽⇸裑칳뺉竸鷦操ᅁ쫎킒쑫䆺ꅆ堩ⰴ阳ᨚƨ敡︹丈珤館耆ꍵ鯌䱯ꖅå㳷ꛊ뾆㮭䫕뛬當拀䉘怰៿⠞˨и茴騸㵉Ɱཀྵ㘗菟ẍ∴鶺䭸鰨ʃ솏錜খ푱냁쁢↢␋뉓澇듴耩\uda1e긏甹གྷ\uda7f菠᭜頃硂搃栃딆탂캤ᯭ촮霻굒婙겺隕쫎⢻첓뱨捉蒊ꥍ層㎍ⷙ붖鮓ៃ\ud9e4쀈ㆬᶄ℁ꮬ蘢泑鱷亚쳭捖陸宍믃\udee4쏰㄂㶩հ攩䢛귟࿲訓磸资䝮氡໤蕶탄쎐䎖⑘额ᠬ䭑쭆裓說ﶷ﹚胭䁖퀻徑ꎣ퓄쐐ˣꁺ㷬䰏鑤ኝ藡䌠洒꽨풼㯶뼙ᴝ鏋➶ꅪ枌窺㵓Ặ☆됗臕絴⽶㈀쿜ߧ燧ᚓ黹憀懄꤃ࢇы媛㼙⻬侤㆛棨ⴭ⮧µꉌ᫁ö̾慢ꇯ邡倗쐻䉓駛.ଃ刍蓼性ᡊ譽惝얠짖৞瓜紲渣簲훈逴ښ䟭叻॓簛ᩔ\uddbeߢ挒쀽샍⛣잽弅빢ﱺ鳼쭉⦈胞ꓥ逊ϙ쏪戹ș杲Ẋ烢퓍쓶鼱៌ᾏ痳ೈ\udc94쐻솥ょ큃耈〜퀗盝垂牺䨀\udc9e첦᳐῿鐘斊넸瑉텸⅏칲鎔펄⎑఑턘醭쇈룺艟\udd26\uddfa㘸\udb8a㵳ꛗ᭤햣鏚铆ᓴ攱礽쏎忉跟袿⓸ඃ⢤㤰葤\udc3aᶪ㊜礓팑ᡄ韰정옶킧纃ኵѠ쌁折ㇿ邋筳썖ꔝ폞㌄ᵡ봽㨐䁇䑵댳蚕ꉊ梓ϕ㵘Ỹ⍙஻䫐勫튷傻ಭ،ཏ䦃࠳\ude60싸퉯褁葹眧掑뇐ǁ뽘෴⇦ꯚ鋪ᒸ퓏렔汯처轓틬뵒쌋圲ጝ呮鷔砳뜿ᢘ肸ꄼ堷ᢒ၍ꠅꐋ奬䣢嫺죔雭ꮌ仏扙፱诙䉬త瑀ṑᤰ⢗ᩐ뻇\u0012▌툦✗駋컊ⲟ睭\uddfd\udded톽构︷ᴚ⎞ᐸ޳킵脟䭬凚᳭䕏܏鐰๭댏໓鈬坭槔䩦⬠ଐ؆ݚ˿䣃굴杲昖丆里Ꙣ繻爛酇慇ꈕ\udc48皒㬉궋ꚗ콿馁匿Ꙣ⁃哚됑柬꺈\udca6얨揊醝窛晐钨뼋䅪Ї㴘\udba4眡泋렘䊛蝃옍팭它뛂刦팒㒙븟१㗐擂ū煰ᧃઅE˘Ŝのᢼ넇筛អ엯ꙃ煻폭過늏阡⮄␸㟃⠙磏䚲帢ꁊ覤耐憋ﳍ䔧埭륉톩㗻\udbef춹㚧掯틒劇䂃녻⸘艞貘׳\uda75\udbca‗爌뷤䈩赈ꄵ缙ᐈƧ䥳绥俎⺞\uddc3夃ᷣ֌䙢썐ョꁌ젴ﰩ녞䃀䙌栘㹞襎藹꙱팄㗺子췢躼睢禱ꃛ虨૶倰벽됌㓠ᅲ奁ⴘ啧⧼ꠉ舑阗䁉ᬂ♄⋧早뎔썣瓨晃뷩\uda55梽錊즅䗇渕ᒉ簨䃨ꇣ긄㻂䊉㉛껪㴣赆Ѻ셊ꀂ墯㐽㤊㘈\uda6f外뾩뢂⒘ꔉ鬿䎭嚾᠇퐭晝襢Ꜽ맖㣙餋郶ዛ㤍漣ヂ㞌ఖ蒚şÿ逥䠮耳䦣ꯟ藀艘冰㱔脅萶䳘딢㉴梩狡阵螞顄삤؋죵₨ᆄ䴋绗ꮫ\ud875懵稀⁶ົ鈲\u0002햋Â궂邠䫐Ძᨣ瑗뜝킞滃㝊㪠᣿庫獼̘ᯖ䌡エ흑쵮놁㫩⾗ᶸ⚻蜍ዽ袻꓎왲഼뿚뫛聢햁憽䃞춴噋륟╩榚塐衯敋㖶ﶟ弪쎢൐哤媸覅T鼢嬲䥩่✽ƙ삁逶꤉켋ᴂᙡꥂ\udd78၎跣䱟驫⥪朆ኁ敹琔屗军૟ވ✉菸﯃舞퓫昽䙅꫎헍拳稅頂\ude97鐀\uda3c⯑쫬諵姚䥭暆\udc1b斡늖퍨棖篹飼\udee5ࠋ쨋㒣넡餻⹈켢䢼䆐⡰鉞⒍┲팅畺‸ఏ『梀膈辆⁠⭽㾲\ud9ca潄븷ꟛ힀삲䂐考붆뀤䤛펵⃐淆ꧢ➄Ј⹢㐞଼䍩쩍ᣞ䥅︛腔睰කꑭ荻ꨍ쥇籗ꔼ\ude1d窈ᠱ\udeb5픁뢐৭樗艉呦煠ⶥ↿䁞䃮菴ㇺⱃప頱\ud80c憍沍ᦵↁ뮽廯棃ᒺ谭ꮹ者壀чᔜꄼꞽ郍Ｃ趐䡒ఇꅢ흛疰檃窴봁이ឲ҅\uddecᡠ轺䘘﷞봃⾘譴햄␸Ԏ報債灀朊ەଝ猌곀㡚陳ሦ讅萬ϧㅆꁉ〒尹斷鋑㐊켦∯ላጉ죂䢙➚씰鲡葡ੜ袞䈨쉗䈐呅ꌽ搖ꉫ䋣뚤팯檽₮㪚䵾䚸됻㦅﷬⹠鋡輢ᴱصઇ슻⾀喱ㄳ䌨摓ᣋ蜖㦲푫\ud96d쇴㾽奠濯关ն\udb7c윪慖憖쁿န耛匉㈘蛣Ĉ位敌દ㜏목蟃㬊㵚黑ꭎꞢ櫗裺ꪘ밾\udaa6៬읊⇓윪죃臒Р驈\ude06ᯃ׆檔䟳囬鯞ꋞ굪轈钴⼯ꀻꦋ♥舅宻棛꘧瀞태ꓭ᩶훽깸뵶఑螑☝ヅ逅\\Ⱞឈʞ\uda60聐蟐\ude3e鎦⒏붥\ud9ca掩㬑\ud83d렿谘缋ꓫӻ㱽섾⾏롄햋태遪胞굄窱䒗恧꧄딓煭볡斦찄儅鍳᳝溨䗎墒員魯ꕔធ೭ꇗ巑댉㜴倜䌃惵ꑐᑪ㝜삒쀰ꀖش㠝膉둧驷蓻ල﷐彀༜ᤂꚽ氊≯婙౮齳̝鼆샂冚牂྆嘆圀ꈒ龣䂟샔ꦭ氣渶䤖⸚쑨ᡈ隶승䆂Ꙭ蜿頀ꋳꮰ⧔⑒暬銺\udc27⒤띪〱穽ା踆Ệ쳆픠䮋脲ᢝᡭ䠑䀏ↆࢄ䕴\ude06⌀腛槟躻식쉹틱䑞ዼ籌殾悅푧სⷋꂺꎝ榎癃࿧텤者』鵛贮흧㇝鍪ⱶ鷞푟濏뜡膋插宧巴뱍喛ꁎ㊉竉Ἠꃬ㈩㤢䬟ⳑ哬盗ㅲ䣯恐舞䘚阇✂癩憻瀌⺙㪇ₗ㎰挸鎞닚鑊Ճ艉唧诌뉯↏ﱚࢼ黳⇻曛륫\ud8ea랠ﯪ䵘㺅筺䜉㸉ꮆ㜰諒췌堇饼쏕쨁⊣䍬ȇ䮊\udd24欕↊㬼㑝ㅳ乻圯뺹诋怊ﬤ燿ణ푺們ꬄ䠁舰鶚焨웞뼭냣폙掋ᢍ䉕푕䛲ຼ㲏ꮂꪑ줉窸謣䊋梩뒮\uda3f槛用᫶\udd6aڃ띏꾰ᆏѡۺ먂驢Ɱ؜ᕡⱔ뉭犨᫁缣弞𧻓鯫ȱͽ⧰⩄ѿ塚䍴و╿袥僅༠ᘊ㠈현ꀅ覀๢뭽,廟䠋w\uddc6แ\uda70絼逴佰꤃Ꮧ⩮쓵亂蝽㶾Ὧ됅謓ˍ⭆ꉊ汾\udda5꩔㡀\udf53霩裉툴䎕敗凼頣퍸먺ꦿ㹼꜉耦ሯ㳭滣銥ꕀ๙ګ♌尌턤服ꯚᡥ쀧蹵⌕疇䣂ꉄ떴㫎힎볯窴⥰웚柰ꢙ㛾䀎漢⶚硫慡휋蛱薼➪Ջ矯늑輤̲⏾ﯗ쁡㺈꽶톳㟙쉬쬴硍뾘῟唣ጏ\udb48읟µ稕二\udb84䣢男楜ﱖ谗碸ᴊ୳؇͖㱰ꁪࠅ蘴坐廟ꭨ㕈ᱻ믝ꤏ୙鰇౟谆킉ᲃ傐অᡀ鿤偳뤻쉹〽⠾ꢯ盷낗퐟渥益ᢜ给蘏ᾬ҉뒢ꐈ﷚빵ߓ뀾薇๣연灃擒䩅ዉ蘇ᾦ憍쟯顡肐页柨ྀנᑢح܆䊺퀃庮蔴㪁䷌颂ｓꟘ朖ࢪ炬Ზ微싐鄊骚ꙑ黯㝳솷᳐煭⸷ᱛ㢠꜖ꫣ岁ꡱ諧恹﨧ᡰ桂효䪈됪ꪉ膪ߵ䯁뛆෋㑥際䠧潋㇜﷣谯㽛 ㇉긠歶ᨱ贘氌粤㵕䋑蒼槎电ﯶ젭纳䘃师焈ﱬ鷷诚౐㕣昩㍘튋蟶腉ꏻꁝ纓䘫徼톏ퟯᮋ⯰⾔ᡯⓆ葌鴧굌ײ슳튠ꨦ塿鮖촦뮲恉ৱ昒糜듉凭依ꟶ㡃ᔵ⛏๦誉垤⋫㝵㕢맑\udce8脈⼺⅌៎舓即眩盛紻⁣獿鮬\udcde䙀閃ֻ귍턜᜺Ლ᧯퓡뛳ꋹ퀥︤ꮳ葊ꏡ㐓ᰐ嬽珴⣲᜚벲쇘횏柞䪉宣岠ﺷ㨣唅鴃篵磓폭ஆ粯담쒤䪰铬寥䠷쐅滀筺༊拣閺굜妆鐜ыᔰฟͰ쏺쀑耒ࠡ禿魑뎬桪壃ᰀ鱖썪泌㘬ᜁಘ䏚넢堜ﺘ阷㾩喪ꛒउ엨輅譨馫訆ꟳ㇡堡椞졅⫖罴뾺▅쿫襢屼䖁ፎ਺陰仔ꔗग़䳙ꌌ甕펃ᅪ㹇腥׭᝜૮豷\u0007F䋙캨䝠䮯㯚啵꡺붤곺괱጖嬉䢔≮࠵⢎犨戶킨\uddda뫚뮢ⴂ㷽띴潿檗멡\udea5署끊䁲였Ⰹ瀇퀡쩀੭৾䷝௟\udbb4ɋ넲ⅵᰘ灕࿁瞌팣畱冱敎㜎ౣ铥ܰ栲₢°#琸䐭쀜㝅稜ꄀ᫤諸ä韄袒舜斉졓棲Ё옂溮弈儭萎յۨ巾黿壝᾿\udc04펹壤첰ࢯ뽐\udfa7ᴇԴ簚ꅍ\udf06\ud853噿뎿\udc37䖉䋷﯆큻嶯Ʌ큮ݨ܈깜챩㾦鼙鎀䖺딵㕙\udb1e顬ጁ⨃耍ᬍꂃ蹃퓡绮剬䧕\udd8d梂\udda1崒䠏ﾥ￯穣졤镮᎓㈏ጪ䤁ங⡎狢㨟ㄮ궀篆䯰᏶μ臠쨛ᙀ聬꽏웶䤳Ŀꃭ휼퇉歪뒷㟱S뿽콌㿿寓က㈂丢㛸゘þల혖ꐚ᪈崁ᒙ鷚렃㰁삆㼀搡萍ꦐ떀⫟㵍㙄분픤須\udfb3짨ᖟ钝냭ꢾ슰敏巐⣛杉㎮㏑䋫琑傺蝐㐮鼆ፀᮀ㙊淠ഄ〄ϋቋᔒ݉堈ᐕ臢ዽϔ߻▵㴑鏚䤓浾䄎耟옇谘ꐂ\u0018쏐预뮌漀쌋裱輡蚳ϴ稱₯웽ꍁﱮ칀萇愁뼀쑀猧䶆摻ㄦ鏣쐕ℐ䂗ै昊ﬓ䎴￝ꓞ㭌銺㴌䱙ꚪ餀屚狉脀꺲晃⬓㒲㼛㈛暤㧎奧䓃ೱ䩈悤ぞ₹ࠎ喹㯙˭\udc78国挜鲉⿾⪚躺䭕쒀ၳ≔糇筳ㄶ竜쉬鬷緺鬕橾鴯䚟ꂦ\udf10샨࿺삺ͩ౐큧迊嶥笠ⴉ袤Ꚃ䧊⎋㈉읹⳱쇾㬊툶ỻ\udef6胢䌋怳攆ꐱⰴリ䇏䡺䄹諬월憸ℽ飶᤟春稪棬꧖壈Ḫ쾾빅ጯ㓑\udc88ၪ分렄\ude90獭蠱짠驶嬠簇\udd98鶐㯰࿀殳·鬵緒彣䦷埘蠛癡簇儃\udecc⻌㨆⧾쵅⃤狁⧣쪖콨겒롋ϒ\ud9b1凈䄮쑆襘ņಢ譮՝΋쇈쁷ᑿ讏禰Ǝ젙a爇쀘亾鴓甀㟜왮႖뙴㫧㕄묣\\ኘ婈蕥蟋琐䥸珢妟ꘊ妮䮮⊓㞳\ud971綩暰潼禴믜鹪諷耘鲁뀆༠涫戵잏폙쫵\udc44⒒걖므澪瘻瞸欨ᨬಖȜ쒚奄ⲯƩ錺鑃⭌\"胗툽༮㉲䞠ⵌ艎䰟駣ᶤ媚⭻䫊ꅫ먇Θ움➠睿\ud800憠况ϋ躼䃚퀰᳃琏ܱ匃뤰⋤鴸샄䮰㐽ꮟ寋\udeff荬ℊ錳틪篪㙆좰롘ႄ戒ଚฬ\"숑懿窢⹃仛䥾詑쑥⃴ᆓ뎒ͺ䅡٠䒡⺊讱偈륻ⴊnᘫ息薁\ud81b㺀戆뇝䃷戓빬\ud915洏眶ٸ塭臾ᘫⴈ䖀⍳檥㖀঵⾩ᅄ麝腼ᑨㄶ餷쓿㙇꽋髗핣첵㘫ἠﴢ蟺ᏽᅆ辈앒椗竣촒軼睙瞪⯜뾢뺀陀趋ᅶ䣛蜮ꌗそ榕꘨︴捒آꮐ뱜檸蛐쏻欞厎魿䅼ഁޟ臢罛శ숕ￃኒ滑䡄沕蚓诺썄愥⇉殑ˮ曰醝ᴬ줆㴇聃Ꮐ嶨憰垽㸽ᕨᖮ鯕榁蓔礢촘摆叝撠㜓Ứּᘨ筇瑟굧ὄ᳇ꄱٱ䇢ꚙ㞹⇣矬䒰턚㕈몠汈ᘒ២೬̄䀴ഒ䇆⃶㴅蠷轇⦷人籖඿忲铎치Ώ툷ი뒨ž똎ৗꈍ샅츃꩓\ude90䄆᧲쮐䟾쓙铷騜莼౧⃀茇쌅砚딝ם⽛䱢隚邳䙨꒧卽蔈駚ﴟ䴂㈠Յ\uda0f㟰턛䙽⯖麂≤ቧ\udc30ڙ삎䆾؋避젵駳⑈隨࿶碎殀锑輕╗쪳鈑൤犰ꌗ阌벀襠ꯁ᷀牰撰ெ\ude60㐊橖㑩竽⶯㚄\u0003栃擀䙆逤Ṵ㵐汑蓔Ე抵ںʇ㜊鮡獇橰專ᬺ汸哼琎ꜝ㑨㨨쑪ొず菒谁뭢휛发ณ㐙ꗊ껦꿑̨号榹ꌯ鋚䠟첄קּⴔ퀹ꊡͩ疄쳃着르呈࠷̉恮ǩ↟续䇱퍧偳㿓鮛˝胾ꭳ桛깯셶պక퀾菅琩瑷䦧꾊輦㰌苩凼⤝Ά對Ḑᐗፕݽ̔\udefd햪㒈艈⇃戀䇩귌\ud92eຮې闫漷鎥솩祩౑踍獸は⺆⮢紆䫨阚⠃㜹꺎魍዗ꊥボ䁕遧〾ᱣӣ嫰餂풽罁锿垭뼲ි뗴묌ꂁ뚍͇つ貅찝힢෨䳴駶蛄쒗씐줯ꓕ퀅宲祙牄濭ᔂ듨ₔ趂滂ꜵ这ꋵ嘱ᇦ졊趲㙺ꤲꞵ鯂௯靵턲\udaf4湠\udebd྘㣷襂慢ꃵ耷☨鸀뺁Ṫ艷霃ꏶ⻑그틄ൿᯈⷳ脴☏끠毇Ἅ鶋䓲뽥韺蕠띳䒌屭ᙻ䀆㠽쉣윇나밎텯鿁쐩䙳ꉌମ륩銘봲䮊쓌顖땉ꓡ\udb32꠾尭喸躨삒䀭\udddb耮礼쳍䍥꘢롔哻氡륂ℛ৶ᖯ蕤畤阮䢒哐♨膎瞈뵋ꆺ䳃遦❰涾荣⳯ꊆ傌綾彧覦㳐鵫ꂍ꧖徥땸㫟䟬쁯ݻ荁狼풘쑪ꦨ컱ﷺ肚嗳݃풄鍯䃷ꅔ䂊蠾쐘㘃䁎䕒篑뾃뻴㿠쓷ꊕ\udd71咕릃쐹之ᐯ膃棋俅靖䡰냂嬦\udb0c叟噏깁텸䛯ފⷘ흄㶿嫖듨꒶缆뷨肀တﾽ᪦䈔키\ud9ac䶍홯餡ᔥ내힃혎鯾\udda1뽴ᚚ▵إ艹娂ࣕM+ㄆ肞숚垡炇嗨밡㿏卍䳱ﭪٱ鵝⻟孯䮫蒍Ⱈ᥵낇ᗨ鰡賂㜈浞諌䞵\ud9a7裞氇繥榱ዜ噌쁷魳턙屴愿桇䠹딼楹፪꩸ꋏ홴\ude30ʗ⁍⟅㏉븆𥳐♞ⓔℹ腬쒐썵젩퉭ꨨ䝔毅\ud81dﰶ瀞眞赫Ό嬥켉阥뾃氊⩮⯵﭅憅䝍캾싯咈灾䦘ᦩ㝦ܰ綹膜὇衹㦍乡ꝝ遮쩫㛯蘿芅恕姺瀷챌혬ኝ捂ᔧ심垵뱃꧌弐왳஑\udeff䄛¢삞逳\ud818ﴀ泑ၨ翑멃㿴㺐쯓벛흧쫿줺숺嚷굞撷颊较ᷧ诒눤⢤䰴쐽㦬嶁䱏ꉧ鏦৓ͳ躜睞ꁷ栚汖ಆ멃\udff4庐혤좻♶樕饣뤉䂿䕐焉ᬔ⡃\uda89밉㏹ựྌᵰ⊤᧱迩ƿꆄ陧相㱣䤀懶븱䑺澢䭓㘽ꂳ䟬ꖢ쥬甾䩳袊䚇ᩉﴭ௘潻鯺⇟⌭ꘈ核ァ睄Ō嶄୉㦮苒瑩礍㸰Ń꾌ዔṳ䜈遐먘袽ꑢﲌ삿嵍ꢦ뾴椱嚐䍐ǔ⦖ᱚث胡꺡\udec1덅尓䦂쨙퉣늆붹늠돭ឲ䊽䗣ꐋᅡ⣿\ud832男枎ү菆ꊶ厬췂ꍈꔧ䢰楠㐀딌竀ᷓ轓⡫䦊쨝퉠犇尞艇瓌부澔伯솝攚饻ᄳ䰹웣㌎셢ᴁ뻀케哘⯰ᯬూ쐙節붵뚗琿殱뛝梣຺轀亡밖⮨炅豂엠欚墬밯赣ಧ璐媮ꗡ닇ᮥ㰌蘒钐\ud8a0紫蝝㌤牰壎ꇼᘛꡨ薌嘀鋈遴ꋭ䥨鏎㷎臦乔끪뇜瀼턵⤦妌⁣샆ᯨ᪻䆘꒰呈㘄ݹ蟩䏜썼蚫︠찗᠋桢ᦎ\uda1e虢Ꮉ馴製墿皙ꚧ츀᥵畂먽嵄훦탸㌍됵ೃ\udcc0Ḇ娄䣂残链鐜䷐䊙ᣭ뢺㣂瞔嘭県찠뷓䯍悒䣹㩀鳯⪧茁왇ㆨ熿鼮ꡰ⮽ँ驠贰ୌ侢ׇ폤컫ꇋ톤蚧䶽逃Й渎Јꆃ㷪穎ꕈヸ৴㼴쟿䊾蘮⅑⛴䜾㶒쵬ࢥ陳而諎䅈鳱儱귱ꈑ䙨娟䍠憹꘦丒ఴ듀氌罩Ⲯᕲ▞뿀퍑䃵ꌖꭱ⡸砲㉹锑릟囀罬搵⮜쯭뎙淦㔀࿭ྼ쑨ꈟㅭ˪㜀뭫\ud8c0雔兯䷴ꉻ넃䮎멷튡ӎ膱蛷頬偎デ俔\udfe8➠㉲⚙Ḯ젎윞꨼倸쥼ꓨ낁碊唬應ヮ谴쒆\udb78忬爍ಇ蒋蛐ⁱ圡砗쪝툐桝瞒ϖ訇⏻ం㓒㑮ㅃᒡ衅Ʉ^씅䭫顨痎⡡禆ꨘ䮁豐\ud95dꬦ\ud858࿤\udb5f쵰꡿ヂ亰ⰹ僇\ude1b断\udcd8详탃⣘蕟花酙⧣벑춦鐬ꯒ싣饒㸣庤滩䁋Ⱘῤ䝽ꃟꃵꋺꈣ왜␶䏕㐊㆚䮘效੬㥳҂蕜썕蕨؍⊦≼\ud856ࡰ䰴ࢰ줎⸺ぽ狶择리㙜슬莵蛈塍捓羵\udf88텍ꮳ메ꁙ䣁㤞廯ꖂ⠶ೡ낷锃㠩宠㘍㶄鷷舐沋᷆蕒ӱ㑠犍\udd75沇䜯ݳ엣懖냤\ud872릍㘘漦㳀\udf98㦐捨៳ܬ±䊞읒骞썒됗냧锎﹠妻ᤑቃ捃䂌ቔ\udb1a厝骱㴊ꛯ냻﹡䅛崦홉窚餾칱꜋옦࣭ⓒ㉮䄓灚䇞䓭뇑퓉ᶼ㉱偠嗿䆖沙⊐寄⥑ꩳℿ礂㚦論釴洏嶆殺Ẁᒌᩨ֛㌞恜묣캠鉾礎〩鰰㳅朏༰㧃簯廄䈨ժ嚐᎕ᥡꐡ\ude5e﬎皇ጡ럒毤ꯪ缲►邰紿횪ᯟ荒̢憑냾ⁿ릂츚ṣ뎇䞘ᝧ㒹咗膽퍋傽\ud856蓥뙕ᰲᩮﰙ宣ꠁ애睿ᢊ⣘ઉ蓗菖窧\udddb黡墬ﮥ老㬁胅⾺\udef0뤬悓櫝᧜ㆷ䍷཭큰⫺睡漍㮹驥â\ud918䯰웺狍㍴鴱᮴᫜ᇽ짿컿炪킒玠퐸퇁✂昉⻍럴䡶휮葿㵯\udd61먫롫溁ꇶ໩뎐⧒溼㦳஬ࠆ茲션惵\ud8fc憴\udf72➨ᅯﱁ⸵ᱚᴀ쥾쫣秅멱諞ᮜ恷蜗ᡝ\udf16朙쀰⤥載ᑉ舶ꮅ樲萀븲쉨\ud928㋓酲촦氀⯊㝘㊌\ud8f6頵鑚㷏⎢覌ఃᩡ긡ア襸熎\ude18屡⸰驙韄ᆿ暣ᅧΨ잔脜E悃ﻢ笑ݍ\ude4e佥\ud859魰⠺⹕ဎᴽ隃ꇪ錄딘㪹焞㑂檐걩鎲夂ၴ挜￡訇怄粃ꆀ愀軓\ud868㪰擄楷젊ꝥ⠅澉퓭⃹섚栉뵃薧枇잾뚿蚾ჯᐧ冋\ud8f0잳蹚鎜鰧឵坞ꖥ唞ⰷ푰鍈ᔩ\uda89鶳那䅝徣罫菬붰勰᧎ទͧӌ莗뒘ͨ찑ࣦ㌜䈳賆ᥫ㐆ꓸ柦듈縸⅗탊衈䒇㩚ቑழ༖蓍ﾑ彺힩㋌⍴ꤜ鍚헺ἅ瑮쀠ή꺨ô௓℘왡衇놘鈑\ud97d耻ഄ掅屮擽阀긼쯩䰗泅덀꧰㺛늾͎੤蝨䤀勻ぁᆩ阨䑶斁ᄛ훶ꪆ⩍긼ჄᤴÇ舟䎌샃ဈݴ䑲斂ᄙ饣葆ᬈໞ宙Ꮨ闳죖ᖓ␯苑༝䎌埯♮垚眮ီ㐄拗ꜜꈲ펥溜渠੅ꄠ뒛ἤ얣⧑ᛉ娦Ꚋ௰\uda9c騁钡֥ጱ䂰눱⠆䬀猙鋄颌昣郎䰆搵\udb23옹渳诀ꐺ⍫騆ꮂ磊ꈴ\ud96a颹춉ꁃ䌑컅裄斕\ud959榀踙ʔ帹勭郇䮦狐䮁榀繀韄杌庠㘨ᦤ킱ỉ捌䛲塲ᡦ령࣎⁡鱢悊敉怸䠼犑ᔛ蔑極䵮)硘搭講Ȃ煢岽睁볍ၜ⇲堰嗹䮙襦蚚鄲褶싋░ᇒ炎肮蘯෸栂镢얄躻凡⌎ⱅࠛ屐濑頝뉀ġꀈ掠⟘֙ᝆಘ䁄䥙\uda29⌶Ⱚ䣽謞ꀋ䤛ᒫ쵢啒ᴪ׋喊譐╝ˠ⢄駡䄞ū㝞搝㤊᪂䲀藑곈怀\udf58澼ㅺ闻ߍ촠손띜⦿캏⤚஡⩆싨썈഍ٗ၀䍈揓⮉䒚먺踲᳟͑\uda8d榘鷀腴䕈ᥒ㰴蘧﫰馘∨㖪턄⮏ⳑ肍ᣮ꜕㌽㊛闍ᥢ⑶ທﱺ틶뢈\udd8a̖\uda06封貃≀ᴀ\ud8e3ỳ爃ᣑ༙ὀ愦䚰᠌\udf40䮹ﵗ䄎ሗࡘ롾뿖ᖆꑿ쳂쯕柸᠂⠐曝툦鐢숹鍮⻵ܡ뾷婤甁肙ᣀ挦䘦嶆킽츃瞗䑊퐎鑀摵⣯˄┆퓴᧸胻胅烊⠗樁ਫ⺃텰袇돚֒䛀⬯Ὢ兞쪅Ⴇ⒲퓝米츁ᬖ砟렄貏栆鲍ａ퓅䦹ꀭ\udda9Ჷ㛪䙁ﶓ釔먌⺄\udee8\ud983侉芜핧⳴嗗尿썞煔ᢄ搝ﱩꞭꥒ值엫ᬄ䚁鋨厑뒺ⳤ献辀б荙몢砻搜崏ᢊꅀ쎁்\udd74漎鵸⛛媕ʨ䃁䝢쁸⣢崄ⰾ꯯橇켣þ쯈ꀘ㴅ᦋꇁ䘒瀹ኔދ뇎歰졙䀂ﻲ☬閝鷘湞疗䤌曓᤺㬸鲍㐓泵萉三؊凥⥍閜铐춂䞪᫨菰鈠䔯舄봁䞢ᚁ㵃颁飳犐懙횤᪓莨섴荮캒㈢贖䨴轀劎ᒡୀ쌃䝍↪嶬挃앤焜홫晼롰Ⲅ\udb8e齭罸墆窑★攷ߥ㪛ồᖮ씄겿愠㼶붦勗ꡛພ똞麶ꜝ㝊わ䎒輣킌ꌓ᭜뀜戊၃拊潁틌Ἷ媢鈡⽯ᒲ튩䴕ﶔ氋崕롽뮁३䚗諴脺텾熷겖힃漶鮞肢찄꣄댙⨵넳诅㘤곢㌕┇咆쒤鋌蕈ⱡ샨梏䰧ᵵ䱶앆檣⒨풳ᣪ觢썡腄\u0005辿\udd11ꀂ蒃뵂輣㌎鏈ᬿ\ud8b0㬋﷫ູ͗\udd1a樻涢鎽㝥若针ሽ連⠗砂ꉻ딧躈红筴㰘￝٪⊣ݿӽ䊕⛇뙉뢻勽⹫⩁笟ሼ둴䲘剉卑龺Ⳕ棪㠏䒑쓉V᠐葝᠆쌒尃⚂햙ૺ紴ꐼױ㉠堷上ꀀ퀑\udca1㨚┎謼ᤢ뛙䷪궷ʻ롎흫啲⤢㓳泗෽멖΁냩掹憂━蚏갱욈嬌痳襈朘ⷿ钕健䄬듲伦䌟敕욣ಠᆳ螈⡚㙾難ᘚ㳍ᡆ豙덏〲㨏렒訌樅励\ud883꘡肝ᄻ邌꛴惣㧋蘗㬼䞧璍ꈑ粥틱㚮鳩쁒梞惋䞧飲톹⬖Ꮾጏආ畽殎퓳๚㬼쑖轨䋙ꎋ\ud962㪗㲑爈䨃箒ꗘ낔긵⼼밼蔹九犄辝ㄨ袼젳屍팁⨌糀ऌ㞝\ud89d檊Ჶ龲뼌䘎ꛜ撣죓砹充ㄢ끌ﷆ玢ﮖ早䌽欮竈ﵘ艴㤊ډ그h팞뺋瓆㹠쒂흰ꋿ敨雪鷗┾鑱ꭑ렢뵵們䪪㨹瓅躌㝇䠪䐡ⵠ쇔㐴잧菰ꅡ哣䰪㦹㐄煦킣䵛⒰鏑톦⡡˾ଽ᠊༙蜈溺먅ﴛ쮷䱈쫗\udce3霉崼⁪♳聁䢼ᤆ\udb1a᩿䌺候⎟挆옉✁곭Ꮡ醦㓴絺㤴잷鯴庬鴈끺⩆暤앺ᔜ橦\udd15咛笴蹙\udb28䍤쁑恛ꀽ䰖ꠀ翕썕鲰憵≀䣊❂闔⟶愥∦䥺将礼甈ධ㑪̘\udb77ꊆࢣ敶딨槙향ᵶ睩ؠ揄ᣙ㴎ص䯮ꛍ↔လ⢢⇧ᇘ◃筟㥖ꉅ齃繐툮ꦌ➢䃆䧨〱ⓝ׵ꡧ䛏ɤ䇺奦琯㽥鴟뷨ﲠ鵩맑④♴ᶂ㙩苎脡哧서樻沄倁⏁┡\udf69᷆㜒䆆㦪웒훖赱੬푮熨凴ﺬⓙ똂儂葊㨡䣠檀㴪Ẃቹ⒣ḳꍈ월捃ꠙ잫꓎Ɑ\udc91㢹䖶ࢼࢬ㖧ᴷ踡拟쮗蚰ᦆ챣尤ᘜ옄馏㙢嬱钣쇁鑏奔糐텕Ẵ㕕䙢揆챸飙댂\ud984䍫顈僂剱侻ਾ鵪튿Ꮚي璹Ꙏ᭳環왚Τ⼺庉崟ม䶵拹偙䏺陪ᬫ᤟ɕ迠泂㙡쓇䶘粘ᒚ䴔ڏ誷엛欮\udacd㸠뛃뭛꙱瀍맱亜碰ഞॣd耝耼閨\ud861㠷銷躧Ⰵ̃陈螀펄妅籠ᴔ銨蓉℞脨﫪耷簚쀇䤆ૂ赁컀箨⦀ᙀᵀਐܻϤƼ(ꠉ䨑툌戄伂芰⻨৮뿔ᰠആаʸ삷⣻鐬蠆መ嘅≄퀃쐁ꃀ匀紨຅༹蕈ٿ聢왴?搚\udea5嘀ɔꐁ䎰혀㖀ᇦ૚혝ᓔăȬ찅絣怜㤍㼇䠀竜縷糀眤׬Ӹ܋ݥ賔탒聅模\u0013防簃哚㮠䄠ٕ䕌ࢬ灨ǰ肂싐/邔䑗ᐋ䀁疁㱐ᱠᎴ᩶ᇽ෷虝胒䀧냁⁇쨕혉騆ᶀ鼁螀埠岲⯢ฺୡڔ菀샻©쁯ꈆᄔ砋쬚殇껁ﲱ\udeac絶ௌ蛻쇌섁ꂭ쁙퀧鸓㐋ກ຃佁翨㫢⊵ൿཅ쓺⌝섃낰恐〯栓ꀎ㌅\udf01刀뽀暱ꒈ↩䫖㉼ҠȐ䰓\udc10ᚎ仃߃刁緱\u0000橯萿\u0001뤀\ud982වꨡꝘ㷄֊ᲶẌڰҘ÷ᆘ˗n⭶쀝ࠇ瀀ⱑ뢰竘奔´ᦾߺӘÜƱ7&붺㐍縉幃䌠혀䢀⮀ຌਧ䔚膘Ǥ怙ぷ〳䀇\udb0dꐁ阘궭䉘젚ऐྶ莁ৱ⇭ၨ끊撖㈕쪊黂Ⴣ崁᳀ৰ⃢⽤੬ࡱ茅텡 鱌숧ꌁ厌뙀員뀁譣吀⋘츀ᢶ㺭¨\u0001요〤怕蠐砄貀猃辀塡䞀얱꼚䐀ᒶ㣩ʨ̲ꔄ뇅䠍脉欆暴뛀륣擄Ҥ≀ᄏഇᨃ跁읠칪뀱汯舆ⶌ乀⡰쁰⃰㫬ੴ証ʐΆ셊⡀氈谂蜇劃웁臇㶐翀♒㍰؎㱇᪣豻膉b\ud8e9퀋퀇ꊃ䪃黇靠껴◸፮ᘒް臒臬⅁瀇䁭砷叅끒嗁䈁샀쿐嘖⒬瀚໶Β͏䁩⃡䠸汖吞堍怇펍ꎀ暠⺱譠ᆬ槿䞟薝쟽rg㸳砀묈ꢅⴃ䪠ﹰ\udfb1൸Ŏ㊨藬胅耖⣍⡻\ud8ea㘚਌덀킁䡁齣枠拘쩦Ứਃ׳軄ꂈ遮舜㜂᱾疘졀瑓妖ᫎ⌀☔ᥦԠٹ茖욨硄\ud8e0鴃뀂蔴쎍᫇刀ﭶ舸ﻉମ㩹ϣ⃃萬逹逽ᐸᱽ팃윚由䥀얠굱툸숀᲎㽿ƀ올ノ䡄者눂㜋甃姆≘恰永짰໎㜶聳費僲胉壀걬ꖃރ丂꧁嵣妰⥰⺸茖ʔ稫諍掯倱蠑簅\ude40鼁蠐况霸\udf2c湮㫫᭿ˎ肙끑㠯톏䘍球䬈交ꌨ⧒㼲ొѲԽ勓賙ㆋ捨瀫ာ␍ᬃ炆㮀븀\udf60ㅈ䙸ዼҗ൴ص쏒⃿ꀫ其⠀阅㲊碑ꮁ䮀਀འ玴ن኎Ѩ싰ɢƸ끄䠄젆︞谄䒆슀㶀筣矐తዡ඼ૐǸ茿쁶¿⁲㠯정圀柖赀빣∖୔ᶲ੮蓕섀y䰜ᤄ▊\ud803㐁ꚾꌨ㚀΀ᇝɂ۬션Ĺ聄耍큌礀ꛀ唑㄀ঐᗰᔼ朠༐욘䉱逌␬렍밁괅줠힁Ⓚ⸬沀♉ᇨ鼐y跀聍僗ꠖ㐍䀓⒇沁䠂̀֠恸哄㼎འӸİꀝ6耸쌠ଟୁ눀醰䂊捠ഓஐƨØǕꁢ蠁縒ꀀ待㬂苇ঔ◢θᣪӝµķ䁴쀤谖㱭ꊄစ蠁먈ੈ夀⤠žö蓌¦怋\u0013钧ሊ䒀喀黫霱懐䪈敔ᷤᅦҨ膬肤Ƙ⣜䀹襪쀃찋塥䫀佴鶐Ь㹐톞㡀胷Ġ셀낢擲壞栃\ud907昅쀃릀ࣀ꣘ద㪎ཻÜ萋ϭꁀ裷⨂ﰩ뱷\udd08䲣ቁﱁ㏀⻱马㝉ீƑ聘ꊵꃂ`硧2ꨛ਍ꄃ쾏ꋇ௣墱엂ฬ昌৻螩Ʒᆺ䡼㐯耑ꀈ怃銂᠁㯨촀䞬ざᫀʋ᣷谜憬\u0011塄鐆킁괆箂가岱ꋬ㲬穒͠䝁䌫膥⁚瀫尃硂翑毠鍀獨ἬϜ縴讨Շ셭왌끽㣟ꀏ댃⠃㰂က⿠᧠௸㙘ছ摷ᤛ솚읕¨壌ꀑ訉眙⁎℀赣횱㌂目ી髵辰♙敜ঞӞ\udc7f脸眜䐀껁멈䟄௸♦ᝐΨɍΨ䁙顡뀫䀀嘻䒅籁㜐琉⒬竬ୗ᪝ό₆\ud858倯萏㸈涏耄냁ᨰ鳐踤᎔變ᥘࠨ䞄ʵ7킙葈鐗✞掏෇⊈メ簀⁋鿅sԃ㨼䂠\u0000燼ꆰᱦᰫꖅ砧懘㶂穾ඈށ胅잷邬ป\ud8ff訍后ꜛ㮨㘀쳱郎⁀ঢ蚨י腁ğ⃽熊㣦ᐁଈୀᖏ䨀꿀Є⽘\ud982棎㌇P䳒䃦恗䠿ӌ刏愂㴒펏ꏆ韰᫐㞘㇄ᫀǔ膕㓶왘쁧\ude3b耂\ud90a㗢貣搁ꈀᤘ廷꣗辜؇芬膃\udc2b㱽똃戅額᠀蠢扈☜❢ᆰȴ螄聯塒\u000f焅贅ڃ㬀땀ꬰ뻨槖㢜.ଯᩧ谫읋順ᨌ쀌ﮆ\udf00嬡鸓昀䢀⩙式͐Xꎗû`갑砊䒅륁寇⤠谤໔ଠՀ䊋쫸ġፐ렘妁ላ欀ⴅ⪀Ꟁ阀䞠䱀ᕦ̣Пᮾ菄惈行ꘈ톎鱁臠樀滱쪈಩ꃡ㱜蛭Ʀ䄖悑뀟\u0018䀙䔅蒆翆௣颱Б㱺͹腤²º 耍ꈃइ龇㬀놁밀닠㌀ሒᚾ〯ᱹ膘:道H者뱷븳䄄쳂혁쳐㚈璸ጩीǆܟ軘䃡낙p琼ฟᢌ\ude02ꠁ됁៣뇌闸핹പඈϛ耝懕倴⨶눛ꒃ怆㶀ῆ䴐终判䵡ॢผ蚈ˉ퇞遢䠄젢ꘟ瞃좚頃⋠ᅣ檢㡀ᢹː÷Ř憥ጘ놢☏︲あ䛡匀眰⩀ᎉࡠҸ줚こ\u0002␺됗뷯蠀⠃庠꿱ꂀ㍬ᦠʦ剘菤쀡ꠗ졋䈝\udc7a떅낁⽀쵣鲱᳴ᛰ̇螘ɦ憪瑍쐀䉶ሊ閇㊂뛀﹨ꨀ拘᷶㨘䐀䈜憾Å뇠磁ᐆ켅넅ꡏ䐦庐ܰ⯜ㆡ᩿媰t凨ꀖ蠄䡠ᰒ䐗됃ꔦ箍ↁ\udee3᫚畼࡜敎ٺ۟踏裁Ⲩ萟ꀉ丶⠅佣ᛇ꺀㙸䎄㟬糱㞖蕨肕ꃁⰏ䀞尝〝⌍㴃螎ˣ쩱釈Ꮞ趰ज˂䷈鄞悀䧞젍쀁抌븀ࡎ︙퀰ৰࠀᛢ磔±䜇自膕쀣娵㣱汣丼덂୉Ԉ笈皘৊䫨ଯӎ猫臗ᎌ䧜吆䂀侂뒨ﾠ咨埊ъទ䣄鳨싈恚\udc37ﰜ옋㘃鉌赩윐ㅱ︤\ud825鏆স龽賮➋揓큖\ud80c刅꘎砅຀씠乒䅩఺⭄2ఏᣢ䲩⚐鏪䦛\ud8d6鉠䄄\ud802酝븐ꔔ娸쿬ௐĀѣ趝䂤ꃃ熽∟ Ḁ跀ꐧﲓ厤Ṉᐐǵइ᪪䈅⚈堒㣠䞯␅ 傠ǆ㠠䁀㸸瘎㪔鷝Ł3恊逶룬됗訃팆츀㐧゠Ꞹោ쌘ᱳ௸鐋㇈죷⩟\u000b먔쯑うꀧ\udb20鬀ᆤ⌝᤾㩸蜻ǧイ䣜Ṗ됟耊儶謙鑍阦瓥㵐ᶨ㮾ᓾ㙭㕰ɮ⇎삖\u0012耣형떭봅걎㨀鼞杠㒠Ⓚǀফ蔚솕傟瀇航\ude17鄏푰⻀'☉葋ᵠ薔ήⅮ譟쁦䡛룯Ɀľₚ⁎ⴂ뛣䟸债ⲉᒁ㠴М≸膕郻ꑺ퀞倒㸃需渰ㄨ⹘ᙱㅏ֐䰌♘ጎ熽錠㉽Ԅ䶀䆁≀漀䆱鏠㔤Ӂ㯫᫈ϩ옉鍗堾ɢଃ䬇\udd22䆠\ude93⮰岄풸ૈུ詫䋺옙킌হ怱鱨愾쬜䒁ﳁ鳸䁄ᮤ眶㋋⢐伐⟷䢏怤蠊ᓍ븭현睑댧ؓ꙱닐㏄ᾡ㼠鴳豎⚴ጷなӠ괏쒶춣蘀᳣깡铘츂狮㮅ȍ貒퇐삟䧉ӧ蠍貟ऄ勠曰㜂甴୫᭹臣⚙送놁擌艦ꛁ罹⬦⫉ﴸ棿୛խ䋫❅鎄৉ӫ瀏眚⻃茧ꖓ뽉ᖜ橙㷬鲜俋✌짻ӌ尕㤋真蛂䱁Ꞡ䢈ㄖ͊ᇲ被ᡧ䋩တ怶Щ瀟찕㠍䘆ᡎ砥᪓\ud94d翴㿌綑㐖ڨ\u0014醂냌耩ሒ떫ꢞ擀\uda28✩嘴㖀ٶ㈴肶䄐䔋àá䉮䨃㨄꾃ँ䄀ʬ㞀Ж㽃蟐˻ꅲm耽ฎ⭀즂翡ఀ걨㌀⬚ʖ㡘й膏♜倓〬㠘凝팊唂ꞌᷡ镐躀∈ꑬ֪ළ萆莍➈‘䠌ꆷ牽눁醆崀ᬐ붤ፑՠّ䄰栧뀑ф椀疂₊郰턀Ấ픁ᆎ蝰鹈쇚⛳‮밥搈逃恇䐀ꨡ\udb20늨Ȥ㟂橠ෟܻϚ밋週〾쀚쀌⬃㞏톁௰䪐⓸섘ᓃ͐鸝躁肸聓踈Ļ챡뀂ђ氀䐑ໄ憟剐Ӣ䆺ृ⡻짮ⰵ椰鰁䖌Ｇ扄ꉢൡᙎ蹟촟膮쇲蛥쁭Ⰲ쌂絅堀찁ꎰ䊀띄恪຃䛰ȗ䇐ご\u000e제ࠏ鸁ꁁ큃㯊乒餿婴⁘̀ɮϦ䌃愵ၕ~ᰑьงကஃȁ될切㑌㧚១ㆈ馰ŋ腅逩ሁ옕䊀슚ᶍ䝣갩讬ᇀឰ贻ᯰǸꚛ錭觡堪䀌஧沄ࠃ믇腣䄩铌㞀֙谕蝳̬てꂎ進㠮䨛⸱䎃症筀䚠ᚸ프࿒萷ả躞웄熈ꓯ琋넁憅浂⯘猠护쥨ک㪘荫轕⚚ፌ熣倨創ꔾ윟灌᳁譣䤀咄༹胆Ǥ䁏琛í+ᓮ艿餰敕떀✧\ud993닉谈ᱴԹ㎲駶举児ꁵꀩ쩻蒍㴃鈃炘暱᭥㌬鮅莈☟뱉々擡쩮褋꬞ᢀ喀ꡱ饀㦜羵໧菄š撲탸࠮1汿줱䎁쐃璦⡰佤ݜ焢\u0007᫊쌴ÿ騑롔쐰剸긽䜞䩎貧ሓ⦔쪠ްě膲⚖卍큝ꀵ찏餱㴀ᙌ᫆馘㴄ቚр驶丽왙뀨%特㰋㨀捀䅡龠㊘嬤ബڹ㉸쐬Ϣ왊M䡟*ᘘ⬀漛ꀃṀ⥣帀⼈ᾼ瑕㩰д乆쀓㠤퉴넻８푡뿠籘쏖൹㮨鰠䅇ㆋ遅␱ᓟఌ쀏ἆ퀁愡쨨䢀嚴♀᭼ɸ鲓͖㷼栒직调뀀㌀⡌뢠፣ᵒ⽤៾ԙ䙵₉✌鏛覑젾ᨖ┈롂鉏技撓흀㿄쒻\ud9c9㚤麽蹅ꂼ鍙栟⓳쪌ᔲ곆廂旇騀\udd50ਜᅜ縜Ҕ頓踕❳卡倬9ᱷ耈！轰\uda21潣鱤囘ⶦ᧶㨘䓌쏺ꜞ怡ꦆ⓻䤺ᡃ堃愦铣衉焵ㆤ願ꌁ☼錵৒⮰\udc7a茄樁弁暀쏠鏁֔풪炶㊲麹聓⟓፵艶숇\ud801頦둠按꣔춓጑袤鰸쁶쀻叢䧾퓊㔴㪟鉍栁䝓믏㌤⍊橊ઍ蒝䱲唟Ꮻ뇬㢎ꄵ䄁뚸䧤ꪓﴩ᧔๵㚜葖ꋛ♚耞ꦩ瀁쩱㸠ﴧ쇐涌ᓘ콂掰ມռᗔ㍨\u0006ৃﰆ餾\udd4eᐦᘨ얱锸疉㣤骨伬텈鏟熆『鐑∍黂쭃鸁眓䓘Ԁ㿚خ㸄龽賅⅛叆䧓ⓤቭ訋㘁概๕蒀⩉쁴〉ᘥ޸ڂ佅ဧ납塤Ӊ鉶┌嬛ㆂ빑閐씉줤\udec2ሣ靄騲䳡ꛘ팔ထ栙䤷︣阮⊰⩀ᩲ෼҈虗ƬꝮ〽౵\ud808툂ႆ\udb05궀鷇ꣀ㐉됈⃐๺੷ᧃØა頯哃漫ꖄݓ蹠ᯔ﷪禠ܬ܃賃薳匕⦈\udc2cꦋ㔱▂㔃裣光\udcf0ᱵあ๨ɟ肨⁎ࡹఆ剨ꤷ趄쓁䄀䖩\u000e㺥股섃膚)쁲㣲ึ\ud880﵎搦⎜﬐蛤⢢ᶊন荿貔ņꀇᠡꓰꉩ\ude3a薃Ȁ簀䪐䒀㎀ὃ֘鼻䌰偣⁏룗쓭눕㢅码袡㭐㑄휊痼ئ٤\u0017ლ\u0006壃䄌䰅鄃푍臠筣扠猴㉆΢રͶ般ꞛ逾遾᠊ꈎ阱ଚ\udac1賀볆Ⱔ⧀ᆰඐҿ貚⃄쀧푰耳氕쀁呁녀捰ⷀᙘ\udbccᶸѯᾄ苜❱牌㡓琘Ḑ脏螄➍䰀왐㒢཰ᗆӕĂ魯☝쁲䅀ఉ鬆㞏緣ꢉ햿题᫠ƓڃĒ잰ꃐ䓵≹긇ଙﬂ㒁꟠Ҹᕑ@͠ඨɌ菥౦펼覰㰎谂箩밞涎ꖕ幨鶈ᮀℼ縠಑萷趄³䋻槯듰鰗⒇첄魡救ꯣ抇ꝰਮƄ䋽‍䂽ጞꡃ\udc06﨓䔲쁀淤먦鼠醰䏖ᰴ㴠՛ӏŋჃ₺࠵⠅簈̀煌ॠ㻠걠⮄퐮੄蘲耜件입恦u䩺耎拓倂Ђ렀䉘铌㧘Ꭰऋόꚸ\u0004䠽㩶ℍ 禃視滀壱춤᭠ި艌侥셒q逷䄜ɧ쀅┇ᎁ䜰碐뉴恀㝉ര֜䁇ↁ⟦၌榰䤧䘇霅脬ᐠ놦ㆩ鬼Ⳙᅎ㶄龸肦ꟼ팳꧒診șڙ玏Ƨ뷣᧠旔픲笶藫ᩜ仪愝퓊硞Ӿ\udc60䄲겙멎뙰ꁴ浜轂濥㄀蚹䴏ꙥ\u000f뀈眽㠒暞㙍쾧蝠௩謸ᅑా鵟䰙꘷퍷熵ȝ츴뢝摂㐀꿚咀ई˅ᮊ윢䒳ʻ턞悁਎䀌嬙襁톦䨰腟揘࢒矃੫Ĩ©쁚䁄聄耚搏鸁悙㸃ᦐ荀铀㘄ယɖ脄舻ꠈࠇ␓䄷ᚭ뮍往₰缴ڤ턊঩㝜騀䰋꛹삋〛耟耉刋⪇ݎ዇⚨劀ⴊ挾㔪鼛貔慒쨣짱䀘쉢礳銆\udc43\ud9e0耓夀塈႖㘠ŉ䊪䍲⇯鏍즉䓢砙뤳䆝浩℠௰㝸彴涃㡐魡侟☋衵\u000e究ሄင뚂᠁硘䦀րݼ飂䉘Ýҟ\n礟Ｇﰀ垚㛸໭㨝肵䵡₡።恴렐阮鈋挃ꠁⰀ蘀盠ञᓹ艐d쇢ć쁭耴䀌\uda72ᴺ︁䁌ꑉ硓戔ୀۢ齐ψ삗揤飜搟쌸㬚廙䒦塓퐹㏤턆籌ؐğꊺ⚲£偧젇牥贏\udde2⩡㏓⚈৮돤ᵀ׮齰͈Ɪ‴္ᓯꘖ﴿䎇䆠鶁洀勘ዼ捝㶢髮䊺♧쐃ᓨꉰ먃빃꽁帀쀔皐隸ሶܽշ茆䠤邶偬ꚛఘ砍㬝ꅍ밀밬惐浈㪴鰈ꝐꝈ卛툁瓑ଋ欄䄖澃㦡ꘀ戬堈㤬ጁ歊₉懻℞ꀶ簩먊쀈홇퀃䐁ꡓ簰䠄쩼ᆬ艏ᶈƉ聈듻搊唲墙ﾍ쨦㫨綴஠ཕ㛃霈Β윙삆a㠆퉻謄\udd07\udde1㸽ᬀ扈岀ᐚὀࢼ鵕䲳肟끿㐃ꀲቶ碀鼆ⶍⱋ呉\uda24ﴒ璓㤖׬芔p폦偯숧䘜ꄸ䚘讍ວ켓㹈㏄઎ਤ鲽佩⚣⣤ꠟ룎됙㡈熃ꊃ愧\uda60ꩱ칌阵㨩玓茹❰鷺‘鰧䞍벚芤妄\udf5a痀޼须읎샮ꃨ耤똘酞಄〃쎐切攔㯒ᒞ㛞ĸ肇ꛩ폇倈䢘\uda06꺅轏㟰觱춴﫲歑㣨\u0003莒♖륢䠢ᘈᨘꀅ\udc9bቂᰀ䊈ሄཬ᳡ڋ佒삤 끰\ud835퀏ꨇ阺펌劦誐瀴쨲碙㮷ᯠ䰝쟊頪짷쓮ᐕ檅蜛䂂댧厓紉싌挃㘱ꫵ賊Ǹࡤ⁯࠴㉢ኛ㿀ဦ薓譀诤ࣰࡽ㻬鼇菌z᠂胚2艳脽삛곏斁댳ˉ딄텦扽㜖ꮻ跷꘭捙香쓓縑嘱馚춌㲦冓孱\udd4cά漳㐰鿀䷙瑾叩駔\ud8f1餲릛덨ᮩ\udc84ﳀᗱࡀǐ䰕憲骠렩璇茹뀁、㼦︳Ὡ품ⶽ偅㽐ƨ\u0013쟆㳻৳뀇怀뼊謟쾌檧ꄳ⊚ᾖ蒘ࠁ㳐ُ䳷ᅲO輔쓗챹鲀疂籹몓㷄⿤ᰠȠ셟ǹ耛郉Ԕ␕々ဂ輀띅袀െ៨Όվg䄚쟐‏燪䠝渊蔆禞곏벦ၩ辤\udd5cယ֔Ԏ≪욃䂪দ氷ɯⴍ현Ὄ췆嵣䓤췒曖㪇ᱢ컙꟟䀕駱䀨锺鲄⹌価Ј다쬪犹㱌鲖臂ꁽ僎籩층ꖞ⹎쎓칼䫤쬳Ꮔહ鱻⛻S覽ӟఞ糧圅≍焦ᘨ툰ꇔ텨᯶ㄽ菚拑⛄폴蠏좄區႙케큀甀༄旀ტ籦૖᪸쎀杸á 壑䤚‍ꄁ권ﭡ컀좀缀ᖀ᭠ධ¸츺晩펡젫ꙻ倇ꑶ㚀⊠긓㩐Ⲁᴘᷦ㾻읈ŔĖ怕ᦱ鐷耀ꬎଚ꣎㮦춦䉘齬Øᜤ蜖舝犁ꀂ0䠤쳎렂᷊㦇ꋎ◒ᵔ쓲ᙦ㙦ᦋㅼ蜹⎶杌폩ᠮ㰻ⱱ分\udf16峁燡뿠圤⏽ᠣ༇᪝䲊Ɔ⧏ӗᱣ긲䙃σ㊥큐닀燤౦蚲ஈР䆕䄿㎩聶⠈ꙴ㨏Ҝ潌窡Ⰰ\ud849౜拥žͼ䊂끁椚㓓ᩴら鸒鉏翁挒沙ꏔ쿂遆૵鰨䄄❚⃪⡃谾᨟鹃ꔁ⠁侀벳鶋毚ກඊЖ鄀첬ၷ㘈䴺➆ૌ䊳鉩锤좒礛」颍乽ᆤ퍧覠룥諣办㫏凇ᒀ炲ꦔ\udd80٥㜲齫辁읁쁳ꦒ哢䄱眝ࠢ並뿄譙봬玕㠬䍟丟槥簧蠑眛週䳣찉뷴蛳㺡ɼ촵♑袕꠽牫 娅᪃濇쎐\ud850㥬૲毝㽿ᦱ伵曚⠘䡟\u0019耇ȇ喜蓎쨧쬓攐敔ఘڂǂ鳾伅懭廏㇔蠗萋넹洂ࠁ㠁芰\udd59Ꞙဓ㎂餇䁙耵ꃳࠓ㓅ᙿ䖞텧꜓ౙ趔ᓙ㱀馀콰♅掿⧓᠄ȍꔊ℅䃌辧᎓䩙ﻴ﹂污㈤齲䵨^륿㑖\ud815퀋ऱዂ塷ề早ꐤ\ud84c輓䩄髑䋖ꘟ挰䬆愃府쑠褧㿠㊴㶄㙻᏶㞪ئꃃ오폔槡퓳白딵蒘潌带ⓓ剩체൪绶㽚駢俨䄥㏓퀙ቮ頍庝蛌垦톳䯰㫴﷬珜ʚ鳾杤鍝젛퓡怓㈈қൌ聠ڨ羬⛻ォ鯕ñ꜇돒䦃퓐טּ᪘퓏㫀딳盘☼籦τ胟썎낥匷\u0000렖쉳ꀂ肛ﳌꘀ硃ӱꪦٺ節ໜت켺曃폥姶磫\ud866㴶缀擀ﺹ榐Ɍ즢ᠫ૖飐Ƀꘃ퍅␄젝눚䉎위ꗸ閩䋐纔㙌ブ焳㸎蜚캦柨댷萱〶脱鮌嬀쿓ᯩ鬬솲祽㳰͎䆗杛㍩\ud86c㣭鈁蚚젃䌧䜓\udbc8ヘ셠᳄ڞ虓Ϯ逷髛뀺ɺ഼堅䒁㙧迓䙩૩㨠颖䳉智ᢠ록䰔\udb02Ĉ牢♎馧꥓ᘉ辤츂泳㏴鹶亲Ꚗ끜꧕壅ꌌ禛喌꫆떳疸牄ၨ਀ව鹦䂶큎꤉嬺ꠂ쪂棧⒳됀緒⚴ᒙ㾜骢쿮遢쁥馭룕쩺쀄涞쩫晡䶳ɘด졖ᧀགྷ职臵Ꚉ厩၊磛ꂙ숈곂\ud84c唐\udfc0︩韤௛㴴鱜⇌ᑾ娹⠄ⳋ䀐ꌷẘ쨙폆ﰀ鬀⪌ᖵꁱ蔓ꌬㆥᦸ䮰鼂쬙@▓י箖ㅼ荎ϴ❼獺즞쳜琜뤾沛鈂㴧鬳뵶ꍺ濍㴐髍仩悳䁰ꧡ泩䔌䯭愂鑐闀甉ᫀਈ֥փ谳ꀱ叝熉铠砌ᤎ调缀娓ͱ㙂矁㡐鱆찧쁋퍦䦾䳘㱹匹\ud8b4༁侀婀ᚐ㐒枰ɫꍅ荏曵郧\ud9a1䳇鉹縇ꑀ᪁벳ㆤ閜削뀡㜦馬䏘줿衶ု㠆㒘퍅ࠣ긦➺塙翘炓๚骒膵옮9逻!\u001c뀎霟ⶏⳀ\ude60ꩄ幸೚慲蝭颥赼杢ꠔ쀜₉鸀≁깑ꨀω佴츊监㳁䓈촰Ꙣ去怚һ찋⠌鑧ꕐ㈌씜Ế㒼鴚耢웃㏌砷泐㩶턴稆Ѐ鸰⣨鑸犔殺ਈࡑ̓载ᅻꀸ\ud82e泋艦退嚛钑\udbb0ꋙ藔\ud92a曦իᯱ출놃堝\udc6e锶娂ᙍ㊧諤\udb2a皳㘾黋˯Ɪ叶妈Ⰶ働嘳冇泌難頑⭵拀㡎琑ʬC䶳➀탔ꦺ哸脿夀趎\udd03ㆱ\udf7c䒾᷍㙗᪮七䂳怼놜\u0007䠖຅鮌ﭡ퍳೉ꇴ탂瑦餹鶥䰲Ꞝ玷뀐䈨㉧✴ﲟ틍⽀ﭱ틜ዣĎ⍃⟛珓맞士⩫㘡㶃蛁\udc40湠蹱리얚渖์骮찾쇧獳栬\ud8c8쉽㤶粣ꛦ빓癙깔癄蔘ˍ褊웜댍ꀐ䲷湺㘾〃웆뻈족ꇜ켂瑷㽷᩹䵘¹錑짯铢␟쑚\udb9f⹏Ӧ㒳㲈ㆶ洴ّӸφ⟂놹氛뱮䨍倁懍矇ᐩ⧀ጤ跅腏航\u0003㧍哰䚀悀錀뢰터ҙ궀㦂稑㬉Մ캠壦㰖䀝뤳π䐀가恰缨㔸᧭߬蒋䄷䆦聢燊蠔耂쌀 ꎌ렧禎渠⾄᢮縄ගܣ赴Ꙍ▘倜’婪ꤾ꺇⎎㇇鈓滫༓臔⌣뎄頼䀬眿᷍囧⥓岹饀ᅮ扇㈰魳亟〰큓\u0019耋百ꨇᘡ私牪랱죘珫マ顇财펾ᡥ騁੢䤵琄æ退咙쏔휚翱㳤齲䲍맾돲駏⹪匵붜䉌ᄧ扐判喷討;첨᷸⛰㡆䈣ꐀ쓁㊓승\u001c箁㸊魟쏹ꛂ鍸\ud808ꘀᱲ袆윟莍ᾀ腉끔ﰀᶏ㇘ᇯ䰐ဢ塡贩耲혟ﴼ続⛍旧㞳ٕኈḁഛ㭕鹵⍡⟣⡭搱䠱ᬺ춟➵㉧ﲳ얱젃ୀ཯㰿蕴₤䠉灷䀆뀳⩓儈᭫쒠䆑篞磘磌Ⱌ椏榧鹹㯘W䠿䔞讋龄䰪驁ሀ餤ɜ㌚滶㩄頦첟暅㎲灮ℛ홫䤺辞协荦剠㨄㣴ກ˥Ǡ쬈九熵볹鞙䗎䄦솳晉薊㫕ᒉ㖽騟䄅잖桰늈鐒㹤̿䶜猁鏧锠渠೔썮ᐎ㌎ᙩ䳒✊䦻㳉ꐁ켳疞珏ශ峳余뼴\ud96c暂ര龁첎삏䂭栿磼Ɐ嬏इ್捧㈀ꍞ䲒⧀ᝩ㜉瀋艸ꟕ「蓣먌焀롌珆\ude60嬀㌀▴᪠য়䍴ጊ삵Ꭹ၆㨮扯㦎젂꘦\ud850孺魸ۆЈ鶥ဪ⚱砈耦穷圷궅䇏꩒찀썉삊唼斂ࠎ鸊쏛꟒ꬬ䓅氇ᄲ롌洦氀龙쳸盀̡頨Ȝ⚶做4ᳱ≪㦍﬇᫁㈧䏣겉闰⹫顴௢鵄䶥ㅼ\t쁃\u000b記⬆娅䠀ꕧ忣픀㳼᩺箑㤯ݕ䵂晽돁獵擵ﱾ鼍얂쉀㰳竘懐㧚ᬂ๶葫⏔{裵f搉ꨒ茾梞壂娦ߣ㚉ﶢ汾㪍虴䵏웴匞觹ꉰ뭎熀਀\udb78㮀㙀࣑车䔎삓膁삥(쓵멨︰ࠃ\ude60뢰혀Ԁ涀ੀདӇ鲈ʶ딪⁢怺耔褂怄▌矍츠\udb13쵰୔틱῟ࢇ艡새Ê遳繂г䠚\udc03㩏賀巓隴콒悤膄胰춢惓ፈ壙ٻ儰膙僎ᰁ菓듩鈜쌺灀蹇ǽ荛猥\u0013䳀순鄲ጂꞦ͒숩보\ud82c煺諢點脧퉂訛鷍薀쟏\udeb3ﳲ࠰ڒ狯㌖ɫ찝悖­秎泣칪ࠌ뫎㧧溳ᇐ楼捪୳ŝ䰗愂\ud9dd⓰ታἳ供᐀দ⦳Ꮨ粼ﱪ瀉㙏麻쾮❙뎲瀨帍ቷ焾攄襁ꊁᾳ䮄⸼㨮ᮡڠ庣貍厱榘ꓡ⩨ࠌㄆ栂뚡䨨旘ॼ펞滫㞠寄òℜ஧秫˾悂笇庞ൎ⦧뜓⬸크즒璽㦦鹋较웣叀㦴낷羿쬲큣꽍⋧턀╨奸Ĕᏻㇾ黓刊ဥ珱燈뀊▄ﻴ窠弐脙푴\udbe8ƍ㶐塢䴣䀭屯䤺\udb05䛁헦꽣莩팦疤욏Ẋ췹쀍¦ю磩琄輷೏묓欀ݠᑎ裶Ä伯胛놶᳴᠈蜻䁛⫏퀗\udbc0ὰᣜ࿴෦޻Ṽ膉臨獞ဂ␈ꉢ픰륆鏍搀㪐䐩긔懬ȿĸ膫䀎惝偓栵홾₻ꁘ竍␗麳㽙覄웞登㛚鿾찓უ恢遻홯贱ኀ額ꐗ蓓\udda9웴쥀ӵލ莒䆶p铠舔耏꼶⮝饎⤁ᾀ隌쩹ᩁԘ莘䴪䀜&k퐂씇帿弜♓爡Ꝙ䜙대ò奭㟱ǫ䴏榨୎駋苸穻倃堇䁎\uda11㧣㖤쏪憱㥏執俐更㎧衔耺尊䌽皝ࠀ傧\ude78䇰䱈ᑝ䈥Ş鿄Ⳉ↋ꨘ⦒䋲혓눅㥈\ud840鳐阉蕘\ud996泳㗐馀췋\u0015\u0015嬋擵칦⊋ꦆ悢㹦ͣၘെݠᤐۥ鬱6聎玏恴谕儚긲炂溂ᲁ钀⬀呬ͯ⺩㰃處輤동릭铺섵몜썍릧꦳窠ჲၜ綦ॗ鴅솄❨鏑꧶ⓑᩱᬾ礪솀㮁䀳붝䋀㙡憁෸䛽賠䀀㏘䧿⳯븰\ud906憂䦦ᣓ哹ᖰ벏鵭脩윟텏娙尌\udc85霁槆餳덠≬￬昉㟞荅츛〓叧꧁퓓癳줵碞ꎌ薦䭓鱱鶲მᎮ㮵䈫亴❲팭⦱ࡥ簋䒚⮟΂臇敌닄暀⍜柖ݒ鱼䆕允叙䧰ꓡ㳊ࠈ隚鵌ꖧȀ쇌៵㭔頃俠❳挬姸툡칩欈朙멏\ud8e6뢳ၩ묮ꔎ翄匆點䊇➈᎗㧋擭찛\ude32ꄆ♍\udb27↓田Ꮈ\ude76灙㗴鬜؎ျ@ࡰ琾娝㜴춀绰ꬁ滠왤㤣趠ᐎ跐鰑懷ꝧ玃屑艻゚䗌◇ะڎⰤ犡ㄗḇ进ࡌ駂糢䂿႕尮獵鯓썱镄Ϫ杏㽦좍쁻胎ꀪ챳ܲ괵誝틁ᇆ뽓镉칔⯢纓ꈜ鹍켷聼냩駐는ꏃ内鐇것䌦鴨殸෬͊鯰䀱េ킂ⱍ᳖ᩰච쾝똰纁ʳᕹ⾆ᇦૠԱ艪晨⃑젘≤쀈徇ꡌᕠ乒ᕘಘ᠗庌ঐƀ䋊鄵㧰耉֌ᚑꀮ镧씋㴄䘂ૡ㽫鬃膈ꞏ‹姜쓶ꉵ句쎙䰃ˆ짣좱贀ᦦ甋வꝢ茽샀鎃֘訏⸙礄﨣츗녱ﱼ츒焉㏦鳒䶯昷த圡铩螈ࠀྟ쩌뜀꒠⫌䡊墴Ǒ䴐颍켄៘䗯鳲턺充ภ艥衅ꓜ稹㪆騰乮Ꝍፙ藝퓢㹤蠂衜㣁蟁酐ᛴ挊ुۅ聭䖪ࠣ⺹邂㳍庑浣判嶜\udc74ж㚇鸶丱ᘙ크䗴㓦慽⸆Ꟍ䄦抐蚅괐ㆡ梐뺃䑨⊒ᘭ୹顫䋴ꤘࢻꑅ쁏ﴦ\udd0b쑅齔✪瞴˫Ấ艙ᜑ ␓晧锸箘杀৲鈠됀枔隆玕㳇ߝ컲ꜽ鍶큖퐘댲欞逦愘䏩鐀ܖ枕㥓鹴憖悀Ꮮ!ᓘ퐏쀏쀇\udca0啡ఀᕘ縼琢扠苕ţ䅨þ‡0ᐇ\udc17ଌ뀇萁櫀뉥㐂ﻂᶶڰ芸临ǎ쁭姒䐯ㆀ딉ૃ摑䚠\uddf0⵸팎៞㷽¯௙䗒᳅ᴃ퍷렭ᄠ෱찂ણ㳗ǨҘĒ:理䀛謌㨂硏②⯈㰹肈ᝑ挤➸蔵胥㏽׿穢巡⚙蘬褗異⩱ϫ㈏᭦췄㎱돢䗦氒쎺ᑜ諍䙐䥳珙ꀯ⅂௥΁ţ䵿暙덐䧏룱汯ꢺ஄ᨭ鋧꽓췩놢澽଴媐΢ଖ᠚䠿驳䢰誜Ḯ봗拓♹펬粎㳐ʼ⻒᝞*䐊婾愹蠀嗌ᱡᛈ⏐ᄸᵚॿᨐⲏ턦rꧫ\u0016뱭缿뚚㗏摦읣占፰⡁᫃㘮䕿ʤ샱\n氹\ud81e䘌ꢛ럦翳ꍐ⨂рԠྻᶥဌ설쀒릱褏⸄먬픱彨껴࠲븚瘉㯔屯䲹☯叫薇鳐䅬᜻\udd05簢อⅳ崩ஂ籨롸媞⼏ᙎ덙退㣒䉨길㣖栂痧䤠Ꭱ畊秘ᛁ㮙鴜芥愀좧㧂⋤乵ࢸ퓘\udcc0\ude09퓂ޘ끾鯦⷗ၹ史뇀詞渱≆齏녦챳血䪀ॄജઐێ칙ᛓ㎈䁁拧᠙㚆ᕎ敦蒱籴ᬂʼ骅살덌딙\ud8e9䀊꤈쬞탎뇦悳㤨綴㶞἖㹶ŷ䏰䳚װ퉵퀊Y汌柳媉죘㘄Ԣ䡀蔺䌗쁆들馤♠Ḻ鱛禶딖뇳듹踴攐뀦鼮⹴應猕騎ᐕ뢴Ι䳂ħ竀㱱ｼ⸠ᰎ㬀şˌꚨ燇퓨ᱩ刅倂ꩃꭀ赀黈ᦼƎ㦄ۈ个䃱譃拙䩻焀咁쭠낐ꖰ᳼᥶㾠ʸ섗鍛衂곈詡쀄킨㶣蜡걋㻙⸬涢â宁ϔ⚚邭\u0015蘋쀌칁捃⢡낳ꆔᡙ肴.т씭胜Ą븒䠟鐔礁謙反譀̀提཰᚞禸౪ش⊆䅠〮泃畛ⰰ\ud9bc炞槔薔삅胍挶䖟ꋢꘘ좻宏퀧첋䆠ඒ6㥐ǳ쿃➡䯙㧾዆퐐䒼耄㙌ꉀ赣ｐ㏐ᇔḐ뱍鵬Ⰽ䀰ၾ姑⋂䥾स碟ލꖅ㴘雐ʒ⨶ઠ봸墹䋎ᛨꁋ薪勻順ᬽ₃蛍쐲琈’膨⿰ཱЖ鐂丣暵㏥뀈Ȟ⸂쥌藦掹ᓘ㨒텉ภ੐ӕ섚レ㌘㦦᳑虢⢻弚쨬멧ꅠྸẲɔ덷舡䱬♎௰偔攝娅᥀砀쨀⯠孌ଠ<鍡茗ꂱ€┐鋢煲録鱝꓍ꍠ툺攅쌀ᢶ㙍鱜∴큏䂗뇔氳爓옆ᡅ黌顰蜘⢸㉜糋ා蒉﮸ᛀ䦿㓲䉩蜎࡙퀬맧馹텎缈끌馭췈쀛倷퀷७҆禜箫㦁뢳庱쉢࢛ݜ䛔ü᫶ႎ蠪鳨樉ﮁ걏鑐֠₋漀⼆悫コ頔䵲ᙽ끡⧯ᓱⱵ질餬촧ᭈ헠禄⭒煺蟠ޡ쀽꘨걝\ud8fd耐ᴂ₊꺗쵣搩캤혜ª࢙ƮĲ䄮䭸U㳍쥣伿牙돍뗆亳㉠ኴ纎ㅒ龠婂匪錁릾鄟긿圛밯멠髣욄烘Ԏᦎ㟀䇩俤삅덚䗄响䥸嘴㊝쫂ꧦᴔވ䠠⟎湨뙑ą츑쟉௽熞泳䀔೨訂\uda60곳甤鲰⯪禸Ľ퓚⺔阀让衏틶”팏\ud8d1蠮㴗뺈ፅ털潈뢲鮍캬ꚾ讶䗐舢ꘕ㐁딀L맇썣恹꣘솕刏㜛ᫎ⾡✄䖤椲쩻ऻ⚁讏彧턀❝䞤㎒炰뾤鱩ꀲ䅾댄ꗐ퓻入뢵戃ꘀₗ㙒싅༟䙽龶˦៳䀳\ud85dഡ㳂䒙㥊昑ΐৰ儼㕁摈뀍驓䰪燇덬䦞䳡笉ᩎ갌綏焧愠✩ៀ㼣막㇊婒䵊晟ꂃ倠泀ꥥ䤼⩙ꂁ㔧㉰㍩빸챁Ƞྻ쌁丘ƛ思즲೏饭怊颁檃慁馐⫹螘샬熅㵼嵡俬⇱蠼ᦴ젭ᜎ↝뛏㡁儳橁폄〬悓㖐ܻ兕珶얘쓶琒唂⅌慣㱹\uddd2얶癔貋荔丄¬エ㧟3䀓뺆や襍摦䝣㤙覘㟬᜿ౢȈǕ鞷샓ࠨ㩤팻殞뀀釀㉠Ôጌ撣㚙շ캱ꆲ驱똽頄ꀊ娂枌됀॰婢㝀᧥儗俎ʮᇕ쏉ᆁ褆䠃섀᠁奠庤ⵓ잨৤⬢᝘ਁ萊䄂䄹ꩣ쁓혪ἄ꥝꒫⩖埠眲⁠ඨ૥є\u001c㩿\ud8c8핹㤸ẋ䐗僠よ鮘䦸뮵ㄗ袞ϲ⇂Р㑆脏标끡␾鞘\ude82䊇쀀뺡褱䟼䋼ᴒ畠夎壘ᑕ⯭\ud8ebㆷ╖챠刃댟遠䫀粕鏀␙嶃㹭湨Ҵ͚ŭö聇䀳ꀕ퀎埖〉ﾀỊ畎㲇隙䱫◓橢䁑聶쀜逕岲샖傁需䠐䒺扙⍙ੑ퐂냢肝耦瘗ဌ焨砣Ꮜ樉⡐ૐⷴ\u000b点롼龄ﮅ떈鈅㡥쮅宀蠀㖮ᎺꞰߘE⛅5郇增耕窦ⲔᎰ됁娀洀皀݀Ꭰאۨ՜䌛陮뇦ᣄ递ࠅ㠂蔀퐃䔁쬤䆠ढ⹒৭脸Ò諏ﳖ혣뀉퓩⯀✀눁佘栀祀Ӑè䊠׮ͣ낺胖ꀝ嚹ꊳ벟聃豪ࡀ霘⤈ᲄ஧䐡\u0001䑥v灻䀤꼉䷄椥馰Ჱ\ude5e䀕ݹ焤\u0018Ͳ̜䦱植챴倇㵍싲ű់ᗥﯠ܀ഀʾ徝큉㏕ᑃ锃崀ၛ精幞㢓ᢀ퀀ുẐ鑤ǋ왇憩臊痘ા瘡\u0004鬌桁艃샮悐ᴷᢩ彎嫒喗쬐聗થ\u0007夁匀̀〨Ǫ钀Ϲʂ臠䀰?递ࠎ尩ڊǩ驴⿋䯥耩ᕹ沸Ԩ̀ϭǕҫ倱ꄛЏ㎇삑濋⿀类㴯ῢ巟⼯燷쬴壒૦昨팔撩\udd61뵊첕鲠ଥ珸絑䓘ʩ㔘⯇ላ᱙ࠗ䷆吁℀ịꭄ䒹᠂㒼뢒ݍ웍ᇎỊ聻쀀ꀄ妓뢣ቐ㾖傸죬ò｠ᮗ荁잼Ç椪঵ቸꄞ綀븚\u0004ˡ⡗滘ཛྷ֊ꪯ寒ᏼ煂ᓱ场ꐣ率倈䀀\u0001異炠\ud8e6\u000e颐滆᧴鉞ⲛᛯ۷讻쓃䆝췦康澘澄辇䰄쪐凰ތ푼溉崟ҽ䟚榙ĺ硬號⼺녊슲꠆傮퍑묀꠼⎅橦䳡岫飪攺ᖏ૷蕮ꤎ奧冩⹃䡅手즓敹饞財倈ꌤ吊⣅굳ᤙ뺖蔃渁֑莜䵤探ᡆ퀂聬論ꂘᱍ䷅㫠\udf00薾궎畢边渂ॠ⟷⻋鞚砅렐Ȭ㲳嚩謧롖㽸뽲쬠ၣዞ奙\ud9af炅耷쀄봛ᨠⓨ鮄낯놳⬜飀濠ᄈ᪨䕑妷᪴噎⭞ᖟ૑\u000f슰貀ࢮ둗舫牡亊ﻭ锏趻샃债炑粅伪䟆䢬䖂꣸ဒ娾ㆄ綘伴ܤ➦棢粓㘴㸎쨍ᅞ쏢⑇薃꽥쀇䝅曚섉帋兂嚢⬰閘諼╨辆倊䢭夾椕ﴟጒ랸閚ੋ푼籰゠鼟⟀尻觱汌ꒅ椾ໄ膛鄜璧ᬺ쌫긱쁚퀗륧㸠뚴✯௢␆떵ꥼ䵰ಳᩔ꾋너෋欐怪\udac0䐃雄\udb5b⮰﷢櫬䃸ꚻ´ȟᗗ扪囦횹䫗ࠊ嶌䁬쭢ᩗ젍䫬煠ᣚ욾≔膸\ud94d겪郌歓倖ꕿß楚‷픫⺕趵蔁꭭桀Ш쒆횥ᣈ\udc39䘷䡐ᥝＭٖ밠杊쥼䣒넙幗恰᭤ۅ㨣ƥ了苋섀쀁\udd70鯑唟ࠐڴೱ嫶芼嚨⬟ᗽ䄗앵슻兜雡딁５‥槬눉彨궂圩⯃Ⅽ⌘冗䣏텘㈱౗䷾ᐕ琱ⷩ퉖丱崡녙᣶⏌襠Į\uda0c㐁쒬까纼餕枏曧ꔼᨀἳ衒囷汽闬鬯䕯䣀ㅙሱᤙ\udcae᎕댣῿ᩲ뻦豻铌垴ꔪ톧⌆짔Ṋ旧큱㲌蘼䷨钹迈쥪怊㊿\ud9f0ⵈ㴐ꌁ犸ㅘ縁䦕觷āꕒ듩嶗憐ᩡ聙ꀏ良લ饜璬虗팫さ닸陥網몮쀏衫냳䂖閝瘘籎િ컄ಬ₫⡕﫚\udd0a뛩尠z嘦훞閆ꕧ՘꣐䅖ᴫꪕ퐪씕磒붶뗿⋭굃灱閣떢敶튽꥟쾊Ꙗ旘ꐆ踪옕瑃鵀淌귐᯳⯊瑦͑敷렇痀籉⟬ᳱ➊핶◢뙴፸꾡⮿蹪諏앮ꊽ\udc00梭і㬫삕욊籋쯙屓૥䆦氡㙔ꠜ춋⨍﹮鵴♈\ude24⪩ⴧᓈ\udbb5Ꮰꌋ좦䠱䋂퇶㙒፡儃馩卽䢞뤇䧙䝲낦ᜈ굞ꮳ㙰鬓镻\uda32⦲ᓘ꡶헥䊤镍腇쇩䧾觟紙滚ₘ\uda57駑퍦䰩골ǉ仾㠇ၦ쀘䦌\ud895湓㙜鬌추⛀覰䂫艕礊뚙弢걪圈ꮊ闶꫒\udad3ꪺ╟咮晖ꢫꚕ큼伊먟ᖚ‪嘐ꯌ喤⫛ᕻꪲ㕜ꀷ兗嫸鴕犩ӟᗪ껍垭퐬嗠쫗啬䪺弔䙗뢫䔘\ude2aḲ봛耒꿁园⬤嗖⫔ᕰ땜責栍ੴ؃岕澀튔蘬꾺铹酂芺镻蠍奚튮홖鰫穕\udb85烊럱屨꺙噚⯦喷醤啬⊽텘⿀쥸誠牞䨯ท襋쓘⇎᧔벋뱚㼳䲇䯁탄땉ꬵᤀ讕ꔨߟ횦섭Ґ夶斮櫙ផ᪲唆싳典饡궽⟵጗蛅䍦᭢鋨쑜帔⺄抱ꤟ엢页콚㗃黊竊땻셆걑禙ꯞ朥蚳엊疈䷆໘楹\uda5eᗨ鄵罋쯓⤂꿺囚ꯉ閻꫾함檶ᥞ䵙ㅗ皫螪痒벵嬚꾫뀦ꯚ꫍ꕦ╘᪬ⵗẫ雕죊촕絪똉辢국噵ꮎ헾ꫮꕰ檰楘청뭗闘톕䇚틪녑跶광囵꬝喗櫅땼㊵䕙窭\udeab밆ꛀ៕煊뉙塤H놚ꓖ븀櫦镾\uda2dꕛ겯駰ᬫ饶ࡪ疲봍尐팴圂⭐氋⫯骔⊵텝䏡뻙ᾶ叛୔ᳶ줆盿즻䥳㴔渻\udb19䡑嶦檸쒀즫쮕줻ꏍ녠㥍ᡆ괷垂퐭햓\udb33同칰붳睖᯲ᅈ鋓䇶쿰㈞걏ﴚ퐅畡窼㦶훦치ì빮䳳㆏ڡ쎤휲䩁\ud9e3Დ碃ڭ桷\udd14옛綵쥘콖ꕦ㥊澪묝并꾛嚍ꬎ햘ᕿ媲╚ອꅗ身훕滚뵩廚껝団ꬿ헠畹檱筗㚫纕馪찍篺뙅嵶갠휣⭡헳꫙䘪ﵜﺬ×恫堵蓪祪벝妒꺧國⬙햼ꀖ畷Çꔎ︒噖㒫䃕싪젵犢똍屬꿨腾⯆嗟૵畨ኻ൚ࢯ흗궬ዕ쒴ϙՐꛪ芼⧺ꃯ੝\ud88f铇㘃ꕛ쳺䦊㾹렢藚\udfe5弦깖脓ꍂ뜥잻ꅊ葤憆䌂裂苊䵧䙤犤桧狙퉙蔶⾩⑬ᴦ硓䣗樔눵蚅⨂荲딜軰癃䖧ꭔ闢ĳ赣慆᪃죗‌뼊ㄾ㊍瀑䪣姱톂⣚у峭櫺൩\udab0ᵟ躮ｗꁫ褵툪쇕粆먃嫂곛嘭⮐㖂⫇檽\ud9a3\udaad×䌫訚﮵番맩岛孻囐欦햢髙땬蚴浞㪭挫᝕︪턍炦뇞☩긇坊欠㖉⫕൭쁭ꆭ툁뺫鐠丠㞠ứᓮ塵嘤 㰴ఌ蠋㍘ﰁ\u0000";
+            window.__GITBOOK_INITIAL_RENDER__ = true;
+            window.__GITBOOK_LAZY_MODULES__ = [];
+        </script>
+        
+                
+    </body>
+</html>

@@ -1,7 +1,2 @@
-# Page 1
+# page1
 
-hello
-
-hello,too
-
-make progress orange
